@@ -1,7 +1,8 @@
 *
 !.gitignore
 !Dockerfile
-!docker-compose.yaml
+!docker-compose.yml
+!docker-compose.dev.yml
 !.dockerignore
 
 !clab_ceis/
