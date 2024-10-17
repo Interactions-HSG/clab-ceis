@@ -24,3 +24,9 @@ clab_ceis/__pycache__
 !doc
 !doc/assets
 !doc/assets/*
+
+!.vscode
+!.vscode/*
+
+!.devcontainer
+!.devcontainer/*

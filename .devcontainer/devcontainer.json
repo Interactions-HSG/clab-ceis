@@ -1,0 +1,15 @@
+{
+    "name": "CLab compose",
+    "dockerComposeFile": "../docker-compose.dev.yml",
+    "service": "ceis",
+    "workspaceFolder": "/app",
+    "customizations": {
+      // Configure properties specific to VS Code.
+      "vscode": {
+        // Add the IDs of extensions you want installed when the container is created.
+        "extensions": ["ms-python.debugpy"]
+      }
+    },
+    "shutdownAction": "stopCompose"
+  }
+  
