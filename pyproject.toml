@@ -5,6 +5,10 @@ description = ""
 authors = ["Alessandro Giugno <alessandro.giugno@unisg.ch>"]
 readme = "README.md"
 
+[tool.poetry.scripts]
+ceis = "clab_ceis.ceis:main"
+shop = "clab_ceis.shop:main"
+
 [tool.poetry.dependencies]
 python = "^3.12"
 dash = "^2.15.0"

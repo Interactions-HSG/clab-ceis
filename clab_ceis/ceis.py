@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 from enum import Enum
 
 import pandas as pd
@@ -6,7 +5,7 @@ from dash import Dash, html, dash_table
 import dash_cytoscape as cyto
 from flask import request, jsonify
 
-import ceis_data, ceis_callbacks, config
+from clab_ceis import ceis_data, ceis_callbacks, config
 
 
 class CeStages(Enum):
@@ -179,9 +178,7 @@ class CeisMonitor():
             self._model.set_data(pd.concat([self._model.get_data(), pd.DataFrame([data])], ignore_index=True))
 
             return jsonify(ceis_data.CeisTrade.get_offer(self._model.get_data()))
-
-
-if __name__ == "__main__":
+def main():
     app = Dash(
         __name__,
         # needed when callbacks and app are specified in different modules
@@ -195,3 +192,6 @@ if __name__ == "__main__":
         port=config.CEIS_MONITOR_PORT,
         debug=True
     )
+
+if __name__ == "__main__":
+    main()

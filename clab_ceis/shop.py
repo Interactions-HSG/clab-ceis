@@ -1,7 +1,6 @@
-#!/usr/bin/env python
 from dash import Dash, dcc, html
 
-import shop_callbacks, config
+from clab_ceis import shop_callbacks, config
 
 
 class CeisShop():
@@ -61,7 +60,7 @@ class CeisShop():
 
         self._app.layout = self._layout
 
-if __name__ == "__main__":
+def main():
     app = Dash(__name__)
     shop = CeisShop(app)
 
@@ -70,3 +69,6 @@ if __name__ == "__main__":
         port=config.CEIS_SHOP_PORT,
         debug=True
     )
+
+if __name__ == "__main__":
+    main()
