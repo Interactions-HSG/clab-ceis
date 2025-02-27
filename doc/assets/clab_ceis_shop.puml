@@ -1,0 +1,77 @@
+@startuml ceis
+skin rose
+actor Customer
+control Shop
+control CEIS
+control MaterialFlowMonitor
+control ProcessControl
+database ProductCookbook
+database DigitalProductPassport
+control CostAnalyzer
+control WISER
+control ERP
+box "ClothingCompany" #LightBlue
+participant MaterialFlowMonitor
+participant ProductCookbook
+participant ProcessControl
+end box
+box "WISER" #GreenYellow
+participant CostAnalyzer
+participant WISER
+participant ERP
+end box
+
+== Order ==
+Customer -> Shop: Select product. Ask for quote.
+Customer --> Shop: Select "Crop Top"
+note right: Quote should contain information about price as well as cost (economical, environmental, social) and delivery date
+
+== Information Gathering  ==
+Shop -> CEIS: Send product ID. Expect customer-facing information.
+note right: CEIS needs to find out what are the possible ways to assemble the requested product. This is a list of BoMs and BoPs
+Shop --> CEIS: Fetch info on "Crop Top"
+CEIS -> ProductCookbook: Request Recipes (Input Materials, Production Recipe) possibilities to create product.
+CEIS --> ProductCookbook: Recipes for "Crop Top"
+ProductCookbook -> CEIS: List of (Input Materials, Production Recipe)
+note right: The Cookbook delivers possibilities of how the product can be procured.
+ProductCookbook --> CEIS: [((2x FabricBlock1, 1x FabricBlock2), (Mark&Align, Sew, Sew, Fold, Sew, Sew, Fold, Fold, Sew))]
+
+== Analysis of Manufacturing Options ==
+note right: CEIS now needs to determine how the Input Materials might be reduced
+CEIS -> MaterialFlowMonitor: Request availability of input materials.
+note right: Could include further metadata, e.g. quality thresholds, wear&tear, etc.
+CEIS --> MaterialFlowMonitor: (2x FabricBlock1, 1x FabricBlock2, Deadline)
+MaterialFlowMonitor -> CEIS: List of options for each input material procurable within deadline, with quality metric
+note right: Quality metric is one-dimensional. NEW at 100%; UNUSABLE at 0%
+MaterialFlowMonitor --> CEIS: (FabricBlock1: 90%; FabricBlock1: 86%; FabricBlock1: 70%; FabricBlock2: 70%; FabricBlock2: 95%)
+CEIS -> CEIS:
+note right: CEIS now knows about available materials
+note right: CEIS adds alternatives to list of possibilities. The resulting possibilities are in list SUST-POSS
+CEIS -> CostAnalyzer: Foreach alternative: fetch economical, ecological and social costs
+CostAnalyzer -> WISER: Request GHG impact of each possibility in SUST-POSS
+WISER --> CostAnalyzer: GHG
+CostAnalyzer -> ERP: Request costs for each possibility in SUST-POSS
+ERP --> CostAnalyzer: Prices
+CostAnalyzer -> CEIS: costs for each alternative
+CostAnalyzer --> CEIS: [1:{(CO2eq: 33 kgCO2, Water: 300l), (Price), (ContributionLocalInitiatives: 60$)}, 2:{...}]
+CEIS --> Shop: alternatives, costs
+
+== Negotiation ==
+Shop -> Shop: Match alternatives with company policies
+Shop --> Customer: Present alternatives to the customer
+Customer -> Shop: Order placement
+note right: Customers may decide for one or more alternatives
+Customer --> Shop: alternatives, costs
+
+
+== Realization ==
+Shop -> CEIS: Event: order
+CEIS -> ProcessControl: alternatives, deadlines
+ProcessControl -> ProcessControl: Schedule processes
+ProcessControl -> ProcessControl: Monitor Processes
+note right: The processes may include internal and external for contract fullfilment
+ProcessControl -> MaterialFlowMonitor: Inform about results
+note right: Noteworthy results might be the completion of a new product and loss
+ProcessControl -> CEIS: Informs about actual costs
+CEIS -> DigitalProductPassport: Update data
+@enduml

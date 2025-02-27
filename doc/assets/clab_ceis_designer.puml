@@ -1,0 +1,104 @@
+@startuml ceis
+skin rose
+actor Designer
+control CAD
+control CEIS
+control MaterialFlowMonitor
+control ProcessControl
+database ProductCookbook
+database DigitalProductPassport
+control CostAnalyzer
+control WISER
+control ERP
+box "ClothingCompany" #LightBlue
+participant MaterialFlowMonitor
+participant ProductCookbook
+participant ProcessControl
+end box
+box "WISER" #GreenYellow
+participant CostAnalyzer
+participant WISER
+participant ERP
+end box
+
+== Design ==
+Designer -> CAD: Creat a new design
+note right
+  * Goal: create fashion optimized with respect to CE and sustainability
+  ** Data that might be relevant for this goal
+  ** Different fabric blocks type might have different statistics
+  *** due to different wear/teat, Farbechtheit
+end note
+Designer --> CAD: Design "Crop Top"
+note right: Designer uses the Refashion method to create circular fashion
+
+== Information Gathering  ==
+
+alt Design
+
+    CAD -> CAD : Synthesize recipe
+
+    note right
+    Although based on Refashion, Designers might take shortcuts
+    e.g. cut and sew instead of folding. This might behandled by a plugin to the CAD system
+    end note
+
+    CAD -> ProductCookbook : Append recipe
+    ProductCookbook --> CAD : Product ID
+
+end
+
+CAD -> CEIS : Send product ID. Expect Designer-facing information.
+note right : CEIS needs to find out what are the possible ways to assemble the requested product. This is a list of BoMs and BoPs
+CAD --> CEIS: Fetch info on "Crop Top"
+CEIS -> ProductCookbook: Request Recipies (Input Materials, Production Recipie) possibilities to create product.
+CEIS --> ProductCookbook: Recipies for "Crop Top"
+ProductCookbook -> CEIS: List of (Input Materials, Production Recipie)
+note right: The Cookbook delivers possibilities of how the product can be procured.
+ProductCookbook --> CEIS: [((2x FabricBlock1, 1x FabricBlock2), (Mark&Align, Sew, Sew, Fold, Sew, Sew, Fold, Fold, Sew))]
+
+== Analysis of Manufacturing Options ==
+alt Design
+    note right : CEIS now needs to determine how the Input Materials might be reduced
+    CEIS -> MaterialFlowMonitor: Request availability of input materials.
+    note right: Could include further metadata, e.g. quality thresholds, wear&tear, etc.
+    CEIS --> MaterialFlowMonitor: (2x FabricBlock1, 1x FabricBlock2, Deadline)
+    MaterialFlowMonitor -> CEIS: List of options for each input material procurable within deadline, with quality metric
+    note right
+    Quality metric is one-dimensional. NEW at 100%; UNUSABLE at 0%.
+    **Also a designer might be interested in other meta data like return rights, lifetime of fabric blocks, etc**
+    end note
+    MaterialFlowMonitor --> CEIS: (FabricBlock1: 90%; FabricBlock1: 86%; FabricBlock1: 70%; FabricBlock2: 70%; FabricBlock2: 95%)
+end
+CEIS -> CEIS:
+note right: CEIS now knows about available materials
+note right: CEIS adds alternatives to list of possibilities. The resulting possibilities are in list SUST-POSS
+CEIS -> CostAnalyzer: Forach alternative: fetch economical, ecological and social costs
+CostAnalyzer -> WISER: Request GHG impact of each possibility in SUST-POSS
+WISER --> CostAnalyzer: GHG
+CostAnalyzer -> ERP: Request costs for each possibility in SUST-POSS
+ERP --> CostAnalyzer: Prices
+CostAnalyzer -> CEIS: costs for each alternative
+CostAnalyzer --> CEIS: [1:{(CO2eq: 33 kgCO2, Water: 300l), (Price), (ContributionLocalInitiatives: 60$)}, 2:{...}]
+CEIS --> CAD: alternatives, costs
+== Negotation ==
+' CAD -> CAD: Match alternatives with company policies
+CAD --> Designer : Present alternatives to the Designer
+Designer -> CAD : (Adjust and) Confirm design
+note right : Designers may decide for one or more alternatives
+CAD -> ProductCookbook : Update recipe
+ProductCookbook --> CAD : Operation status
+CAD --> Designer : Show operation status
+
+
+' == Realization ==
+' CAD -> CEIS: Event: order
+' CEIS -> ProcessControl: alternatives, deadlines
+' ProcessControl -> ProcessControl: Schedule processes
+' ProcessControl -> ProcessControl: Monitor Processes
+' note right: The processes may include internal and external for contract fullfilment
+' ProcessControl -> MaterialFlowMonitor: Inform about results
+' note right: Noteworthy results might be the completion of a new product and loss
+' ProcessControl -> CEIS: Informs about actual costs
+' CEIS -> DigitalProductPassport: Update data
+@enduml
