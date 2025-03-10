@@ -8,8 +8,8 @@
 @prefix graphdb: <http://www.ontotext.com/config/graphdb#>.
 
 [] a rep:Repository ;
-    rep:repositoryID "clab-dev-local" ;
-    rdfs:label "A local repository for developement purposes of CLab" ;
+    rep:repositoryID "ceis-dev-local" ;
+    rdfs:label "A local repository for developement purposes of CEIS" ;
     rep:repositoryImpl [
         rep:repositoryType "graphdb:SailRepository" ;
         sr:sailImpl [
