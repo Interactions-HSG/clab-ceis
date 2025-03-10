@@ -58,7 +58,7 @@ setup_repository() {
         if [ "$status_setup" -eq 201 ]; then
             echo "Setup of $1 successful!"
         else
-            echo "Setup of $1 failed!"
+            echo "Setup of $1 failed: $status_setup"
         fi
     else
         echo "Repo $1 already exists. Skip setup"

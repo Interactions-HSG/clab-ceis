@@ -5,26 +5,25 @@ services:
       context: .
     environment:
       - CEIS_SHOP_HOSTNAME=shop
+      - CEIS_MONITOR_HOSTNAME=ceis
     ports:
       - "8050:8050"
-    # Masks sourcode in container so changes are synced to host
+    # Masks sourcecode in container so changes are synced to host
     volumes:
       - ./:/app/
-    network_mode: host
     entrypoint: ["poetry", "run", "shop"]
-    # entrypoint: ["tail", "-F", "anything"]
 
   ceis:
     hostname: ceis
     environment:
       - CEIS_MONITOR_HOSTNAME=ceis
+      - CEIS_SHOP_HOSTNAME=shop
     build:
       context: .
     ports:
       - "8051:8051"
     volumes:
       - ./:/app/
-    network_mode: host
     entrypoint: ["poetry", "run", "ceis"]
 
   graphdb:
@@ -34,10 +33,8 @@ services:
     ports: 
     - 7200:7200
     - 7300:7300
-    # Masks sourcode in container so changes are synced to host
     volumes:
       - ceis-graphdb-volume:/opt/graphdb/home
-    network_mode: host
 
 volumes:
   ceis-graphdb-volume:
