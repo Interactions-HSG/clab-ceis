@@ -1,6 +1,6 @@
 from SPARQLWrapper import SPARQLWrapper, JSON
 
-SPARQL_ENDPOINT = "http://localhost:7200/repositories/clab-ceis"
+SPARQL_ENDPOINT = "http://graphdb:7200/repositories/ceis-dev-local"
 
 def fetch_material():
     query = """
@@ -50,10 +50,7 @@ def fetch_material():
             }
             for item in bindings
         ]
-
-        # Debug: Print the parsed data
         print(data)
-
         return data
 
     except Exception as e:
@@ -62,23 +59,50 @@ def fetch_material():
 
 def fetch_skirt_recipes():
     query = """
+    # PREFIX : <http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/>
+    # PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+    # PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+    # SELECT 
+    #     (STRAFTER(STR(?recipe), "http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/") AS ?recipeName)
+    #     (STRAFTER(STR(?fabricBlockDesign), "http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/") AS ?fabricBlockDesignName)
+    #     ?requiredAmount
+    #     ?pdf
+    #     WHERE {
+    #     # Fetch recipes
+    #     ?design rdf:type/rdfs:subClassOf* :SkirtDesign .
+    #     ?recipe :isRecipeOf ?design .
+    #     ?recipe :hasRequirement ?requirement .
+    #     ?requirement :requiresFabricBlockDesign ?fabricBlockDesign .
+    #     ?requirement :fabricBlockAmount ?requiredAmount .
+    #     ?recipe :documentation ?pdf .
+    # }
     PREFIX : <http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/>
     PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-
-    SELECT 
-        (STRAFTER(STR(?recipe), "http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/") AS ?recipeName)
-        (STRAFTER(STR(?fabricBlockDesign), "http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/") AS ?fabricBlockDesignName)
-        ?requiredAmount
-        ?pdf
-        WHERE {
-        # Fetch recipes
-        ?design rdf:type/rdfs:subClassOf* :SkirtDesign .
-        ?recipe :isRecipeOf ?design .
-        ?recipe :hasRequirement ?requirement .
-        ?requirement :requiresFabricBlockDesign ?fabricBlockDesign .
-        ?requirement :fabricBlockAmount ?requiredAmount .
-        ?recipe :documentation ?pdf .
+    SELECT
+    (STRAFTER(STR(?recipe), "http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/") AS ?recipeName)
+    (STRAFTER(STR(?fabricBlockDesign), "http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/") AS ?fabricBlockDesignName)
+    ?requiredAmount
+    ?pdfURL
+    WHERE {
+    # Fetch skirt designs
+    ?design rdf:type :SkirtDesign .
+    
+    # Connect design to recipe (using hasRecipe instead of isRecipeOf)
+    ?design :hasRecipe ?recipe .
+    
+    # Get requirements from recipe
+    ?recipe :hasRequirement ?requirement .
+    
+    # Get fabricBlockDesign from requirement (ensuring it's a FabricBlockRequirement)
+    ?requirement rdf:type :FabricBlockRequirement .
+    ?requirement :requiresFabricBlockDesign ?fabricBlockDesign .
+    ?requirement :fabricBlockAmount ?requiredAmount .
+    
+    # Get PDF information (using hasPDF)
+    ?recipe :hasPDF ?pdf .
+    ?pdf :URLtoPDF ?pdfURL .
     }
 
 
@@ -89,13 +113,12 @@ def fetch_skirt_recipes():
     try:
         results = client.query().convert()
         bindings = results['results']['bindings']
-
         data = [
                 {
                     # Make recipe name clickable with proper HTML formatting
                     'recipe': (
-                        f"[{item['recipeName']['value']}]({item['pdf']['value']})"
-                        if 'pdf' in item and 'recipeName' in item else None
+                        f"[{item['recipeName']['value']}]({item['pdfURL']['value']})"
+                        if 'pdfURL' in item and 'recipeName' in item else None
                     ),
 
                     # Extract fabric block design name
@@ -108,8 +131,6 @@ def fetch_skirt_recipes():
                 }
                 for item in bindings
             ]
-
-
         print(data)
         return data
 
@@ -119,26 +140,50 @@ def fetch_skirt_recipes():
 
 def fetch_top_recipes():
     query = """
+    # PREFIX : <http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/>
+    # PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+    # PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+    # SELECT 
+    #     (STRAFTER(STR(?recipe), "http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/") AS ?recipeName)
+    #     (STRAFTER(STR(?fabricBlockDesign), "http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/") AS ?fabricBlockDesignName)
+    #     ?requiredAmount
+    #     ?pdf
+    #     WHERE {
+    #     # Fetch recipes
+    #     ?design rdf:type/rdfs:subClassOf* :TopDesign .
+    #     ?recipe :isRecipeOf ?design .
+    #     ?recipe :hasRequirement ?requirement .
+    #     ?requirement :requiresFabricBlockDesign ?fabricBlockDesign .
+    #     ?requirement :fabricBlockAmount ?requiredAmount .
+    #     ?recipe :documentation ?pdf .
+    # }
+
     PREFIX : <http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/>
     PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-
-    SELECT 
-        (STRAFTER(STR(?recipe), "http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/") AS ?recipeName)
-        (STRAFTER(STR(?fabricBlockDesign), "http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/") AS ?fabricBlockDesignName)
-        ?requiredAmount
-        ?pdf
-        WHERE {
-        # Fetch recipes
-        ?design rdf:type/rdfs:subClassOf* :TopDesign .
-        ?recipe :isRecipeOf ?design .
-        ?recipe :hasRequirement ?requirement .
-        ?requirement :requiresFabricBlockDesign ?fabricBlockDesign .
-        ?requirement :fabricBlockAmount ?requiredAmount .
-        ?recipe :documentation ?pdf .
+    SELECT
+    (STRAFTER(STR(?recipe), "http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/") AS ?recipeName)
+    (STRAFTER(STR(?fabricBlockDesign), "http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/") AS ?fabricBlockDesignName)
+    ?requiredAmount
+    ?pdfURL
+    WHERE {
+    # Fetch top designs
+    ?design rdf:type/rdfs:subClassOf* :TopDesign .
+    
+    # Get recipe from design using the correct property
+    ?design :hasRecipe ?recipe .
+    
+    # Get fabric block requirements from recipe
+    ?recipe :hasRequirement ?requirement .
+    ?requirement rdf:type :FabricBlockRequirement .
+    ?requirement :requiresFabricBlockDesign ?fabricBlockDesign .
+    ?requirement :fabricBlockAmount ?requiredAmount .
+    
+    # Get PDF URL using the correct property path
+    ?recipe :hasPDF ?pdfObj .
+    ?pdfObj :URLtoPDF ?pdfURL .
     }
-
-
     """
     client = SPARQLWrapper(SPARQL_ENDPOINT)
     client.setQuery(query)
@@ -146,25 +191,23 @@ def fetch_top_recipes():
     try:
         results = client.query().convert()
         bindings = results['results']['bindings']
-
+        print("Raw Results:", results)
         data = [
-                {
-                    # Make recipe name clickable with proper HTML formatting
-                    'recipe': (
-                        f"[{item['recipeName']['value']}]({item['pdf']['value']})"
-                        if 'pdf' in item and 'recipeName' in item else None
-                    ),
-
-                    # Extract fabric block design name
-                    'fabricBlockDesign': item['fabricBlockDesignName']['value'] 
-                                        if 'fabricBlockDesignName' in item else None,
-
-                    # Convert required amount to integer
-                    'requiredAmount': int(item['requiredAmount']['value']) 
-                                    if 'requiredAmount' in item else 0
-                }
-                for item in bindings
-            ]
+            {
+                # Make recipe name clickable with proper HTML formatting
+                'recipe': (
+                    f"[{item['recipeName']['value']}]({item['pdfURL']['value']})"
+                    if 'pdfURL' in item and 'recipeName' in item else None
+                ),
+                # Extract fabric block design name
+                'fabricBlockDesign': item['fabricBlockDesignName']['value']
+                if 'fabricBlockDesignName' in item else None,
+                # Convert required amount to integer
+                'requiredAmount': int(item['requiredAmount']['value'])
+                if 'requiredAmount' in item else 0
+            }
+            for item in bindings
+        ]
 
 
         print(data)
@@ -198,10 +241,8 @@ def fetch_location():
     client.setReturnFormat(JSON)
     try:
         results = client.query().convert()
-        print("Raw Results:", results)  # Debug raw results
         bindings = results['results']['bindings']
-        print("Bindings:", bindings)  # Debug parsed bindings
-        
+
         data = [
             {
                 'location': item['location']['value'].split("/")[-1] if 'location' in item else None,
