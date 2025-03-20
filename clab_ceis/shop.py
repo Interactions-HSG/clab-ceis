@@ -1,74 +1,63 @@
 from dash import Dash, dcc, html
+from clab_ceis.layouts.home import home_page
+from clab_ceis.layouts.skirt import skirt_page
+from clab_ceis.layouts.top import top_page
+from clab_ceis.layouts.dashboard import dashboard_page
+from clab_ceis.callbacks import skirt_callbacks, top_callbacks, dashboard_callbacks
+from dash.dependencies import Input, Output
+from clab_ceis import config
 
-from clab_ceis import shop_callbacks, config
+# Initialize the app
+app = Dash(__name__, suppress_callback_exceptions=True)
+server = app.server
 
+# Define app layout
+app.layout = html.Div(
+    children=[
+        dcc.Location(id="url", refresh=False),
+        html.Div(
+            className="menu",
+            children=[
+                dcc.Link("Home", href="/", className="menu-link", style={"margin-right": "20px"}),
+                dcc.Link("Dashboard", href="/dashboard", className="menu-link", style={"margin-right": "20px"}),
+            ],
+            style={
+                "background-color": "#f5f5f5",
+                "padding": "10px",
+                "display": "flex",
+                "justify-content": "center",
+            },
+        ),
+        html.Div(id="page-content", style={"padding": "20px"}),
+    ]
+)
 
-class CeisShop():
-    _app: Dash = None
-    _layout = None
+# Page routing callback
+@app.callback(
+    Output("page-content", "children"),
+    [Input("url", "pathname")]
+)
+def display_page(pathname):
+    if pathname == "/dashboard":
+        return dashboard_page()
+    elif pathname == "/skirt":
+        return skirt_page()
+    elif pathname == "/top":
+        return top_page()
+    else:
+        return home_page()
 
-    @property
-    def layout(self):
-        return self._layout
-    
-    def __init__(self, app) -> None:
-        self._app = app
-        self.make_layout()
-        shop_callbacks.get_callbacks(self._app)
-
-    def make_layout(self):
-        self._layout = html.Div([
-            html.Header(
-                html.H1(
-                    "Welcome to Our Clothing Order Website",
-                    style={"color": "#fff", "background-color": "#333", "padding": "20px", "text-align": "center"}),
-            ),
-            html.Div(
-                className="container",
-                children=[
-                    html.H2("Order a Dress or a Coat"),
-                    html.P("Select the type of clothing you want to order:"),
-                    html.Div(
-                        className="order-form",
-                        children=[
-                            html.Img(
-                                src=self._app.get_asset_url("dress.jpg"),
-                                alt="Dress",
-                                className="product-image",
-                            ),
-                            html.Img(
-                                src=self._app.get_asset_url("coat.jpg"),
-                                alt="Coat",
-                                className="product-image",
-                            ),
-                            dcc.Dropdown(
-                                id="clothing-type",
-                                options=[
-                                    {"label": "Dress", "value": "Dress"},
-                                    {"label": "Coat", "value": "Coat"}
-                                ],
-                                value="dress",
-                                style={"flex": "1"},
-                            ),
-                            html.Button("Get Quote", id="btn-get-quote", n_clicks=0),
-                            html.Div(id="quote-result", className="quote-result", style={"font-size": "18px", "margin-top": "20px", "color": "#333"}),
-                        ]
-                    ),
-                ]
-            ),
-        ])
-
-        self._app.layout = self._layout
+# Import callbacks
+skirt_callbacks.register_callbacks(app)
+top_callbacks.register_callbacks(app)
+dashboard_callbacks.register_callbacks(app)
 
 def main():
-    app = Dash(__name__)
-    shop = CeisShop(app)
-
     app.run_server(
         host=config.CEIS_SHOP_HOSTNAME,
         port=config.CEIS_SHOP_PORT,
         debug=True
-    )
+        )
 
 if __name__ == "__main__":
     main()

@@ -10,6 +10,7 @@
 !clab_ceis/*
 clab_ceis/__pycache__
 
+!clab_ceis/queries/
 !clab_ceis/queries/*
 !clab_ceis/assets
 !clab_ceis/assets/*
@@ -20,8 +21,10 @@ clab_ceis/__pycache__
 !clab_ceis/assets/graphdb/data/
 !clab_ceis/assets/graphdb/data/*
 !clab_ceis/utils/*
-
-
+!clab_ceis/layouts/
+!clab_ceis/layouts/*
+!clab_ceis/callbacks/
+!clab_ceis/callbacks/*
 
 !doc
 !doc/assets
