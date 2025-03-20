@@ -22,7 +22,7 @@ class CeLoops(Enum):
     Composting = 14
 
 
-class CeisMonitor():
+class CeisMonitor:
     _model: pd.DataFrame = None
     _app: Dash = None
     _layout = None
@@ -31,167 +31,248 @@ class CeisMonitor():
     @property
     def layout(self):
         return self._layout
-    
+
     def __init__(self, app) -> None:
         self._app = app
         self._model = ceis_data.CeisData()
         self.make_layout()
         self.get_route(self._app.server)
         ceis_callbacks.get_callbacks(self._app, self._model)
-    
+
     def make_layout(self) -> None:
         # Sample flow chart data
         flow_chart_data = {
             "elements": [
-                {"data": {"id": f"{CeStages.Extraction.value}", "label": f"{CeStages.Extraction.name}"}, "position": {"x": 100, "y": 0.5 * self._chart_height}},
-                {"data": {"id": f"{CeStages.Production.value}", "label": f"{CeStages.Production.name}"}, "position": {"x": 300, "y": 0.5 * self._chart_height}},
-                {"data": {"id": f"{CeStages.Use.value}", "label": f"{CeStages.Use.name}"}, "position": {"x": 500, "y": 0.5 * self._chart_height}},
-                {"data": {"id": f"{CeStages.Waste.value}", "label": f"{CeStages.Waste.name}"}, "position": {"x": 700, "y": 0.5 * self._chart_height}},
-                {"data": {"source": f"{CeStages.Extraction.value}", "target": f"{CeStages.Production.value}", "label": "Supply"}},
-                {"data": {"source": f"{CeStages.Production.value}", "target": f"{CeStages.Use.value}", "label": "Deliver"}},
-                {"data": {"source": f"{CeStages.Use.value}", "target": f"{CeStages.Waste.value}", "label": "Release"}},
+                {
+                    "data": {
+                        "id": f"{CeStages.Extraction.value}",
+                        "label": f"{CeStages.Extraction.name}",
+                    },
+                    "position": {"x": 100, "y": 0.5 * self._chart_height},
+                },
+                {
+                    "data": {
+                        "id": f"{CeStages.Production.value}",
+                        "label": f"{CeStages.Production.name}",
+                    },
+                    "position": {"x": 300, "y": 0.5 * self._chart_height},
+                },
+                {
+                    "data": {
+                        "id": f"{CeStages.Use.value}",
+                        "label": f"{CeStages.Use.name}",
+                    },
+                    "position": {"x": 500, "y": 0.5 * self._chart_height},
+                },
+                {
+                    "data": {
+                        "id": f"{CeStages.Waste.value}",
+                        "label": f"{CeStages.Waste.name}",
+                    },
+                    "position": {"x": 700, "y": 0.5 * self._chart_height},
+                },
+                {
+                    "data": {
+                        "source": f"{CeStages.Extraction.value}",
+                        "target": f"{CeStages.Production.value}",
+                        "label": "Supply",
+                    }
+                },
+                {
+                    "data": {
+                        "source": f"{CeStages.Production.value}",
+                        "target": f"{CeStages.Use.value}",
+                        "label": "Deliver",
+                    }
+                },
+                {
+                    "data": {
+                        "source": f"{CeStages.Use.value}",
+                        "target": f"{CeStages.Waste.value}",
+                        "label": "Release",
+                    }
+                },
                 # loops
-                {"data": {"id": f"{CeLoops.Repair.value}", "label": f"{CeLoops.Repair.name}", "source": f"{CeStages.Use.value}", "target": f"{CeStages.Use.value}"}},
-                {"data": {"id": f"{CeLoops.Remanufacture.value}","label": f"{CeLoops.Remanufacture.name}", "source": f"{CeStages.Use.value}", "target": f"{CeStages.Production.value}"}},
-                {"data": {"id": f"{CeLoops.Recycle.value}","label": f"{CeLoops.Recycle.name}", "source": f"{CeStages.Waste.value}", "target": f"{CeStages.Production.value}"}},
-                {"data": {"id": f"{CeLoops.Composting.value}","label": f"{CeLoops.Composting.name}", "source": f"{CeStages.Waste.value}", "target": f"{CeStages.Extraction.value}"}},
+                {
+                    "data": {
+                        "id": f"{CeLoops.Repair.value}",
+                        "label": f"{CeLoops.Repair.name}",
+                        "source": f"{CeStages.Use.value}",
+                        "target": f"{CeStages.Use.value}",
+                    }
+                },
+                {
+                    "data": {
+                        "id": f"{CeLoops.Remanufacture.value}",
+                        "label": f"{CeLoops.Remanufacture.name}",
+                        "source": f"{CeStages.Use.value}",
+                        "target": f"{CeStages.Production.value}",
+                    }
+                },
+                {
+                    "data": {
+                        "id": f"{CeLoops.Recycle.value}",
+                        "label": f"{CeLoops.Recycle.name}",
+                        "source": f"{CeStages.Waste.value}",
+                        "target": f"{CeStages.Production.value}",
+                    }
+                },
+                {
+                    "data": {
+                        "id": f"{CeLoops.Composting.value}",
+                        "label": f"{CeLoops.Composting.name}",
+                        "source": f"{CeStages.Waste.value}",
+                        "target": f"{CeStages.Extraction.value}",
+                    }
+                },
             ]
         }
 
         self._layout = html.Div(
             children=[
-                html.Header([
-                    html.Div("Circular Lab Cockpit", className="logo")
-                ]),
-                html.Div([
-                    html.H1("Product Lifecycle"),
-                    cyto.Cytoscape(
-                        id="flow-chart",
-                        layout={"name": "preset"},
-                        style={"height": f"{self._chart_height}px"},
-                        autolock=True,
-                        elements=flow_chart_data["elements"],
-                        panningEnabled=False,
-                        zoom=1,
-                        stylesheet=[
-                            {
-                                "selector": "node",
-                                "style": {
-                                    "label": "data(label)",
-                                    "shape": "tag",
-                                    # "width": f"{0.3 * self._chart_height}",
-                                    # "height": f"{0.15 * self._chart_height}",
-                                    "text-halign": "left",
-                                    "text-valign": "bottom",
-                                    "text-margin-x": "-10%",
-                                    "line-color": "yellow",
-                                    "background-color": "darkblue",
-                                    "text-background-color": "grey",
-                                    "text-background-opacity": 0.7,
-
+                html.Header([html.Div("Circular Lab Cockpit", className="logo")]),
+                html.Div(
+                    [
+                        html.H1("Product Lifecycle"),
+                        cyto.Cytoscape(
+                            id="flow-chart",
+                            layout={"name": "preset"},
+                            style={"height": f"{self._chart_height}px"},
+                            autolock=True,
+                            elements=flow_chart_data["elements"],
+                            panningEnabled=False,
+                            zoom=1,
+                            stylesheet=[
+                                {
+                                    "selector": "node",
+                                    "style": {
+                                        "label": "data(label)",
+                                        "shape": "tag",
+                                        # "width": f"{0.3 * self._chart_height}",
+                                        # "height": f"{0.15 * self._chart_height}",
+                                        "text-halign": "left",
+                                        "text-valign": "bottom",
+                                        "text-margin-x": "-10%",
+                                        "line-color": "yellow",
+                                        "background-color": "darkblue",
+                                        "text-background-color": "grey",
+                                        "text-background-opacity": 0.7,
+                                    },
                                 },
-                            },
-                            {
-                                "selector": "edge",
-                                "style": {
-                                    "label": "data(label)",
-                                    "target-arrow-shape": "triangle",  # Set the arrow shape to triangle
-                                    "arrow-scale": 1.5,
-                                    "line-color": "darkblue",
-                                    "text-margin-y" : "-15%",
+                                {
+                                    "selector": "edge",
+                                    "style": {
+                                        "label": "data(label)",
+                                        "target-arrow-shape": "triangle",  # Set the arrow shape to triangle
+                                        "arrow-scale": 1.5,
+                                        "line-color": "darkblue",
+                                        "text-margin-y": "-15%",
+                                    },
                                 },
-                            },
-                            {
-                                "selector":  f"#{CeLoops.Repair.value}, #{CeLoops.Recycle.value}, #{CeLoops.Remanufacture.value}, #{CeLoops.Composting.value}",
-                                "style": {
-                                    "label": "data(label)",
-                                    "curve-style": "unbundled-bezier",
-                                    "control-point-distance": "200",
-                                    "line-color": "orange",
-                                    
+                                {
+                                    "selector": f"#{CeLoops.Repair.value}, #{CeLoops.Recycle.value}, #{CeLoops.Remanufacture.value}, #{CeLoops.Composting.value}",
+                                    "style": {
+                                        "label": "data(label)",
+                                        "curve-style": "unbundled-bezier",
+                                        "control-point-distance": "200",
+                                        "line-color": "orange",
+                                    },
                                 },
-                            },
-                            {
-                                "selector":  f"#{CeLoops.Composting.value}",
-                                "style": {
-                                    "label": "data(label)",
-                                    "curve-style": "unbundled-bezier",
-                                    "control-point-distance": "-300",
-                                    "text-margin-y" : "15%",
+                                {
+                                    "selector": f"#{CeLoops.Composting.value}",
+                                    "style": {
+                                        "label": "data(label)",
+                                        "curve-style": "unbundled-bezier",
+                                        "control-point-distance": "-300",
+                                        "text-margin-y": "15%",
+                                    },
                                 },
-                            },
-                            {
-                                "selector":  f"#{CeLoops.Remanufacture.value}",
-                                "style": {
-                                    "label": "data(label)",
-                                    "curve-style": "unbundled-bezier",
-                                    "control-point-distance": "-200",
-                                    "text-margin-y" : "15%",
+                                {
+                                    "selector": f"#{CeLoops.Remanufacture.value}",
+                                    "style": {
+                                        "label": "data(label)",
+                                        "curve-style": "unbundled-bezier",
+                                        "control-point-distance": "-200",
+                                        "text-margin-y": "15%",
+                                    },
                                 },
-                            },
-                        ],
-                    ),
-                    html.P(id="cytoscape-output"),
-
-                    html.H1("Resource Event Dashboard"),
-                    
-                    html.Button('Update DataTable', id='update-button', n_clicks=0),
-
-                    dash_table.DataTable(
-                        id="res-dashboard-table",
-                        columns=[{"name": col, "id": col} for col in self._model.get_data().columns],
-                        data=self._model.get_data().to_dict("records"),
-                        style_table={"maxWidth": f"{self._chart_height}px"},
-                        style_cell={"textAlign": "center"},
-                        style_header={"fontWeight": "bold"},
-                    ),
-
-                    html.H1("Circular Economy Dashboard"),
-                    dash_table.DataTable(
-                        id="dashboard-table",
-                        columns=[
-                            {"name": "Metric", "id": "metric"},
-                            {"name": "Value", "id": "value"},
-                        ],
-                        data=[
-                            {"metric": "Circular Economy Metric 1", "value": "1234"},
-                            {"metric": "Circular Economy Metric 2", "value": "5678"},
-                            {"metric": "Circular Economy Metric 3", "value": "9012"},
-                        ],
-                        style_table={"maxWidth": "600px"},
-                        style_cell={"textAlign": "center"},
-                        style_header={"fontWeight": "bold"},
-                    ),
-
-                ], className="wrapper")
+                            ],
+                        ),
+                        html.P(id="cytoscape-output"),
+                        html.H1("Resource Event Dashboard"),
+                        html.Button("Update DataTable", id="update-button", n_clicks=0),
+                        dash_table.DataTable(
+                            id="res-dashboard-table",
+                            columns=[
+                                {"name": col, "id": col}
+                                for col in self._model.get_data().columns
+                            ],
+                            data=self._model.get_data().to_dict("records"),
+                            style_table={"maxWidth": f"{self._chart_height}px"},
+                            style_cell={"textAlign": "center"},
+                            style_header={"fontWeight": "bold"},
+                        ),
+                        html.H1("Circular Economy Dashboard"),
+                        dash_table.DataTable(
+                            id="dashboard-table",
+                            columns=[
+                                {"name": "Metric", "id": "metric"},
+                                {"name": "Value", "id": "value"},
+                            ],
+                            data=[
+                                {
+                                    "metric": "Circular Economy Metric 1",
+                                    "value": "1234",
+                                },
+                                {
+                                    "metric": "Circular Economy Metric 2",
+                                    "value": "5678",
+                                },
+                                {
+                                    "metric": "Circular Economy Metric 3",
+                                    "value": "9012",
+                                },
+                            ],
+                            style_table={"maxWidth": "600px"},
+                            style_cell={"textAlign": "center"},
+                            style_header={"fontWeight": "bold"},
+                        ),
+                    ],
+                    className="wrapper",
+                ),
             ]
         )
         self._app.layout = self._layout
 
     def get_route(self, server):
-        @server.route('/quote', methods=['PUT'])
+        @server.route("/quote", methods=["PUT"])
         def quote_endpoint():
             # Retrieve data from the HTTP request
             # global self._data.data
             data = request.json
             data["EventID"] = self._model.get_data().get("EventID").iloc()[-1] + 1
-            self._model.set_data(pd.concat([self._model.get_data(), pd.DataFrame([data])], ignore_index=True))
+            self._model.set_data(
+                pd.concat(
+                    [self._model.get_data(), pd.DataFrame([data])], ignore_index=True
+                )
+            )
 
             return jsonify(ceis_data.CeisTrade.get_offer(self._model.get_data()))
+
+
 def main():
     app = Dash(
         __name__,
         # needed when callbacks and app are specified in different modules
-        suppress_callback_exceptions=True
+        suppress_callback_exceptions=True,
     )
     mon = CeisMonitor(app)
     # TODO: implement a good way to change the configuration
     # app.run_server(host="ceis", port="8051", debug=True)
     app.run_server(
-        host=config.CEIS_MONITOR_HOSTNAME,
-        port=config.CEIS_MONITOR_PORT,
-        debug=True
+        host=config.CEIS_MONITOR_HOSTNAME, port=config.CEIS_MONITOR_PORT, debug=True
     )
+
 
 if __name__ == "__main__":
     main()

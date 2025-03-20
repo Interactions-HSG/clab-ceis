@@ -1,10 +1,16 @@
 from dash import html, dcc
 
+
 def home_page():
     return html.Div(
         className="wrapper",
         children=[
-            html.Header(html.H1("Welcome to Our Clothing Order Website", className="header-title"), className="card"),
+            html.Header(
+                html.H1(
+                    "Welcome to Our Clothing Order Website", className="header-title"
+                ),
+                className="card",
+            ),
             html.Div(
                 className="card",
                 children=[
@@ -21,7 +27,7 @@ def home_page():
                                         html.Img(
                                             src="/assets/skirt.jpg",
                                             alt="Skirt",
-                                            className="product-image"
+                                            className="product-image",
                                         ),
                                         html.Span("Skirt", className="product-label"),
                                     ],
@@ -35,7 +41,7 @@ def home_page():
                                         html.Img(
                                             src="/assets/top.jpg",
                                             alt="Top",
-                                            className="product-image"
+                                            className="product-image",
                                         ),
                                         html.Span("Top", className="product-label"),
                                     ],
@@ -47,5 +53,5 @@ def home_page():
                 ],
             ),
             html.Footer("© 2024 CeisShop. All rights reserved.", className="footer"),
-        ]
+        ],
     )

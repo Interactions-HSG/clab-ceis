@@ -1,14 +1,11 @@
 import copy
 
 import httpx
-from dash.dependencies import (
-    Input,
-    Output,
-    State
-)
+from dash.dependencies import Input, Output, State
 
-from clab_ceis  import ceis_data as cd
+from clab_ceis import ceis_data as cd
 from clab_ceis import config
+
 
 def get_callbacks(app):
 
@@ -16,10 +13,12 @@ def get_callbacks(app):
         Output("quote-result", "children"),
         Input("btn-get-quote", "n_clicks"),
         State("clothing-type", "value"),
-        prevent_initial_call=True
+        prevent_initial_call=True,
     )
     def display_quote(n_clicks, value):
-        quote_url = f"http://{config.CEIS_MONITOR_HOSTNAME}:{config.CEIS_MONITOR_PORT}/quote"
+        quote_url = (
+            f"http://{config.CEIS_MONITOR_HOSTNAME}:{config.CEIS_MONITOR_PORT}/quote"
+        )
         headers = {"Content-Type": "application/json"}
         product_quote = copy.deepcopy(cd.CeisTrade.get_quote())
         product_quote["CIType"] = value

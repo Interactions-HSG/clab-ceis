@@ -2,13 +2,14 @@ from SPARQLWrapper import SPARQLWrapper, JSON
 
 SPARQL_ENDPOINT = "http://graphdb:7200/repositories/ceis-dev-local"
 
+
 def fetch_material():
     query = """
     PREFIX : <http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/>
     PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
-    SELECT 
+    SELECT
         (STRAFTER(STR(?recipe), "http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/") AS ?recipeName)
         (STRAFTER(STR(?fabricBlockDesign), "http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/") AS ?fabricBlockDesignName)
         ?requiredAmount
@@ -37,16 +38,32 @@ def fetch_material():
     client.setReturnFormat(JSON)
     try:
         # Query the endpoint and get results
-        results = client.query().convert()  
-        bindings = results['results']['bindings']
-        
+        results = client.query().convert()
+        bindings = results["results"]["bindings"]
+
         data = [
             {
-                'recipe': item['recipeName']['value'] if 'recipeName' in item else None,
-                'fabricBlockDesign': item['fabricBlockDesignName']['value'] if 'fabricBlockDesignName' in item else None,
-                'requiredAmount': int(item['requiredAmount']['value']) if 'requiredAmount' in item else 0,
-                'availableAmount': int(item['availableAmount']['value']) if 'availableAmount' in item else 0,
-                'readyForAssembly': item['readyForAssembly']['value'] if 'readyForAssembly' in item else "No"
+                "recipe": item["recipeName"]["value"] if "recipeName" in item else None,
+                "fabricBlockDesign": (
+                    item["fabricBlockDesignName"]["value"]
+                    if "fabricBlockDesignName" in item
+                    else None
+                ),
+                "requiredAmount": (
+                    int(item["requiredAmount"]["value"])
+                    if "requiredAmount" in item
+                    else 0
+                ),
+                "availableAmount": (
+                    int(item["availableAmount"]["value"])
+                    if "availableAmount" in item
+                    else 0
+                ),
+                "readyForAssembly": (
+                    item["readyForAssembly"]["value"]
+                    if "readyForAssembly" in item
+                    else "No"
+                ),
             }
             for item in bindings
         ]
@@ -56,6 +73,7 @@ def fetch_material():
     except Exception as e:
         print(f"Error querying SPARQL endpoint: {e}")
         return []
+
 
 def fetch_skirt_recipes():
     query = """
@@ -112,31 +130,37 @@ def fetch_skirt_recipes():
     client.setReturnFormat(JSON)
     try:
         results = client.query().convert()
-        bindings = results['results']['bindings']
+        bindings = results["results"]["bindings"]
         data = [
-                {
-                    # Make recipe name clickable with proper HTML formatting
-                    'recipe': (
-                        f"[{item['recipeName']['value']}]({item['pdfURL']['value']})"
-                        if 'pdfURL' in item and 'recipeName' in item else None
-                    ),
-
-                    # Extract fabric block design name
-                    'fabricBlockDesign': item['fabricBlockDesignName']['value'] 
-                                        if 'fabricBlockDesignName' in item else None,
-
-                    # Convert required amount to integer
-                    'requiredAmount': int(item['requiredAmount']['value']) 
-                                    if 'requiredAmount' in item else 0
-                }
-                for item in bindings
-            ]
+            {
+                # Make recipe name clickable with proper HTML formatting
+                "recipe": (
+                    f"[{item['recipeName']['value']}]({item['pdfURL']['value']})"
+                    if "pdfURL" in item and "recipeName" in item
+                    else None
+                ),
+                # Extract fabric block design name
+                "fabricBlockDesign": (
+                    item["fabricBlockDesignName"]["value"]
+                    if "fabricBlockDesignName" in item
+                    else None
+                ),
+                # Convert required amount to integer
+                "requiredAmount": (
+                    int(item["requiredAmount"]["value"])
+                    if "requiredAmount" in item
+                    else 0
+                ),
+            }
+            for item in bindings
+        ]
         print(data)
         return data
 
     except Exception as e:
         print(f"Error querying SPARQL endpoint: {e}")
         return []
+
 
 def fetch_top_recipes():
     query = """
@@ -190,25 +214,31 @@ def fetch_top_recipes():
     client.setReturnFormat(JSON)
     try:
         results = client.query().convert()
-        bindings = results['results']['bindings']
+        bindings = results["results"]["bindings"]
         print("Raw Results:", results)
         data = [
             {
                 # Make recipe name clickable with proper HTML formatting
-                'recipe': (
+                "recipe": (
                     f"[{item['recipeName']['value']}]({item['pdfURL']['value']})"
-                    if 'pdfURL' in item and 'recipeName' in item else None
+                    if "pdfURL" in item and "recipeName" in item
+                    else None
                 ),
                 # Extract fabric block design name
-                'fabricBlockDesign': item['fabricBlockDesignName']['value']
-                if 'fabricBlockDesignName' in item else None,
+                "fabricBlockDesign": (
+                    item["fabricBlockDesignName"]["value"]
+                    if "fabricBlockDesignName" in item
+                    else None
+                ),
                 # Convert required amount to integer
-                'requiredAmount': int(item['requiredAmount']['value'])
-                if 'requiredAmount' in item else 0
+                "requiredAmount": (
+                    int(item["requiredAmount"]["value"])
+                    if "requiredAmount" in item
+                    else 0
+                ),
             }
             for item in bindings
         ]
-
 
         print(data)
         return data
@@ -216,6 +246,7 @@ def fetch_top_recipes():
     except Exception as e:
         print(f"Error querying SPARQL endpoint: {e}")
         return []
+
 
 def fetch_location():
     query = """
@@ -241,13 +272,25 @@ def fetch_location():
     client.setReturnFormat(JSON)
     try:
         results = client.query().convert()
-        bindings = results['results']['bindings']
+        bindings = results["results"]["bindings"]
 
         data = [
             {
-                'location': item['location']['value'].split("/")[-1] if 'location' in item else None,
-                'fabricBlockDesign': item['fabricBlockDesign']['value'].split("/")[-1] if 'fabricBlockDesign' in item else None,
-                'countAtLocation': int(item['countAtLocation']['value']) if 'countAtLocation' in item else 0
+                "location": (
+                    item["location"]["value"].split("/")[-1]
+                    if "location" in item
+                    else None
+                ),
+                "fabricBlockDesign": (
+                    item["fabricBlockDesign"]["value"].split("/")[-1]
+                    if "fabricBlockDesign" in item
+                    else None
+                ),
+                "countAtLocation": (
+                    int(item["countAtLocation"]["value"])
+                    if "countAtLocation" in item
+                    else 0
+                ),
             }
             for item in bindings
         ]

@@ -2,18 +2,19 @@ from dash import html, dash_table
 from dash.dependencies import Input, Output
 from clab_ceis.utils.sparql_queries import fetch_material, fetch_location
 
+
 def register_callbacks(app):
     @app.callback(
         Output("dynamic-tables-container", "children"),
         Input("fetch-material-data", "n_clicks"),
-        prevent_initial_call=True
+        prevent_initial_call=True,
     )
     def update_material_tables(n_clicks):
         try:
             material_data = fetch_material()
             grouped_data = {}
             for item in material_data:
-                recipe_name = item['recipe']
+                recipe_name = item["recipe"]
                 if recipe_name not in grouped_data:
                     grouped_data[recipe_name] = []
                 grouped_data[recipe_name].append(item)
@@ -28,9 +29,16 @@ def register_callbacks(app):
                         {"name": "Ready For Assembly", "id": "readyForAssembly"},
                     ],
                     data=rows,
-                    style_table={"overflowX": "auto", "width": "100%", "margin-top": "20px"},
+                    style_table={
+                        "overflowX": "auto",
+                        "width": "100%",
+                        "margin-top": "20px",
+                    },
                     style_cell={"textAlign": "left", "padding": "5px"},
-                    style_header={"backgroundColor": "rgb(230, 230, 230)", "fontWeight": "bold"},
+                    style_header={
+                        "backgroundColor": "rgb(230, 230, 230)",
+                        "fontWeight": "bold",
+                    },
                     page_size=5,
                 )
                 tables.append(html.Div([html.H4(f"Recipe: {recipe}"), table]))
@@ -43,7 +51,7 @@ def register_callbacks(app):
     @app.callback(
         Output("location-data-table", "data"),
         Input("fetch-location-data", "n_clicks"),
-        prevent_initial_call=True
+        prevent_initial_call=True,
     )
     def update_location_table(n_clicks):
         try:
