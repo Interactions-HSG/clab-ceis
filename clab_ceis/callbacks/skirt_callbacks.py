@@ -1,11 +1,12 @@
 from dash.dependencies import Input, Output
 from clab_ceis.utils.sparql_queries import fetch_skirt_recipes
 
+
 def register_callbacks(app):
     @app.callback(
         Output("skirt-data-table", "data"),
         Input("fetch-skirt-data", "n_clicks"),
-        prevent_initial_call=True
+        prevent_initial_call=True,
     )
     def update_skirt_table(n_clicks):
         try:

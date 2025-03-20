@@ -12,8 +12,10 @@ class CeStage:
         self._y = y
 
     def to_cyto_elem(self) -> dict:
-        return frozenset({
-            "data": {"id": self._id, "label": self._label},
-            "position": {"x": self._x, "y": self._y},
-            "locked": True
-        })
+        return frozenset(
+            {
+                "data": {"id": self._id, "label": self._label},
+                "position": {"x": self._x, "y": self._y},
+                "locked": True,
+            }
+        )

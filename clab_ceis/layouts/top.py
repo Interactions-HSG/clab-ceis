@@ -1,5 +1,6 @@
 from dash import html, dash_table, dcc
 
+
 def top_page():
     return html.Div(
         className="product-detail",
@@ -14,24 +15,22 @@ def top_page():
                             src="/assets/top.jpg",
                             alt="Top",
                             style={"width": "100%", "border-radius": "8px"},
-                        )
+                        ),
                     ),
                     html.Div(
                         className="product-description",
                         children=[
                             html.P(
-                                "Crop top made from fine hemp fabric in a linen weave." 
+                                "Crop top made from fine hemp fabric in a linen weave."
                                 "Loose fit with a T-shape geometric opening at the neck.",
                                 style={"font-size": "18px"},
                             ),
-                             # Button to trigger SPARQL query
+                            # Button to trigger SPARQL query
                             html.Button("Fetch Top Data", id="fetch-top-data"),
                             # DataTable to display SPARQL results
                             dash_table.DataTable(
                                 id="top-data-table",
-                                columns=[
-                                    {"name": "Recipe", "id": "recipe"}
-                                ],
+                                columns=[{"name": "Recipe", "id": "recipe"}],
                                 style_table={
                                     "overflowX": "auto",
                                     "width": "100%",
@@ -47,7 +46,7 @@ def top_page():
                                 },
                                 page_size=5,
                             ),
-                        ]
+                        ],
                     ),
                 ],
                 style={"display": "flex", "gap": "20px"},
@@ -56,7 +55,11 @@ def top_page():
                 "Back to Home",
                 href="/",
                 className="back-link",
-                style={"margin-top": "20px", "display": "block", "text-align": "center"},
+                style={
+                    "margin-top": "20px",
+                    "display": "block",
+                    "text-align": "center",
+                },
             ),
         ],
     )

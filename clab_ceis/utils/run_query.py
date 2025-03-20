@@ -2,10 +2,11 @@ import os
 import requests
 import sys
 
+
 def run_sparql_query(query_file):
     # Get the directory of the current script
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    
+
     # Set the base directory for the query files relative to the script location
     query_file_path = os.path.join(script_dir, query_file)
 
@@ -16,7 +17,7 @@ def run_sparql_query(query_file):
 
     # Load the SPARQL query from file
     try:
-        with open(query_file_path, 'r') as file:
+        with open(query_file_path, "r") as file:
             sparql_query = file.read()
     except FileNotFoundError:
         print(f"Query file '{query_file_path}' not found.")
@@ -26,9 +27,7 @@ def run_sparql_query(query_file):
     graphdb_url = "http://localhost:7200/repositories/ceis-dev-local"
 
     # Headers for SPARQL query request
-    headers = {
-        "Content-Type": "application/sparql-query"
-    }
+    headers = {"Content-Type": "application/sparql-query"}
 
     # Send the query to GraphDB
     try:
@@ -47,6 +46,7 @@ def run_sparql_query(query_file):
 
     except requests.exceptions.RequestException as e:
         print("Error executing query:", e)
+
 
 # Run the function if the script is executed directly
 if __name__ == "__main__":

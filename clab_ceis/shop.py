@@ -18,8 +18,18 @@ app.layout = html.Div(
         html.Div(
             className="menu",
             children=[
-                dcc.Link("Home", href="/", className="menu-link", style={"margin-right": "20px"}),
-                dcc.Link("Dashboard", href="/dashboard", className="menu-link", style={"margin-right": "20px"}),
+                dcc.Link(
+                    "Home",
+                    href="/",
+                    className="menu-link",
+                    style={"margin-right": "20px"},
+                ),
+                dcc.Link(
+                    "Dashboard",
+                    href="/dashboard",
+                    className="menu-link",
+                    style={"margin-right": "20px"},
+                ),
             ],
             style={
                 "background-color": "#f5f5f5",
@@ -32,11 +42,9 @@ app.layout = html.Div(
     ]
 )
 
+
 # Page routing callback
-@app.callback(
-    Output("page-content", "children"),
-    [Input("url", "pathname")]
-)
+@app.callback(Output("page-content", "children"), [Input("url", "pathname")])
 def display_page(pathname):
     if pathname == "/dashboard":
         return dashboard_page()
@@ -47,17 +55,18 @@ def display_page(pathname):
     else:
         return home_page()
 
+
 # Import callbacks
 skirt_callbacks.register_callbacks(app)
 top_callbacks.register_callbacks(app)
 dashboard_callbacks.register_callbacks(app)
 
+
 def main():
     app.run_server(
-        host=config.CEIS_SHOP_HOSTNAME,
-        port=config.CEIS_SHOP_PORT,
-        debug=True
-        )
+        host=config.CEIS_SHOP_HOSTNAME, port=config.CEIS_SHOP_PORT, debug=True
+    )
+
 
 if __name__ == "__main__":
     main()
