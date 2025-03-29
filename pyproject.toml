@@ -9,7 +9,7 @@ packages = [
 ]
 
 [tool.poetry.scripts]
-ceis = "clab_ceis.ceis_dashboard.ceis:main"
+ceis-dashboard = "clab_ceis.ceis_dashboard.ceis:main"
 shop = "clab_ceis.shop.shop:main"
 
 [tool.poetry.dependencies]
