@@ -4,10 +4,13 @@ version = "0.1.0"
 description = ""
 authors = ["Alessandro Giugno <alessandro.giugno@unisg.ch>"]
 readme = "README.md"
+packages = [
+ { include = "clab_ceis" }
+]
 
 [tool.poetry.scripts]
-ceis = "clab_ceis.ceis:main"
-shop = "clab_ceis.shop:main"
+ceis = "clab_ceis.ceis_dashboard.ceis:main"
+shop = "clab_ceis.shop.shop:main"
 
 [tool.poetry.dependencies]
 python = "^3.12"
