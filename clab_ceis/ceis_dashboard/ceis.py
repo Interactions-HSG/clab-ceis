@@ -5,7 +5,8 @@ from dash import Dash, html, dash_table
 import dash_cytoscape as cyto
 from flask import request, jsonify
 
-from clab_ceis import ceis_data, ceis_callbacks, config
+from clab_ceis.ceis_dashboard import ceis_data, ceis_callbacks
+from clab_ceis import config
 
 
 class CeStages(Enum):
@@ -265,6 +266,7 @@ def main():
         __name__,
         # needed when callbacks and app are specified in different modules
         suppress_callback_exceptions=True,
+        assets_folder="/app/clab_ceis/assets",
     )
     mon = CeisMonitor(app)
     # TODO: implement a good way to change the configuration

@@ -80,7 +80,7 @@ class CeisShop:
 
 
 def main():
-    app = Dash(__name__)
+    app = Dash(__name__,assets_folder="/app/clab_ceis/assets")
     shop = CeisShop(app)
 
     app.run_server(
