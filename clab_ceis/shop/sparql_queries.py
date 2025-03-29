@@ -16,8 +16,9 @@ def fetch_material():
         ?availableAmount
         (IF(?availableAmount >= ?requiredAmount, "Yes", "No") AS ?readyForAssembly)
     WHERE {
-        # Link recipes to their requirements
-        ?recipe :hasRequirement ?requirement .
+        # Link recipes to their fabric block requirements
+        ?recipe :hasMaterialRequirement ?requirement .
+        ?requirement rdf:type :FabricBlockRequirement .
         ?requirement :requiresFabricBlockDesign ?fabricBlockDesign .
         ?requirement :fabricBlockAmount ?requiredAmount .
 
@@ -67,7 +68,7 @@ def fetch_material():
             }
             for item in bindings
         ]
-        print(data)
+        print('data', data)
         return data
 
     except Exception as e:
@@ -77,24 +78,6 @@ def fetch_material():
 
 def fetch_skirt_recipes():
     query = """
-    # PREFIX : <http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/>
-    # PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-    # PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-
-    # SELECT 
-    #     (STRAFTER(STR(?recipe), "http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/") AS ?recipeName)
-    #     (STRAFTER(STR(?fabricBlockDesign), "http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/") AS ?fabricBlockDesignName)
-    #     ?requiredAmount
-    #     ?pdf
-    #     WHERE {
-    #     # Fetch recipes
-    #     ?design rdf:type/rdfs:subClassOf* :SkirtDesign .
-    #     ?recipe :isRecipeOf ?design .
-    #     ?recipe :hasRequirement ?requirement .
-    #     ?requirement :requiresFabricBlockDesign ?fabricBlockDesign .
-    #     ?requirement :fabricBlockAmount ?requiredAmount .
-    #     ?recipe :documentation ?pdf .
-    # }
     PREFIX : <http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/>
     PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -104,23 +87,24 @@ def fetch_skirt_recipes():
     ?requiredAmount
     ?pdfURL
     WHERE {
-    # Fetch skirt designs
-    ?design rdf:type :SkirtDesign .
-    
-    # Connect design to recipe (using hasRecipe instead of isRecipeOf)
-    ?design :hasRecipe ?recipe .
-    
-    # Get requirements from recipe
-    ?recipe :hasRequirement ?requirement .
-    
-    # Get fabricBlockDesign from requirement (ensuring it's a FabricBlockRequirement)
-    ?requirement rdf:type :FabricBlockRequirement .
-    ?requirement :requiresFabricBlockDesign ?fabricBlockDesign .
-    ?requirement :fabricBlockAmount ?requiredAmount .
-    
-    # Get PDF information (using hasPDF)
-    ?recipe :hasPDF ?pdf .
-    ?pdf :URLtoPDF ?pdfURL .
+        # Fetch skirt designs
+        ?design rdf:type :SkirtDesign .
+        
+        # Connect design to recipe (using hasRecipe instead of isRecipeOf)
+        ?design :hasRecipe ?recipe .
+        
+        # Get requirements from recipe
+        ?recipe :hasMaterialRequirement ?requirement .
+        ?requirement rdf:type :FabricBlockRequirement .
+        
+        # Get fabricBlockDesign from requirement (ensuring it's a FabricBlockRequirement)
+        ?requirement rdf:type :FabricBlockRequirement .
+        ?requirement :requiresFabricBlockDesign ?fabricBlockDesign .
+        ?requirement :fabricBlockAmount ?requiredAmount .
+        
+        # Get PDF information (using hasPDF)
+        ?recipe :hasPDF ?pdf .
+        ?pdf :URLtoPDF ?pdfURL .
     }
 
 
@@ -192,21 +176,22 @@ def fetch_top_recipes():
     ?requiredAmount
     ?pdfURL
     WHERE {
-    # Fetch top designs
-    ?design rdf:type/rdfs:subClassOf* :TopDesign .
-    
-    # Get recipe from design using the correct property
-    ?design :hasRecipe ?recipe .
-    
-    # Get fabric block requirements from recipe
-    ?recipe :hasRequirement ?requirement .
-    ?requirement rdf:type :FabricBlockRequirement .
-    ?requirement :requiresFabricBlockDesign ?fabricBlockDesign .
-    ?requirement :fabricBlockAmount ?requiredAmount .
-    
-    # Get PDF URL using the correct property path
-    ?recipe :hasPDF ?pdfObj .
-    ?pdfObj :URLtoPDF ?pdfURL .
+        # Fetch top designs
+        ?design rdf:type/rdfs:subClassOf* :TopDesign .
+        
+        # Get recipe from design using the correct property
+        ?design :hasRecipe ?recipe .
+        
+        # Get fabric block requirements from recipe
+        ?recipe :hasMaterialRequirement ?requirement .
+        ?requirement rdf:type :FabricBlockRequirement .
+        ?requirement rdf:type :FabricBlockRequirement .
+        ?requirement :requiresFabricBlockDesign ?fabricBlockDesign .
+        ?requirement :fabricBlockAmount ?requiredAmount .
+        
+        # Get PDF URL using the correct property path
+        ?recipe :hasPDF ?pdfObj .
+        ?pdfObj :URLtoPDF ?pdfURL .
     }
     """
     client = SPARQLWrapper(SPARQL_ENDPOINT)
