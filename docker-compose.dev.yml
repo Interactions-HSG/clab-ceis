@@ -1,45 +1,52 @@
 services:
-  shop:
-    hostname: shop
-    build:
-      context: .
-    environment:
-      - CEIS_SHOP_HOSTNAME=shop
-    ports:
-      - "8050:8050"
-    # Masks sourcode in container so changes are synced to host
-    volumes:
-      - ./:/app/
-    # network_mode: host
-    entrypoint: ["poetry", "run", "shop"]
-    # entrypoint: ["tail", "-F", "anything"]
+    shop:
+        hostname: shop
+        build:
+            context: .
+        environment:
+            - CEIS_SHOP_HOSTNAME=shop
+            - CEIS_MONITOR_HOSTNAME=ceis-dashboard
+        ports:
+            - '8050:8050'
+        # Masks sourcecode in container so changes are synced to host
+        volumes:
+            - ./:/app/
+        entrypoint: ['poetry', 'run', 'shop']
 
-  ceis:
-    hostname: ceis
-    environment:
-      # - POETRY_VIRTUALENVS_IN_PROJECT=true
-      - CEIS_MONITOR_HOSTNAME=ceis
-    build:
-      context: .
-    ports:
-      - "8051:8051"
-    volumes:
-      - ./:/app/
-    # network_mode: host
-    # entrypoint: ["poetry", "run", "ceis"]
-    entrypoint: ["tail", "-F", "anything"]
+    ceis-dashboard:
+        hostname: ceis-dashboard
+        environment:
+            - CEIS_MONITOR_HOSTNAME=ceis-dashboard
+            - CEIS_SHOP_HOSTNAME=shop
+        build:
+            context: .
+        ports:
+            - '8051:8051'
+        volumes:
+            - ./:/app/
+        entrypoint: ['poetry', 'run', 'ceis-dashboard']
 
-  graphdb:
-    hostname: graphdb
-    build:
-      context: clab_ceis/assets/graphdb
-    ports: 
-    - 7200:7200
-    - 7300:7300
-    # Masks sourcode in container so changes are synced to host
-    volumes:
-      - ceis-graphdb-volume:/opt/graphdb/home
-    # network_mode: host
+    ceis-backend:
+        hostname: ceis-backend
+        build:
+            context: ./clab_ceis/ceis_backend
+        environment:
+            - CEIS_SHOP_HOSTNAME=shop
+            - CEIS_MONITOR_HOSTNAME=ceis-dashboard
+        ports:
+            - '8052:8052'
+        volumes:
+            - ./clab_ceis/ceis_backend:/app
+        command: ['poetry', 'run', 'uvicorn', 'main:app', '--host', '0.0.0.0', '--port', '8052', '--reload']
+    graphdb:
+        hostname: graphdb
+        build:
+            context: clab_ceis/assets/graphdb
+        ports:
+            - 7200:7200
+            - 7300:7300
+        volumes:
+            - ceis-graphdb-volume:/opt/graphdb/home
 
 volumes:
-  ceis-graphdb-volume:
+    ceis-graphdb-volume:
