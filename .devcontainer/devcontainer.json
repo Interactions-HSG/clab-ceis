@@ -1,15 +1,21 @@
 {
     "name": "CLab compose",
     "dockerComposeFile": "../docker-compose.dev.yml",
-    "service": "ceis",
+    "service": "ceis-dashboard",
     "workspaceFolder": "/app",
     "customizations": {
-      // Configure properties specific to VS Code.
-      "vscode": {
-        // Add the IDs of extensions you want installed when the container is created.
-        "extensions": ["ms-python.debugpy"]
-      }
+        "vscode": {
+            "extensions": ["ms-python.debugpy", "ms-python.black-formatter"],
+            "settings": {
+                "editor.defaultFormatter": "ms-python.black-formatter",
+                "editor.formatOnSave": true
+            }
+        }
+    },
+    "features": {
+        "ghcr.io/devcontainers/features/python:1": {
+            "installTools": true
+        }
     },
     "shutdownAction": "stopCompose"
-  }
-  
+}

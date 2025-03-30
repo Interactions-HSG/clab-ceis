@@ -68,7 +68,7 @@ def fetch_material():
             }
             for item in bindings
         ]
-        print('data', data)
+        print("data", data)
         return data
 
     except Exception as e:

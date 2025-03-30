@@ -1,0 +1,26 @@
+PREFIX : <http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT
+(STRAFTER(STR(?recipe), "http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/") AS ?recipeName)
+(STRAFTER(STR(?fabricBlockDesign), "http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/") AS ?fabricBlockDesignName)
+?requiredAmount
+?pdfURL
+WHERE {
+    # Fetch top designs
+    ?design rdf:type/rdfs:subClassOf* :TopDesign .
+    
+    # Get recipe from design using the correct property
+    ?design :hasRecipe ?recipe .
+    
+    # Get fabric block requirements from recipe
+    ?recipe :hasMaterialRequirement ?requirement .
+    ?requirement rdf:type :FabricBlockRequirement .
+    ?requirement rdf:type :FabricBlockRequirement .
+    ?requirement :requiresFabricBlockDesign ?fabricBlockDesign .
+    ?requirement :fabricBlockAmount ?requiredAmount .
+    
+    # Get PDF URL using the correct property path
+    ?recipe :hasPDF ?pdfObj .
+    ?pdfObj :URLtoPDF ?pdfURL .
+}

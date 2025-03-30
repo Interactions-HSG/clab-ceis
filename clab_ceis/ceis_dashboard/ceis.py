@@ -24,8 +24,8 @@ class CeLoops(Enum):
 
 
 class CeisMonitor:
-    _model: pd.DataFrame = None
-    _app: Dash = None
+    _model: pd.DataFrame
+    _app: Dash
     _layout = None
     _chart_height = 400
 
