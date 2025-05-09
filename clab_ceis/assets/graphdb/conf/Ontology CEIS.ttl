@@ -12,23 +12,6 @@
 #    Object Properties
 #################################################################
 
-###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20#hasFabric
-:hasFabric rdf:type owl:ObjectProperty ;
-           rdfs:domain :BaseMaterialRequirement ;
-           rdfs:range :Fabric .
-
-
-###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20#hasMaterialRequirement
-:hasMaterialRequirement rdf:type owl:ObjectProperty ;
-                        owl:inverseOf :isMaterialRequirementOf ;
-                        rdfs:domain :Recipe ;
-                        rdfs:range :MaterialRequirement .
-
-
-###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20#isMaterialRequirementOf
-:isMaterialRequirementOf rdf:type owl:ObjectProperty .
-
-
 ###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/fabricBlockDesignRequiredBy
 :fabricBlockDesignRequiredBy rdf:type owl:ObjectProperty ;
                              owl:inverseOf :requiresFabricBlockDesign .
@@ -39,6 +22,12 @@
                           owl:inverseOf :isFollowedByFabricBlock ;
                           rdfs:domain :FabricBlock ;
                           rdfs:range :FabricBlockDesign .
+
+
+###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/hasFabric
+:hasFabric rdf:type owl:ObjectProperty ;
+           rdfs:domain :BaseMaterialRequirement ;
+           rdfs:range :Fabric .
 
 
 ###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/hasFabricBlock
@@ -53,6 +42,13 @@
              owl:inverseOf :isLocationOf ;
              rdfs:domain :FabricBlock ;
              rdfs:range :Location .
+
+
+###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/hasMaterialRequirement
+:hasMaterialRequirement rdf:type owl:ObjectProperty ;
+                        owl:inverseOf :isMaterialRequirementOf ;
+                        rdfs:domain :Recipe ;
+                        rdfs:range :MaterialRequirement .
 
 
 ###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/hasPDF
@@ -96,6 +92,10 @@
 :isLocationOf rdf:type owl:ObjectProperty .
 
 
+###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/isMaterialRequirementOf
+:isMaterialRequirementOf rdf:type owl:ObjectProperty .
+
+
 ###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/isPDFOf
 :isPDFOf rdf:type owl:ObjectProperty .
 
@@ -136,40 +136,38 @@
 #    Data properties
 #################################################################
 
-###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20#fabricDensity
-:fabricDensity rdf:type owl:DatatypeProperty ;
-               rdfs:domain :Fabric ;
-               rdfs:range xsd:float .
+###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20#hasCost
+:hasCost rdf:type owl:DatatypeProperty ;
+         rdfs:domain :Requirement ;
+         rdfs:range xsd:double .
 
 
-###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20#fabricName
-:fabricName rdf:type owl:DatatypeProperty ;
-            rdfs:domain :Fabric ;
-            rdfs:range xsd:string .
+###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20#hasCostEconomical
+:hasCostEconomical rdf:type owl:DatatypeProperty ;
+                   rdfs:subPropertyOf :hasCost ;
+                   rdfs:range xsd:double ;
+                   owl:propertyDisjointWith :hasCostEnvironmental .
 
 
-###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20#hasBaseMaterialFabric
-:hasBaseMaterialFabric rdf:type owl:DatatypeProperty ;
-                       rdfs:domain :BaseMaterialRequirement ;
-                       rdfs:range xsd:string .
+###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20#hasCostEnvironmental
+:hasCostEnvironmental rdf:type owl:DatatypeProperty ;
+                      rdfs:subPropertyOf :hasCost ;
+                      rdfs:range xsd:double .
 
 
-###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20#hasX
-:hasX rdf:type owl:DatatypeProperty ;
-      rdfs:domain :BaseMaterialRequirement ;
-      rdfs:range xsd:integer .
+###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20#hasCostEnvironmentalCO2
+:hasCostEnvironmentalCO2 rdf:type owl:DatatypeProperty ;
+                         rdfs:subPropertyOf :hasCostEnvironmental .
 
 
-###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20#hasY
-:hasY rdf:type owl:DatatypeProperty ;
-      rdfs:domain :BaseMaterialRequirement ;
-      rdfs:range xsd:integer .
+###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20#hasCostEnvironmentalLandmass
+:hasCostEnvironmentalLandmass rdf:type owl:DatatypeProperty ;
+                              rdfs:subPropertyOf :hasCostEnvironmental .
 
 
-###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20#hasZ
-:hasZ rdf:type owl:DatatypeProperty ;
-      rdfs:domain :BaseMaterialRequirement ;
-      rdfs:range xsd:float .
+###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20#hasCostEnvironmentalWater
+:hasCostEnvironmentalWater rdf:type owl:DatatypeProperty ;
+                           rdfs:subPropertyOf :hasCostEnvironmental .
 
 
 ###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/URLtoPDF
@@ -180,6 +178,42 @@
 ###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/fabricBlockAmount
 :fabricBlockAmount rdf:type owl:DatatypeProperty ;
                    rdfs:domain :FabricBlockRequirement .
+
+
+###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/fabricDensity
+:fabricDensity rdf:type owl:DatatypeProperty ;
+               rdfs:domain :Fabric ;
+               rdfs:range xsd:float .
+
+
+###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/fabricName
+:fabricName rdf:type owl:DatatypeProperty ;
+            rdfs:domain :Fabric ;
+            rdfs:range xsd:string .
+
+
+###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/hasBaseMaterialFabric
+:hasBaseMaterialFabric rdf:type owl:DatatypeProperty ;
+                       rdfs:domain :BaseMaterialRequirement ;
+                       rdfs:range xsd:string .
+
+
+###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/hasX
+:hasX rdf:type owl:DatatypeProperty ;
+      rdfs:domain :BaseMaterialRequirement ;
+      rdfs:range xsd:integer .
+
+
+###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/hasY
+:hasY rdf:type owl:DatatypeProperty ;
+      rdfs:domain :BaseMaterialRequirement ;
+      rdfs:range xsd:integer .
+
+
+###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/hasZ
+:hasZ rdf:type owl:DatatypeProperty ;
+      rdfs:domain :BaseMaterialRequirement ;
+      rdfs:range xsd:float .
 
 
 ###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/sewingAmount
@@ -201,22 +235,17 @@
 #    Classes
 #################################################################
 
-###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20#BaseMaterialRequirement
+###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/BaseMaterialRequirement
 :BaseMaterialRequirement rdf:type owl:Class ;
                          rdfs:subClassOf :MaterialRequirement .
 
 
-###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20#Fabric
-:Fabric rdf:type owl:Class .
-
-
-###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20#MaterialRequirement
-:MaterialRequirement rdf:type owl:Class ;
-                     rdfs:subClassOf :Requirement .
-
-
 ###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/Design
 :Design rdf:type owl:Class .
+
+
+###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/Fabric
+:Fabric rdf:type owl:Class .
 
 
 ###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/FabricBlock
@@ -248,6 +277,11 @@
 :Location rdf:type owl:Class .
 
 
+###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/MaterialRequirement
+:MaterialRequirement rdf:type owl:Class ;
+                     rdfs:subClassOf :Requirement .
+
+
 ###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/PDF
 :PDF rdf:type owl:Class .
 
@@ -262,7 +296,11 @@
 
 
 ###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/Requirement
-:Requirement rdf:type owl:Class .
+:Requirement rdf:type owl:Class ;
+             rdfs:subClassOf [ rdf:type owl:Restriction ;
+                               owl:onProperty :hasCost ;
+                               owl:someValuesFrom xsd:double
+                             ] .
 
 
 ###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/SewingRequirement
@@ -295,20 +333,13 @@
 #    Individuals
 #################################################################
 
-###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20#BMR1
+###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/BMR1
 :BMR1 rdf:type owl:NamedIndividual ,
                :BaseMaterialRequirement ;
       :hasFabric :Fabric1 ;
       :hasX 14 ;
       :hasY 40 ;
       :hasZ "0.1"^^xsd:float .
-
-
-###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20#Fabric1
-:Fabric1 rdf:type owl:NamedIndividual ,
-                  :Fabric ;
-         :fabricDensity "3.8"^^xsd:float ;
-         :fabricName "cotton" .
 
 
 ###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/FB1
@@ -401,6 +432,13 @@
            :hasProcessRequirement :sewingRequirementFB3 ,
                                   :shippingRequirementFB ,
                                   :steamingRequirementFB3 .
+
+
+###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/Fabric1
+:Fabric1 rdf:type owl:NamedIndividual ,
+                  :Fabric ;
+         :fabricDensity "3.8"^^xsd:float ;
+         :fabricName "cotton" .
 
 
 ###  http://www.semanticweb.org/sophi/ontologies/2024/10/untitled-ontology-20/cropTopDesign
@@ -569,6 +607,14 @@
                 :PDF
                 :Recipe
                 :Requirement
+              )
+] .
+
+
+[ rdf:type owl:AllDisjointProperties ;
+  owl:members ( :hasCostEnvironmentalCO2
+                :hasCostEnvironmentalLandmass
+                :hasCostEnvironmentalWater
               )
 ] .
 
