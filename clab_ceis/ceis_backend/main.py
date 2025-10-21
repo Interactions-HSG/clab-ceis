@@ -75,7 +75,6 @@ async def create_fabric_block(fabric_block: FabricBlock, request: Request):
 
 @app.get("/fabric-blocks")
 def get_fabric_blocks(type: Optional[str] = None):
-    print("type", type)
     conn = sqlite3.connect('ceis_backend.db')
     cursor = conn.cursor()
     cursor.execute('''
@@ -115,7 +114,7 @@ def get_assessments():
             material, amount = extract_materials_from_fabric_block_recipe(FB1_recipe)
         elif fabric_block == "FB2":
             material, amount = extract_materials_from_fabric_block_recipe(FB2_recipe)
-        print("material", material, "amount", amount)
+        print("material:", material, "amount:", amount)
         activity_id = None
         if material == "cotton":
             activity_id = 3878
@@ -141,7 +140,7 @@ def get_assessments():
                 (item["emissions"] for item in json["lcia_results"] if item["method"]["name"] == "IPCC 2021"),
                 None
             )
-            print(f"Material: {material}, Amount: {amount}, CO2eq per unit: {emission}")
+            print(f"CO2eq per unit: {emission}")
             if emission is not None:
                 total_emission += emission * amount
     

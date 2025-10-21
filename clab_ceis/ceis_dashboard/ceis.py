@@ -1,7 +1,8 @@
 from enum import Enum
 
 import pandas as pd
-from dash import Dash, html, dash_table
+from dash import Dash, html, dcc, dash_table
+from dash.dependencies import Input, Output
 import dash_cytoscape as cyto
 from flask import request, jsonify
 
@@ -129,7 +130,8 @@ class CeisMonitor:
             ]
         }
 
-        self._layout = html.Div(
+        # Build the dashboard layout (the full content previously used as app.layout)
+        self._dashboard_layout = html.Div(
             children=[
                 html.Header([html.Div("Circular Lab Cockpit", className="logo")]),
                 html.Div(
@@ -149,8 +151,6 @@ class CeisMonitor:
                                     "style": {
                                         "label": "data(label)",
                                         "shape": "tag",
-                                        # "width": f"{0.3 * self._chart_height}",
-                                        # "height": f"{0.15 * self._chart_height}",
                                         "text-halign": "left",
                                         "text-valign": "bottom",
                                         "text-margin-x": "-10%",
@@ -164,7 +164,7 @@ class CeisMonitor:
                                     "selector": "edge",
                                     "style": {
                                         "label": "data(label)",
-                                        "target-arrow-shape": "triangle",  # Set the arrow shape to triangle
+                                        "target-arrow-shape": "triangle",
                                         "arrow-scale": 1.5,
                                         "line-color": "darkblue",
                                         "text-margin-y": "-15%",
@@ -243,15 +243,59 @@ class CeisMonitor:
                 ),
             ]
         )
+
+        # Simple index layout with a link to /dashboard and fabric block inventory
+        self._index_layout = html.Div(
+            [
+            html.Header([html.Div("Circular Lab Cockpit", className="logo")]),
+            html.Div(
+                [
+                html.H1("Welcome"),
+                dcc.Link("Go to old Dashboard", href="/dashboard", id="dashboard-link"),
+                html.H2("Fabric Block Inventory"),
+                html.Button("Refresh Fabric Blocks", id="refresh-fabric-blocks", n_clicks=0),
+                dash_table.DataTable(
+                    id="fabric-blocks-table",
+                    columns=[
+                    {"name": "id", "id": "id"},
+                    {"name": "type", "id": "type"},
+                    {"name": "co2eq", "id": "co2eq"},
+                    # {"name": "garment_id", "id": "garment_id"},
+                    {"name": "preparations", "id": "preparations"}
+                    ],
+                    data=[],  # populated via callback
+                    style_table={"maxWidth": "800px"},
+                    style_cell={"textAlign": "center"},
+                    style_header={"fontWeight": "bold"},
+                ),
+                ],
+                className="wrapper",
+            ),
+            ]
+        )
+
+
+        # App-level layout handling routing (client-side)
+        self._layout = html.Div([dcc.Location(id="url", refresh=False), html.Div(id="page-content")])
         self._app.layout = self._layout
+
+        # Callback to render page content based on the pathname
+        @self._app.callback(Output("page-content", "children"), [Input("url", "pathname")])
+        def display_page(pathname):
+            if pathname == "/dashboard":
+                return self._dashboard_layout
+            # default / or unknown paths -> index
+            return self._index_layout
 
     def get_route(self, server):
         @server.route("/quote", methods=["PUT"])
         def quote_endpoint():
             # Retrieve data from the HTTP request
-            # global self._data.data
             data = request.json
-            data["EventID"] = self._model.get_data().get("EventID").iloc()[-1] + 1
+            # Safely compute next EventID
+            last_id_series = self._model.get_data().get("EventID")
+            last_id = int(last_id_series.iloc[-1]) if (last_id_series is not None and not last_id_series.empty) else 0
+            data["EventID"] = last_id + 1
             self._model.set_data(
                 pd.concat(
                     [self._model.get_data(), pd.DataFrame([data])], ignore_index=True
