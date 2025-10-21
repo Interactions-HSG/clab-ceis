@@ -260,7 +260,7 @@ class CeisMonitor:
                     {"name": "id", "id": "id"},
                     {"name": "type", "id": "type"},
                     {"name": "co2eq", "id": "co2eq"},
-                    # {"name": "garment_id", "id": "garment_id"},
+                    {"name": "garment_id", "id": "garment_id"},
                     {"name": "preparations", "id": "preparations"}
                     ],
                     data=[],  # populated via callback
@@ -273,7 +273,68 @@ class CeisMonitor:
             ),
             ]
         )
+        # UI for adding fabric blocks and callbacks to update the fabric blocks table
 
+        # Add a simple form to the index page for adding fabric blocks
+        fabric_form = html.Div(
+            [
+                html.H2("Add Fabric Blocks"),
+                html.Div(
+                    [
+                        html.Label("Type"),
+                        dcc.Dropdown(
+                            id="fabric-type",
+                            options=[
+                                {"label": "Fabric Block 1", "value": "FB1"},
+                                {"label": "Fabric Block 2", "value": "FB2"},
+                                {"label": "Fabric Block 3", "value": "FB3"},
+                                {"label": "Fabric Block 4", "value": "FB4"},
+                            ],
+                            placeholder="Select a fabric type",
+                        ),
+                    ],
+                    style={"marginBottom": "12px", "maxWidth": "400px"},
+                ),
+                html.H3("Preparations"),
+                html.Div(id="preparations-container", children=[]),
+                html.Div(
+                    [
+                        html.Button("Add Preparation", id="add-prep-button", n_clicks=0),
+                        html.Button("Remove Last Preparation", id="remove-prep-button", n_clicks=0),
+                    ],
+                    style={"marginTop": "8px", "marginBottom": "12px", "display": "flex", "gap": "8px"},
+                ),
+                html.Button("Add Fabric Block", id="add-fabric-blocks", n_clicks=0),
+                html.Div(id="fabric-add-status", style={"marginTop": "8px", "color": "green"}),
+            ],
+            className="fabric-add-form",
+        )
+
+        # Append form to the existing wrapper in the index layout
+        try:
+            # _index_layout structure: [Header, html.Div(wrapper...)]
+            wrapper_div = self._index_layout.children[1]
+            # append the form after existing fabric-blocks-table area
+            wrapper_children = list(wrapper_div.children)
+            wrapper_children.append(fabric_form)
+            wrapper_div.children = wrapper_children
+        except Exception:
+            # If structure differs, append to top-level index layout as fallback
+            index_children = list(self._index_layout.children)
+            index_children.append(fabric_form)
+            self._index_layout.children = index_children
+
+        # Helper to extract current fabric table subset (ensures columns exist)
+        def _fabric_table_records():
+            df = self._model.get_data()
+            if df is None or df.empty:
+                return []
+            # Ensure columns used in the fabric table exist in df
+            required_cols = ["id", "type", "co2eq", "garment_id", "preparations"]
+            for c in required_cols:
+                if c not in df.columns:
+                    df[c] = None
+            return df[required_cols].to_dict("records")
 
         # App-level layout handling routing (client-side)
         self._layout = html.Div([dcc.Location(id="url", refresh=False), html.Div(id="page-content")])

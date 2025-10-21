@@ -78,14 +78,14 @@ def get_fabric_blocks(type: Optional[str] = None):
     conn = sqlite3.connect('ceis_backend.db')
     cursor = conn.cursor()
     cursor.execute('''
-                   SELECT id, type, co2eq FROM fabric_blocks
+                   SELECT id, type, co2eq, garment_id FROM fabric_blocks
                    WHERE type = ? OR ? IS NULL
                    ''', (type, type))
     fabric_blocks_data = cursor.fetchall()
 
     fabric_blocks = []
     for fb in fabric_blocks_data:
-        fb_id, fb_type, fb_co2eq = fb
+        fb_id, fb_type, fb_co2eq, garment_id = fb
         cursor.execute('SELECT type, amount FROM preparations WHERE fabric_block_id = ?', (fb_id,))
         preparations_data = cursor.fetchall()
         preparations = [{"type": p[0], "amount": p[1]} for p in preparations_data]
@@ -93,6 +93,7 @@ def get_fabric_blocks(type: Optional[str] = None):
             "id": fb_id,
             "type": fb_type,
             "co2eq": fb_co2eq,
+            "garment_id": garment_id,
             "preparations": preparations
         })
     conn.close()
