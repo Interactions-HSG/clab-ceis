@@ -6,10 +6,11 @@ import math
 from clab_ceis.ceis_dashboard import ceis_data
 from clab_ceis import config
 from dash.dependencies import ALL
+from dash import no_update
 
 
 def get_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
-
+    
     # Callback to add/remove preparation input fields
     @app.callback(
         Output("preparations-container", "children"),
@@ -22,10 +23,10 @@ def get_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
     def update_preparation_fields(add_clicks, remove_clicks, children):
         ctx = callback_context
         triggered = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else None
-        
+
         if children is None:
             children = []
-        
+
         # Add a new preparation field
         if triggered == "add-prep-button":
             new_id = len(children)
@@ -37,11 +38,9 @@ def get_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
                                 dcc.Dropdown(
                                     id={"type": "prep-name", "index": new_id},
                                     options=[
-                                        {"label": "Sewing", "value": "sewing"},
-                                        {"label": "Dyeing", "value": "dyeing"},
-                                        {"label": "Steaming", "value": "steaming"},
-                                        {"label": "Cutting", "value": "cutting"},
-                                        {"label": "Washing", "value": "washing"},
+                                        {"label": "Sewing", "value": "1"},
+                                        {"label": "Dyeing", "value": "3"},
+                                        {"label": "Steaming", "value": "2"},
                                     ],
                                     placeholder="Select preparation",
                                     clearable=False,
@@ -72,11 +71,11 @@ def get_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
                     },
                 )
             )
-        
+
         # Remove the last preparation field
         elif triggered == "remove-prep-button" and len(children) > 0:
             children = children[:-1]
-        
+
         return children
 
     @app.callback(
@@ -90,70 +89,59 @@ def get_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
             State("fabric-type", "value"),
             State({"type": "prep-name", "index": ALL}, "value"),
             State({"type": "prep-count", "index": ALL}, "value"),
+            State("fabric-blocks-table", "data"),  # keep current table data
         ],
     )
-    def update_fabric_table(refresh_clicks, add_clicks, type_val, prep_names, prep_counts):
+    def update_fabric_table(
+        refresh_clicks, add_clicks, type_val, prep_names, prep_counts, current_data
+    ):
         ctx = callback_context
         triggered = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else None
 
         status_msg = ""
 
-        # If add button triggered
+        if not triggered:
+            return fetch_fabric_blocks(), ""
+        if triggered == "refresh-fabric-blocks":
+            return fetch_fabric_blocks(), ""
+
         if triggered == "add-fabric-blocks":
+
             if not type_val:
-                return [], "Please select a fabric type."
-            
-            # Build preparations list from dynamic inputs
+                return no_update, "Please select a fabric type."
+
             preparations = []
             for name, count in zip(prep_names, prep_counts):
-                if name:  # Only add if name is selected
+                if name:
                     try:
                         cnt = int(count) if count else 1
                     except:
                         cnt = 1
-                    preparations.append({
-                        "type": name,
-                        "amount": cnt
-                    })
 
-            # Send to backend API
+                    preparations.append({"type_id": name, "amount": cnt})
+
+            payload = {"type_id": type_val, "preparations": preparations}
+            print("Payload:", payload)
             try:
-                payload = {
-                    "type": type_val,
-                    "preparations": preparations
-                }
                 resp = requests.post(
-                    f"{config.BACKEND_API_URL}/fabric-block",
-                    json=payload
+                    f"{config.BACKEND_API_URL}/fabric-block", json=payload
                 )
-                if resp.status_code in [200, 201]:
+
+                # Only update table if SUCCESS
+                if resp.status_code in (200, 201):
                     status_msg = f"Successfully added fabric block with {len(preparations)} preparation(s)."
+
+                    # Now fetch fresh data
+                    return fetch_fabric_blocks(), status_msg
+
                 else:
-                    status_msg = f"Error adding fabric block: {resp.status_code}"
+                    return no_update, f"Error adding fabric block: {resp.status_code}"
+
             except Exception as e:
-                status_msg = f"Error connecting to backend: {str(e)}"
+                return no_update, f"Error connecting to backend: {str(e)}"
 
-        # Fetch backend data (on refresh or after add)
-        try:
-            resp = requests.get(f"{config.BACKEND_API_URL}/fabric-blocks")
-            if resp.status_code == 200:
-                backend_data = resp.json()
-                # Format preparations for display
-                for block in backend_data:
-                    preps = block.get('preparations', [])
-                    if isinstance(preps, list):
-                        block['preparations'] = ", ".join(
-                            f"{p.get('type', '')}({p.get('amount', 1)})" for p in preps
-                        )
-                    else:
-                        block['preparations'] = str(preps)
-                return backend_data, status_msg
-            else:
-                return [], status_msg or f"Error fetching data: {resp.status_code}"
-        except Exception as e:
-            return [], status_msg or f"Error connecting to backend: {str(e)}"
+        return no_update, ""
 
-    # Your existing callbacks...
     @app.callback(
         Output("res-dashboard-table", "data", allow_duplicate=True),
         Input("flow-chart", "tapEdgeData"),
@@ -188,4 +176,58 @@ def get_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
     def update_table(n_clicks):
         return data.get_data().to_dict("records")
 
+    @app.callback(
+        Output("co2-form-content", "children"),
+        Input("co2-form-load", "n_clicks"),
+    )
+    def load_co2_form(pathname):
+        top_co2 = get_co2("croptop")
+        skirt_co2 = get_co2("skirt")
+        return html.Div(
+            [
+                html.H3("Crop Top CO2 Assessment"),
+                html.P(f"Total CO2 Emissions for Crop Top: {top_co2} kg CO2eq"),
+                html.H3("Skirt CO2 Assessment"),
+                html.P(f"Total CO2 Emissions for Skirt: {skirt_co2} kg CO2eq"),
+            ]
+        )
 
+
+def fetch_fabric_blocks():
+    try:
+        resp = requests.get(f"{config.BACKEND_API_URL}/fabric-blocks")
+
+        if resp.status_code != 200:
+            return []
+
+        backend_data = resp.json()
+        print("Fetched fabric blocks:", backend_data)
+
+        for block in backend_data:
+            preps = block.get("preparations", [])
+
+            if isinstance(preps, list):
+                block["preparations"] = ", ".join(
+                    f"{p.get('type','')}({p.get('amount',0)})" for p in preps
+                )
+            else:
+                block["preparations"] = str(preps)
+
+        return backend_data
+
+    except Exception:
+        return []
+
+
+def get_co2(garment_type: str) -> float:
+    try:
+        resp = requests.get(f"{config.BACKEND_API_URL}/co2/{garment_type}")
+
+        if resp.status_code != 200:
+            return 0.0
+
+        backend_data = resp.json()
+        return backend_data.get("total_co2eq", 0.0)
+
+    except Exception:
+        return 0.0

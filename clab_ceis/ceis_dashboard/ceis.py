@@ -247,30 +247,41 @@ class CeisMonitor:
         # Simple index layout with a link to /dashboard and fabric block inventory
         self._index_layout = html.Div(
             [
-            html.Header([html.Div("Circular Lab Cockpit", className="logo")]),
-            html.Div(
-                [
-                html.H1("Welcome"),
-                dcc.Link("Go to old Dashboard", href="/dashboard", id="dashboard-link"),
-                html.H2("Fabric Block Inventory"),
-                html.Button("Refresh Fabric Blocks", id="refresh-fabric-blocks", n_clicks=0),
-                dash_table.DataTable(
-                    id="fabric-blocks-table",
-                    columns=[
-                    {"name": "id", "id": "id"},
-                    {"name": "type", "id": "type"},
-                    {"name": "co2eq", "id": "co2eq"},
-                    {"name": "garment_id", "id": "garment_id"},
-                    {"name": "preparations", "id": "preparations"}
+                html.Header([html.Div("Circular Lab Cockpit", className="logo")]),
+                html.Div(
+                    [
+                        html.H1("Welcome"),
+                        dcc.Link(
+                            "Go to old Dashboard",
+                            href="/dashboard",
+                            id="dashboard-link",
+                        ),
+                        html.H2("Fabric Block Inventory"),
+                        html.Button(
+                            "Refresh Fabric Blocks",
+                            id="refresh-fabric-blocks",
+                            n_clicks=0,
+                        ),
+                        dash_table.DataTable(
+                            id="fabric-blocks-table",
+                            columns=[
+                                {"name": "id", "id": "id"},
+                                {"name": "type", "id": "type"},
+                                {"name": "co2eq", "id": "co2eq"},
+                                {"name": "garment_id", "id": "garment_id"},
+                                {
+                                    "name": "preparations necessary",
+                                    "id": "preparations",
+                                },
+                            ],
+                            data=[],  # populated via callback
+                            style_table={"maxWidth": "800px"},
+                            style_cell={"textAlign": "center"},
+                            style_header={"fontWeight": "bold"},
+                        ),
                     ],
-                    data=[],  # populated via callback
-                    style_table={"maxWidth": "800px"},
-                    style_cell={"textAlign": "center"},
-                    style_header={"fontWeight": "bold"},
+                    className="wrapper",
                 ),
-                ],
-                className="wrapper",
-            ),
             ]
         )
         # UI for adding fabric blocks and callbacks to update the fabric blocks table
@@ -285,10 +296,10 @@ class CeisMonitor:
                         dcc.Dropdown(
                             id="fabric-type",
                             options=[
-                                {"label": "Fabric Block 1", "value": "FB1"},
-                                {"label": "Fabric Block 2", "value": "FB2"},
-                                {"label": "Fabric Block 3", "value": "FB3"},
-                                {"label": "Fabric Block 4", "value": "FB4"},
+                                {"label": "Fabric Block 1", "value": "1"},
+                                {"label": "Fabric Block 2", "value": "2"},
+                                # {"label": "Fabric Block 3", "value": "FB3"},
+                                # {"label": "Fabric Block 4", "value": "FB4"},
                             ],
                             placeholder="Select a fabric type",
                         ),
@@ -299,15 +310,35 @@ class CeisMonitor:
                 html.Div(id="preparations-container", children=[]),
                 html.Div(
                     [
-                        html.Button("Add Preparation", id="add-prep-button", n_clicks=0),
-                        html.Button("Remove Last Preparation", id="remove-prep-button", n_clicks=0),
+                        html.Button(
+                            "Add Preparation", id="add-prep-button", n_clicks=0
+                        ),
+                        html.Button(
+                            "Remove Last Preparation",
+                            id="remove-prep-button",
+                            n_clicks=0,
+                        ),
                     ],
-                    style={"marginTop": "8px", "marginBottom": "12px", "display": "flex", "gap": "8px"},
+                    style={
+                        "marginTop": "8px",
+                        "marginBottom": "12px",
+                        "display": "flex",
+                        "gap": "8px",
+                    },
                 ),
                 html.Button("Add Fabric Block", id="add-fabric-blocks", n_clicks=0),
-                html.Div(id="fabric-add-status", style={"marginTop": "8px", "color": "green"}),
+                html.Div(
+                    id="fabric-add-status", style={"marginTop": "8px", "color": "green"}
+                ),
             ],
             className="fabric-add-form",
+        )
+
+        co2_form = html.Div(
+            [
+                html.H2("CO2 Assessment"),
+                html.Div(id="co2-form-content"),
+            ]
         )
 
         # Append form to the existing wrapper in the index layout
@@ -317,11 +348,13 @@ class CeisMonitor:
             # append the form after existing fabric-blocks-table area
             wrapper_children = list(wrapper_div.children)
             wrapper_children.append(fabric_form)
+            wrapper_children.append(co2_form)
             wrapper_div.children = wrapper_children
         except Exception:
             # If structure differs, append to top-level index layout as fallback
             index_children = list(self._index_layout.children)
             index_children.append(fabric_form)
+            index_children.append(co2_form)
             self._index_layout.children = index_children
 
         # Helper to extract current fabric table subset (ensures columns exist)
@@ -337,11 +370,15 @@ class CeisMonitor:
             return df[required_cols].to_dict("records")
 
         # App-level layout handling routing (client-side)
-        self._layout = html.Div([dcc.Location(id="url", refresh=False), html.Div(id="page-content")])
+        self._layout = html.Div(
+            [dcc.Location(id="url", refresh=False), html.Div(id="page-content")]
+        )
         self._app.layout = self._layout
 
         # Callback to render page content based on the pathname
-        @self._app.callback(Output("page-content", "children"), [Input("url", "pathname")])
+        @self._app.callback(
+            Output("page-content", "children"), [Input("url", "pathname")]
+        )
         def display_page(pathname):
             if pathname == "/dashboard":
                 return self._dashboard_layout
@@ -355,7 +392,11 @@ class CeisMonitor:
             data = request.json
             # Safely compute next EventID
             last_id_series = self._model.get_data().get("EventID")
-            last_id = int(last_id_series.iloc[-1]) if (last_id_series is not None and not last_id_series.empty) else 0
+            last_id = (
+                int(last_id_series.iloc[-1])
+                if (last_id_series is not None and not last_id_series.empty)
+                else 0
+            )
             data["EventID"] = last_id + 1
             self._model.set_data(
                 pd.concat(
