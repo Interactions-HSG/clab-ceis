@@ -19,6 +19,7 @@ pandas = "^2.2.0"
 dash-cytoscape = "^1.0.0"
 httpx = "^0.26.0"
 sparqlwrapper = "^2.0.0"
+pydantic = "^2.6.1"
 
 [tool.poetry.group.dev.dependencies]
 commitizen = "^3.14.1"

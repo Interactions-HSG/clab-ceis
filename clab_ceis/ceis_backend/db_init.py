@@ -68,8 +68,8 @@ def init_sqlite_db():
             garment_type INTEGER NOT NULL,
             fabric_block_id INTEGER NOT NULL,
             amount INTEGER,
-            FOREIGN KEY (garment_type) REFERENCES garment_types(id),
-            FOREIGN KEY (fabric_block_id) REFERENCES fabric_block_types(id)
+            FOREIGN KEY (garment_type) REFERENCES garment_types(id) ON DELETE CASCADE,
+            FOREIGN KEY (fabric_block_id) REFERENCES fabric_block_types(id) ON DELETE CASCADE
         )
     """
     )
@@ -81,8 +81,8 @@ def init_sqlite_db():
             garment_type INTEGER NOT NULL,
             process_id INTEGER NOT NULL,
             time INTEGER,
-            FOREIGN KEY (garment_type) REFERENCES garment_types(id),
-            FOREIGN KEY (process_id) REFERENCES process_types(id)
+            FOREIGN KEY (garment_type) REFERENCES garment_types(id) ON DELETE CASCADE,
+            FOREIGN KEY (process_id) REFERENCES process_types(id) ON DELETE CASCADE
         )
     """
     )
@@ -95,7 +95,7 @@ def init_sqlite_db():
             type_id INTEGER NOT NULL,
             co2eq INTEGER,
             price INTEGER,
-            FOREIGN KEY (type_id) REFERENCES garment_types (id)
+            FOREIGN KEY (type_id) REFERENCES garment_types (id) ON DELETE CASCADE
         )
     """
     )
@@ -107,8 +107,8 @@ def init_sqlite_db():
             type_id INTEGER NOT NULL,
             co2eq INTEGER,
             garment_id INTEGER,
-            FOREIGN KEY (type_id) REFERENCES fabric_block_types (id),
-            FOREIGN KEY (garment_id) REFERENCES garments_inventory (id)
+            FOREIGN KEY (type_id) REFERENCES fabric_block_types (id) ON DELETE CASCADE,
+            FOREIGN KEY (garment_id) REFERENCES garments_inventory (id) ON DELETE CASCADE
         )
     """
     )
@@ -120,8 +120,8 @@ def init_sqlite_db():
             type_id INTEGER NOT NULL,
             amount INTEGER,
             fabric_block_id INTEGER,
-            FOREIGN KEY (type_id) REFERENCES process_types (id),
-            FOREIGN KEY (fabric_block_id) REFERENCES fabric_blocks_inventory (id)
+            FOREIGN KEY (type_id) REFERENCES process_types (id) ON DELETE CASCADE,
+            FOREIGN KEY (fabric_block_id) REFERENCES fabric_blocks_inventory (id) ON DELETE CASCADE
         )
     """
     )

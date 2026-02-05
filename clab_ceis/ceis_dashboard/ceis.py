@@ -296,8 +296,8 @@ class CeisMonitor:
                         dcc.Dropdown(
                             id="fabric-type",
                             options=[
-                                {"label": "Fabric Block 1", "value": "1"},
-                                {"label": "Fabric Block 2", "value": "2"},
+                                # {"label": "Fabric Block 1", "value": "1"},
+                                # {"label": "Fabric Block 2", "value": "2"},
                                 # {"label": "Fabric Block 3", "value": "FB3"},
                                 # {"label": "Fabric Block 4", "value": "FB4"},
                             ],
@@ -337,7 +337,12 @@ class CeisMonitor:
         co2_form = html.Div(
             [
                 html.H2("CO2 Assessment"),
-                html.Div(id="co2-form-content"),
+                dcc.Loading(
+                    id="co2-loading",
+                    type="circle",  # "default", "circle", "dot"
+                    children=html.Div(id="co2-form-content"),
+                    color="green",  # optional spinner color
+                ),
             ]
         )
 

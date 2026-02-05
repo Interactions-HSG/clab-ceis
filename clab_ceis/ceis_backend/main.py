@@ -1,11 +1,11 @@
-from typing import Optional
+from typing import Optional, Mapping, cast
 from db_init import init_sqlite_db
-from utils import get_bindings
-from fastapi import FastAPI, Request
+from utils import get_bindings, get_co2
+from fastapi import FastAPI, Request, HTTPException
 import requests
 import sqlite3
 import json
-from models import FabricBlock
+from models import Co2Response, FabricBlock, FabricBlockInfo
 
 app = FastAPI()
 
@@ -37,26 +37,33 @@ def get_info_croptop():
     except Exception as e:
         return {"error": str(e)}
 
-    # return {
-    #     "alternatives": [
-    #         {
-    #             "price": 25,
-    #             "co2eq": 33,
-    #             "timestamp": 1707985660,
-    #         },
-    #         {
-    #             "price": 40,
-    #             "co2eq": 20,
-    #             "timestamp": 1708985660,
-    #         },
-    #     ]
-    # }
+
+@app.get("/fabric-block-types")
+def get_fabric_block_types():
+    conn = sqlite3.connect("ceis_backend.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, name FROM fabric_block_types")
+    fabric_block_types = cursor.fetchall()
+    conn.close()
+    return [{"id": fb_type[0], "name": fb_type[1]} for fb_type in fabric_block_types]
+
+
+@app.get("/process-types")
+def get_preparation_types():
+    conn = sqlite3.connect("ceis_backend.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, name FROM process_types")
+    preparation_types = cursor.fetchall()
+    conn.close()
+    return [
+        {"id": prep_type[0], "name": prep_type[1]} for prep_type in preparation_types
+    ]
 
 
 @app.post("/fabric-block")
-async def create_fabric_block(fabric_block: FabricBlock):
+async def create_fabric_block(fabric_block: FabricBlockInfo):
     print("Received fabric block:", fabric_block)
-    co2eq = fabric_block.co2eq if fabric_block.co2eq is not None else None
+    co2eq = None  # Placeholder
     conn = sqlite3.connect("ceis_backend.db")
     cursor = conn.cursor()
 
@@ -72,14 +79,14 @@ async def create_fabric_block(fabric_block: FabricBlock):
         conn.close()
         return {"error": "Invalid fabric block type"}
 
-    preparations = fabric_block.preparations or []
+    preparations = fabric_block.processes or []
     if preparations:
         cursor.executemany(
             """
             INSERT INTO preparations_used_fabric_blocks (type_id, amount, fabric_block_id)
             VALUES (?, ?, ?)
             """,
-            [(prep.type_id, prep.amount, fabric_block_id) for prep in preparations],
+            [(prep.type_id, prep.time, fabric_block_id) for prep in preparations],
         )
 
     conn.commit()
@@ -120,7 +127,6 @@ def get_fabric_blocks(type: Optional[str] = None):
             (fb_id,),
         )
         preparations_data = cursor.fetchall()
-        print("preparations_data:", preparations_data)
         preparations = [{"type": p[0], "amount": p[1]} for p in preparations_data]
         fabric_blocks.append(
             {
@@ -161,204 +167,3 @@ def test_endpoint():
     print("Response:", response.text)
 
 
-def get_wiser_token():
-    url = (
-        "https://auth.wiser.ehealth.hevs.ch/realms/wiser/protocol/openid-connect/token"
-    )
-    payload = {
-        "grant_type": "password",
-        "client_id": "wiser-api-public",
-        "username": "simeon",
-        "password": "meWdis-sikfup-0josgi",
-    }
-    headers = {"Content-Type": "application/x-www-form-urlencoded"}
-
-    try:
-        response = requests.post(url, data=payload, headers=headers)
-        response.raise_for_status()
-        json = response.json()
-        return json["access_token"]
-    except Exception as e:
-        return {"error": str(e)}
-
-
-def get_recipe_for_fabric_block(fabric_block: str):
-    conn = sqlite3.connect("ceis_backend.db")
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT material, activity_id, amount_kg FROM fabric_block_types WHERE name = ?",
-        (fabric_block,),
-    )
-    result = cursor.fetchone()
-    if result:
-        material, activity_id, amount_kg = result
-        return material, activity_id, amount_kg
-    return None, None, 0
-
-
-def get_resource_data_for_process(process: str) -> Optional[list[tuple[str, float]]]:
-    conn = sqlite3.connect("ceis_backend.db")
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-        SELECT rt.activity_id, prc.amount
-        FROM process_types pt
-        JOIN process_resource_consumption prc ON prc.process_id = pt.id
-        JOIN resource_types rt ON prc.resource_id = rt.id
-        WHERE pt.name = ?
-        """,
-        (process,),
-    )
-    result = cursor.fetchall()
-    conn.close()
-    if result:
-        return [(row[0], row[1]) for row in result]
-    return None
-
-
-def get_co2(garment_type: str) -> dict[str, object]:
-    wiser_token = get_wiser_token()
-    print("wiser_token", wiser_token)
-
-    total_emission = 0
-    emission_details = {"fabric_blocks": [], "processes": []}
-    recipe = None
-    if garment_type == "croptop":
-        recipe = get_garment_recipe("croptop")
-    elif garment_type == "skirt":
-        recipe = get_garment_recipe("skirt")
-    else:
-        return {"error": "Invalid garment type"}
-    if recipe is None:
-        return {"error": "Recipe not found for garment type"}
-    print("recipe", recipe)
-
-    activity_url = "https://api.wiser.ehealth.hevs.ch/ecoinvent/3.11-cutoff/activity/"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {wiser_token}",
-    }
-    for fabric_block in recipe["fabric_blocks"]:
-        print("fabric block", fabric_block)
-        material, activity_id, amount = get_recipe_for_fabric_block(fabric_block)
-
-        url = f"{activity_url}{activity_id}/"
-
-        try:
-            response = requests.get(url, headers=headers)
-            response.raise_for_status()
-            json = response.json()
-        except Exception as e:
-            print("error", str(e))
-            return {"error": str(e)}
-        emission = next(
-            (
-                item["emissions"]
-                for item in json["lcia_results"]
-                if item["method"]["name"] == "IPCC 2021"
-            ),
-            None,
-        )
-        emission_details["fabric_blocks"].append(
-            {
-                "fabric_block": fabric_block,
-                "material": material,
-                "amount": amount,
-                "activity_id": activity_id,
-                "emission": emission * amount if emission is not None else None,
-            }
-        )
-        print(f"CO2eq per unit: {emission}")
-        if emission is not None:
-            total_emission += emission * amount
-    for process, details in recipe["processes"].items():
-        print("process", process)
-        emission_details["processes"].append({"process": process, "details": details})
-        resource_data = get_resource_data_for_process(process)
-        if resource_data is None:
-            print(f"No activity ids found for process {process}")
-            continue
-        for activity_id, amount in resource_data:
-            url = f"{activity_url}{activity_id}/"
-            try:
-                response = requests.get(url, headers=headers)
-                response.raise_for_status()
-                json = response.json()
-            except Exception as e:
-                print("error", str(e))
-                return {"error": str(e)}
-            emission = next(
-                (
-                    item["emissions"]
-                    for item in json["lcia_results"]
-                    if item["method"]["name"] == "IPCC 2021"
-                ),
-                None,
-            )
-            # append emission details
-            emission_details["processes"][-1].setdefault("emissions", []).append(
-                {
-                    "amount": amount,
-                    "activity_id": activity_id,
-                    "emission": (
-                        emission * amount * details["time"]
-                        if emission is not None
-                        else None
-                    ),
-                }
-            )
-            print(f"CO2eq for process {process} activity {activity_id}: {emission}")
-            if emission is not None:
-                total_emission += emission * amount * details["time"]
-
-    return {"total_co2eq": total_emission, "details": emission_details}
-
-
-def get_garment_recipe(garment_type: str):
-    conn = sqlite3.connect("ceis_backend.db")
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT id FROM garment_types WHERE name = ?", (garment_type,))
-    garment_type_id = cursor.fetchone()
-
-    if not garment_type_id:
-        return None
-
-    garment_type_id = garment_type_id[0]
-
-    cursor.execute(
-        """
-        SELECT ft.name, grfb.amount FROM garment_recipe_fabric_blocks grfb
-        JOIN fabric_block_types ft ON grfb.fabric_block_id = ft.id
-        WHERE grfb.garment_type = ?
-    """,
-        (garment_type_id,),
-    )
-
-    fabric_blocks_data = cursor.fetchall()
-
-    fabric_blocks = []
-    for fb in fabric_blocks_data:
-        fb_name, fb_amount = fb
-        fabric_blocks.extend([fb_name] * fb_amount)
-
-    cursor.execute(
-        """
-        SELECT pt.name, grp.time FROM garment_recipe_processes grp
-        JOIN process_types pt ON grp.process_id = pt.id
-        WHERE grp.garment_type = ?
-    """,
-        (garment_type_id,),
-    )
-
-    processes_data = cursor.fetchall()
-
-    processes = {}
-    for proc in processes_data:
-        proc_name, proc_time = proc
-        processes[proc_name] = {"time": proc_time}
-
-    conn.close()
-
-    recipe = {"fabric_blocks": fabric_blocks, "processes": processes}
-    return recipe
