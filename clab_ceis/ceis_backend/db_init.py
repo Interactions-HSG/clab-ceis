@@ -151,7 +151,7 @@ def init_sqlite_db():
 
             INSERT OR IGNORE INTO process_types (name) VALUES
             ('sewing'),
-            ('steaming'),
+            ('washing'),
             ('dyeing');
 
             INSERT OR IGNORE INTO resource_types (name, unit, activity_id) VALUES
@@ -161,9 +161,9 @@ def init_sqlite_db():
             INSERT OR IGNORE INTO process_resource_consumption (process_id, resource_id, amount) VALUES
             ((SELECT id FROM process_types WHERE name='sewing'),
              (SELECT id FROM resource_types WHERE name='electricity'), 1.0),
-            ((SELECT id FROM process_types WHERE name='steaming'),
+            ((SELECT id FROM process_types WHERE name='washing'),
              (SELECT id FROM resource_types WHERE name='water'), 5.0),
-            ((SELECT id FROM process_types WHERE name='steaming'),
+            ((SELECT id FROM process_types WHERE name='washing'),
              (SELECT id FROM resource_types WHERE name='electricity'), 2.0),
             ((SELECT id FROM process_types WHERE name='dyeing'),
              (SELECT id FROM resource_types WHERE name='water'), 10.0);
@@ -176,7 +176,7 @@ def init_sqlite_db():
 
             INSERT OR IGNORE INTO garment_recipe_processes (garment_type, process_id, time) VALUES
             ((SELECT id FROM garment_types WHERE name='croptop'), (SELECT id FROM process_types WHERE name='sewing'), 1),
-            ((SELECT id FROM garment_types WHERE name='croptop'), (SELECT id FROM process_types WHERE name='steaming'), 3),
+            ((SELECT id FROM garment_types WHERE name='croptop'), (SELECT id FROM process_types WHERE name='washing'), 3),
             ((SELECT id FROM garment_types WHERE name='skirt'), (SELECT id FROM process_types WHERE name='sewing'), 1),
             ((SELECT id FROM garment_types WHERE name='skirt'), (SELECT id FROM process_types WHERE name='dyeing'), 2);
         """

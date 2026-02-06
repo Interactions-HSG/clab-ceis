@@ -1,5 +1,10 @@
 #!/usr/bin/env python
-from clab_ceis.ceis_backend.models import Co2Response, FabricBlock, FabricBlockInfo, PreparationInfo
+from clab_ceis.ceis_backend.models import (
+    Co2Response,
+    FabricBlock,
+    FabricBlockInfo,
+    PreparationInfo,
+)
 from dash import Dash, Input, Output, State, callback_context, html, dcc
 import requests
 import pandas as pd
@@ -252,7 +257,7 @@ def get_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
                 (fb["alternative"]["emission"] if fb["alternative"] else 0)
                 for fb in top_co2.fabric_blocks.details
             )
-                
+
             alternative_co2_top = (
                 top_co2.processes.total_emission + co2_from_used_fabric_blocks_top
             )
@@ -404,7 +409,6 @@ def get_co2(garment_type: str) -> Co2Response | None:
             return None
 
         data = resp.json()
-        print(f"CO2 data for {garment_type}:", data)
         return Co2Response(**data)
 
     except Exception as e:
