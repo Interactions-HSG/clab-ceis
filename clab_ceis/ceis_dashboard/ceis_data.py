@@ -58,17 +58,3 @@ class CeisTrade:
                 "co2eq": CeisTrade._quote["CO2eq"],
             }
         return CeisTrade._offer
-
-
-# def _get_data():
-#     csv_path = Path("clab_prototype/resevents.csv")
-#     if csv_path.exists():
-#         return pd.read_csv(csv_path).sort_values(by="Timestamp")
-#     else:
-#         return pd.read_csv("resevents.csv").sort_values(by="Timestamp")
-
-
-# data = _get_data()
-
-
-# ceis_event_tr = data["EventTrigger"].sort_values().unique()
