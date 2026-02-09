@@ -1,6 +1,7 @@
 from typing import Optional, Mapping, cast
+import base64
 from db_init import init_sqlite_db
-from utils import get_bindings, get_co2
+from utils import get_bindings, get_co2, get_wiser_token
 from fastapi import FastAPI, Request, HTTPException
 import requests
 import sqlite3
@@ -10,6 +11,7 @@ from models import (
     FabricBlock,
     FabricBlockInfo,
     FabricBlockTypeCreate,
+    ActivitySearchRequest,
     GarmentRecipeCreate,
     GarmentTypeCreate,
     ProcessTypeCreate,
@@ -186,6 +188,53 @@ def get_resource_types():
         }
         for res_type in resource_types
     ]
+
+
+@app.post("/activity-search")
+def activity_search(payload: ActivitySearchRequest):
+    if not payload.query:
+        raise HTTPException(status_code=400, detail="Query is required")
+
+    token = get_wiser_token()
+    print("token:", token)
+    if isinstance(token, dict):
+        raise HTTPException(status_code=500, detail="Failed to fetch Wiser token")
+
+    url = "https://api.wiser.ehealth.hevs.ch/ecoinvent/3.12-cutoff/activity/search/"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+    response = requests.post(url, headers=headers, json={"query": payload.query})
+    if response.status_code != 200:
+        print("Activity search failed")
+        print("Request url:", url)
+        print("Query:", payload.query)
+        print("Status:", response.status_code)
+        print("Response headers:", dict(response.headers))
+        try:
+            print("Response body:", response.json())
+        except Exception:
+            print("Response body (text):", response.text)
+        raise HTTPException(
+            status_code=response.status_code,
+            detail="Activity search failed",
+        )
+
+    data = response.json()
+    results = []
+    for item in data.get("search_results", []):
+        location = item.get("location", {}) or {}
+        results.append(
+            {
+                "id": item.get("id"),
+                "location": location.get("code"),
+                "name": item.get("name"),
+                "reference_product": item.get("reference_product"),
+            }
+        )
+
+    return {"results": results}
 
 
 @app.get("/croptop")
@@ -495,6 +544,32 @@ def get_fabric_blocks(type: Optional[str] = None):
     return fabric_blocks
 
 
+@app.delete("/fabric-blocks/{fabric_block_id}")
+def delete_fabric_block(fabric_block_id: int):
+    conn = sqlite3.connect("ceis_backend.db")
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "SELECT id FROM fabric_blocks_inventory WHERE id = ?",
+            (fabric_block_id,),
+        )
+        if cursor.fetchone() is None:
+            raise HTTPException(status_code=404, detail="Fabric block not found")
+
+        cursor.execute(
+            "DELETE FROM preparations_used_fabric_blocks WHERE fabric_block_id = ?",
+            (fabric_block_id,),
+        )
+        cursor.execute(
+            "DELETE FROM fabric_blocks_inventory WHERE id = ?",
+            (fabric_block_id,),
+        )
+        conn.commit()
+        return {"message": "Fabric block deleted"}
+    finally:
+        conn.close()
+
+
 @app.get("/co2/croptop")
 def get_co2_croptop():
     co2_data = get_co2("croptop")
@@ -509,13 +584,45 @@ def get_co2_skirt():
 
 @app.get("/test")
 def test_endpoint():
+    # token = get_wiser_token()
+    token = "eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJralFLN3FFYXl1cS1mM1NLU2FiaXV4Z3lpRG5IRnlSWXVQc3c3cEQyVDVFIn0.eyJleHAiOjE3NzA2MzU3MjUsImlhdCI6MTc3MDYzNTQyNSwianRpIjoiYTE3MDg4YmEtOTM4MC00ZTdmLWE3YTItNTM3YjhhZjQ1Zjk2IiwiaXNzIjoiaHR0cHM6Ly9hdXRoLndpc2VyLmVoZWFsdGguaGV2cy5jaC9yZWFsbXMvd2lzZXIiLCJhdWQiOlsic3A0LWtnIiwic3A1LWJhY2tlbmQtdGVzdCIsIndpc2VyLXNwMy1hcGkiLCJzcDUtc3dpc3MtcHJvZHVjdGlvbiIsInNwNS1zd2lzcy1wcm9kdWN0aW9uLXRlc3QiLCJzcDYtY2l0eS1pY3QiLCJhY2NvdW50Iiwic3A3LWRhdGEtY2VudGVycyJdLCJzdWIiOiIxN2E5ODUxMC0yMmRhLTQwZmMtYmJhNS0xMDYwMmQ2MWFkNzEiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJ3aXNlci1hcGktcHVibGljIiwic2Vzc2lvbl9zdGF0ZSI6ImQ5ZWFlMjUzLTM3MmUtNGYyMC1hYmFhLTdhYjA2ZmMwNWVhNCIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiLyoiXSwicmVhbG1fYWNjZXNzIjp7InJvbGVzIjpbIm9mZmxpbmVfYWNjZXNzIiwiZGVmYXVsdC1yb2xlcy13aXNlciIsInVtYV9hdXRob3JpemF0aW9uIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsic3A1LXN3aXNzLXByb2R1Y3Rpb24iOnsicm9sZXMiOlsiUk9MRV9TUDVfQURNSU4iXX0sInNwNS1zd2lzcy1wcm9kdWN0aW9uLXRlc3QiOnsicm9sZXMiOlsiUk9MRV9TUDVfQURNSU4iXX0sInNwNi1jaXR5LWljdCI6eyJyb2xlcyI6WyJST0xFX1NQNl9BRE1JTiJdfSwid2lzZXItc3AzLWFwaSI6eyJyb2xlcyI6WyJwbGFzdGljc2V1cm9wZV8qIiwiZWNvaW52ZW50XyoiLCJ1dmVrXyoiLCJrYm9iXyoiXX0sInNwNC1rZyI6eyJyb2xlcyI6WyJST0xFX0FETUlOIiwiUkVBRF9SRVBPXyoiXX0sImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfSwic3A3LWRhdGEtY2VudGVycyI6eyJyb2xlcyI6WyJST0xFX1NQN19BRE1JTiJdfX0sInNjb3BlIjoicHJvZmlsZSBlbWFpbCIsInNpZCI6ImQ5ZWFlMjUzLTM3MmUtNGYyMC1hYmFhLTdhYjA2ZmMwNWVhNCIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJ2ZXJzaW9ucyI6WyJwbGFzdGljc2V1cm9wZV8qIiwiZWNvaW52ZW50XyoiLCJ1dmVrXyoiLCJrYm9iXyoiXSwicm9sZXMiOlsiUk9MRV9BRE1JTiIsIlJFQURfUkVQT18qIl0sIm5hbWUiOiJTaW1lb24gUGlseiIsIm9yZ2FuaXphdGlvbnMiOlt7Imdyb3VwX2lkIjoiN2E1NGVlZDItNzc2Ny00MDdjLThhYjYtZjU5YmJkZjgxMzk3IiwiY29tcGFueV9uYW1lIjoiVW5pdmVyc2l0w6R0IFN0LiBHYWxsZW4iLCJhdWRpdG9yX2dyb3VwIjoiNTMwZTllNzMtNzdiMC00Njc5LWE3MGUtZDIyZDc4MzI3MWM3In1dLCJncm91cF9uYW1lcyI6WyIvSU5URVJOQUwvVU5JVkVSU0lUWV9TVF9HQUxMRU4vQURNSU5fR1JPVVAiLCIvSU5URVJOQUwvVU5JVkVSU0lUWV9TVF9HQUxMRU4iXSwiYWRtaW5fZ3JvdXBfaWRzIjpbIjdhNTRlZWQyLTc3NjctNDA3Yy04YWI2LWY1OWJiZGY4MTM5NyJdLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJzaW1lb24iLCJnaXZlbl9uYW1lIjoiU2ltZW9uIiwiZmFtaWx5X25hbWUiOiJQaWx6IiwibWFpbl9vcmdhbml6YXRpb25faWQiOiI3YTU0ZWVkMi03NzY3LTQwN2MtOGFiNi1mNTliYmRmODEzOTciLCJlbWFpbCI6InNpbWVvbi5waWx6QHVuaXNnLmNoIn0.U9joIYkESQvRa7yQY7Zxjk0BmVerzsu4QnPc4wHHsKRxoHc8IFs2oQAmfjfeDsF55tVNy0lckbUSgQWV5H6-F6GXsvhjekH7opCEmNcrfeLVvilltI6Qtco0liTAm_xa1YY-klLVhzYq0w7wuy1hrWQXbyPqU-udsJfTKnQAjX996arxPXAfJi2MOeOqq0t1dFEsgkaa4U6tzBSC7hBlclKDa8NBz-6PVa2_j6FWCTs82-0geDvNKtXUjvTg3d2Th2SlvsJ7g9nEOUddRmhYcmBd_7mGgw-_iB53Rc0oa1LBG32OM6aFvTFDP-DNiJQ94dDVZBPzTTQ5d3mrEIPxkw"
+    print("token:", token)
+    if isinstance(token, dict):
+        raise HTTPException(status_code=500, detail="Failed to fetch Wiser token")
 
-    url = "https://api.wiser.ehealth.hevs.ch/ecoinvent/3.11-cutoff/activity/3878/"
-
+    url = "https://api.wiser.ehealth.hevs.ch/ecoinvent/3.12-cutoff/activity/search/"
     headers = {
-        "Authorization": "Bearer eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJralFLN3FFYXl1cS1mM1NLU2FiaXV4Z3lpRG5IRnlSWXVQc3c3cEQyVDVFIn0.eyJleHAiOjE3NzAwNTQ3MzEsImlhdCI6MTc3MDA1NDQzMSwianRpIjoiY2Y1MWViNTYtZTY5MS00ZjBiLWEwNDgtMGQzNDgzOTIzNWI3IiwiaXNzIjoiaHR0cHM6Ly9hdXRoLndpc2VyLmVoZWFsdGguaGV2cy5jaC9yZWFsbXMvd2lzZXIiLCJhdWQiOlsic3A0LWtnIiwic3A1LWJhY2tlbmQtdGVzdCIsIndpc2VyLXNwMy1hcGkiLCJzcDUtc3dpc3MtcHJvZHVjdGlvbiIsInNwNS1zd2lzcy1wcm9kdWN0aW9uLXRlc3QiLCJzcDYtY2l0eS1pY3QiLCJhY2NvdW50Iiwic3A3LWRhdGEtY2VudGVycyJdLCJzdWIiOiIxN2E5ODUxMC0yMmRhLTQwZmMtYmJhNS0xMDYwMmQ2MWFkNzEiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJ3aXNlci1hcGktcHVibGljIiwic2Vzc2lvbl9zdGF0ZSI6ImYwNjFiZjJiLTkxMGQtNGMyYi1iNDA5LTc0ZmNiNWM0ZWIyZCIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiLyoiXSwicmVhbG1fYWNjZXNzIjp7InJvbGVzIjpbIm9mZmxpbmVfYWNjZXNzIiwiZGVmYXVsdC1yb2xlcy13aXNlciIsInVtYV9hdXRob3JpemF0aW9uIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsic3A1LXN3aXNzLXByb2R1Y3Rpb24iOnsicm9sZXMiOlsiUk9MRV9TUDVfQURNSU4iXX0sInNwNS1zd2lzcy1wcm9kdWN0aW9uLXRlc3QiOnsicm9sZXMiOlsiUk9MRV9TUDVfQURNSU4iXX0sInNwNi1jaXR5LWljdCI6eyJyb2xlcyI6WyJST0xFX1NQNl9BRE1JTiJdfSwid2lzZXItc3AzLWFwaSI6eyJyb2xlcyI6WyJwbGFzdGljc2V1cm9wZV8qIiwiZWNvaW52ZW50XyoiLCJ1dmVrXyoiLCJrYm9iXyoiXX0sInNwNC1rZyI6eyJyb2xlcyI6WyJST0xFX0FETUlOIiwiUkVBRF9SRVBPXyoiXX0sImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfSwic3A3LWRhdGEtY2VudGVycyI6eyJyb2xlcyI6WyJST0xFX1NQN19BRE1JTiJdfX0sInNjb3BlIjoicHJvZmlsZSBlbWFpbCIsInNpZCI6ImYwNjFiZjJiLTkxMGQtNGMyYi1iNDA5LTc0ZmNiNWM0ZWIyZCIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJyb2xlcyI6WyJST0xFX0FETUlOIiwiUkVBRF9SRVBPXyoiXSwibmFtZSI6IlNpbWVvbiBQaWx6Iiwib3JnYW5pemF0aW9ucyI6W3siZ3JvdXBfaWQiOiI3YTU0ZWVkMi03NzY3LTQwN2MtOGFiNi1mNTliYmRmODEzOTciLCJjb21wYW55X25hbWUiOiJVbml2ZXJzaXTDpHQgU3QuIEdhbGxlbiIsImF1ZGl0b3JfZ3JvdXAiOiI1MzBlOWU3My03N2IwLTQ2NzktYTcwZS1kMjJkNzgzMjcxYzcifV0sImdyb3VwX25hbWVzIjpbIi9JTlRFUk5BTC9VTklWRVJTSVRZX1NUX0dBTExFTi9BRE1JTl9HUk9VUCIsIi9JTlRFUk5BTC9VTklWRVJTSVRZX1NUX0dBTExFTiJdLCJhZG1pbl9ncm91cF9pZHMiOlsiN2E1NGVlZDItNzc2Ny00MDdjLThhYjYtZjU5YmJkZjgxMzk3Il0sInByZWZlcnJlZF91c2VybmFtZSI6InNpbWVvbiIsImdpdmVuX25hbWUiOiJTaW1lb24iLCJmYW1pbHlfbmFtZSI6IlBpbHoiLCJtYWluX29yZ2FuaXphdGlvbl9pZCI6IjdhNTRlZWQyLTc3NjctNDA3Yy04YWI2LWY1OWJiZGY4MTM5NyIsImVtYWlsIjoic2ltZW9uLnBpbHpAdW5pc2cuY2gifQ.V5bZgTz86CxSDtI1hCwkDcXKmrlDXmQdtdyOjNrWQGlPJGULbT7ULqI_CzVRt967rAUwljTg8xyrbnCzYiV_zWOggIZHdiBtdq1idKBB7imlGE5t-wn7JFyV8wv0HF4wBuSdj5Ri3w9Pe5TyEV4hr9WmXi_MbSu33O4cWpFb-duBxwXYE6yVH_SbTrXssf5D4HN2K5PHv5g-K0WinffY460GNRnFl_lbbgCXyy9ZbPY9D1vUxx6dMuabsJZOKTOUKFsYBRCI7_QhqLPXMtH15StbgTJbTB52hdMqGlkA1OPPGYfIuU7Qmt3olDpKVlvOrI8lD_OCgcbioan6QxeeiQ",
+        "Authorization": f"Bearer {token}",
+        # "Content-Type": "application/json",
     }
+    response = requests.post(url, headers=headers, json={"query": "electricity"})
+    print("History:", response.history)
+    if response.status_code != 200:
+        print("Activity search failed")
+        print("Request url:", url)
+        print("Query:", "electricity")
+        print("Status:", response.status_code)
+        print("Response headers:", dict(response.headers))
+        try:
+            print("Response body:", response.json())
+        except Exception:
+            print("Response body (text):", response.text)
+        raise HTTPException(
+            status_code=response.status_code,
+            detail="Activity search failed",
+        )
 
-    response = requests.get(url, headers=headers)
-    print("Status:", response.status_code)
-    print("Response:", response.text)
+    data = response.json()
+    results = []
+    for item in data.get("search_results", []):
+        location = item.get("location", {}) or {}
+        results.append(
+            {
+                "id": item.get("id"),
+                "location": location.get("code"),
+                "name": item.get("name"),
+                "reference_product": item.get("reference_product"),
+            }
+        )
+
+    return {"results": results}

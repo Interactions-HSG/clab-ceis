@@ -29,6 +29,25 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
 
         return []
 
+    @app.callback(
+        Output("delete-fabric-block-id", "options"),
+        Input("url", "pathname"),
+        Input("refresh-fabric-blocks", "n_clicks"),
+        Input("add-fabric-blocks", "n_clicks"),
+        Input("delete-fabric-block-button", "n_clicks"),
+    )
+    def load_fabric_block_inventory_options(
+        pathname, refresh_clicks, add_clicks, delete_clicks
+    ):
+        blocks = fetch_fabric_blocks()
+        return [
+            {
+                "label": f"{block.get('id')} - {block.get('type')}",
+                "value": block.get("id"),
+            }
+            for block in blocks
+        ]
+
     # Callback to add/remove preparation input fields
     @app.callback(
         Output("preparations-container", "children"),
@@ -111,34 +130,42 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
     @app.callback(
         Output("fabric-blocks-table", "data"),
         Output("fabric-add-status", "children"),
+        Output("fabric-remove-status", "children"),
         [
             Input("refresh-fabric-blocks", "n_clicks"),
             Input("add-fabric-blocks", "n_clicks"),
+            Input("delete-fabric-block-button", "n_clicks"),
         ],
         [
             State("fabric-type", "value"),
             State({"type": "prep-name", "index": ALL}, "value"),
             State({"type": "prep-count", "index": ALL}, "value"),
+            State("delete-fabric-block-id", "value"),
             State("fabric-blocks-table", "data"),
         ],
     )
     def update_fabric_table(
-        refresh_clicks, add_clicks, type_val, prep_names, prep_counts, current_data
+        refresh_clicks,
+        add_clicks,
+        delete_clicks,
+        type_val,
+        prep_names,
+        prep_counts,
+        delete_id,
+        current_data,
     ):
         ctx = callback_context
         triggered = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else None
 
-        status_msg = ""
-
         if not triggered:
-            return fetch_fabric_blocks(), ""
+            return fetch_fabric_blocks(), "", ""
         if triggered == "refresh-fabric-blocks":
-            return fetch_fabric_blocks(), ""
+            return fetch_fabric_blocks(), "", ""
 
         if triggered == "add-fabric-blocks":
 
             if not type_val:
-                return no_update, "Please select a fabric type."
+                return no_update, "Please select a fabric type.", ""
 
             preparations: list[PreparationInfo] = []
             for name, count in zip(prep_names, prep_counts):
@@ -165,12 +192,36 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
                     )
 
                     # Now fetch fresh data
-                    return fetch_fabric_blocks(), status_msg
+                    return fetch_fabric_blocks(), status_msg, ""
 
                 else:
-                    return no_update, f"Error adding fabric block: {resp.status_code}"
+                    return (
+                        no_update,
+                        f"Error adding fabric block: {resp.status_code}",
+                        "",
+                    )
 
             except Exception as e:
-                return no_update, f"Error connecting to backend: {str(e)}"
+                return no_update, f"Error connecting to backend: {str(e)}", ""
 
-        return no_update, ""
+        if triggered == "delete-fabric-block-button":
+            if not delete_id:
+                return no_update, "", "Please select a fabric block to remove."
+
+            try:
+                resp = requests.delete(
+                    f"{config.BACKEND_API_URL}/fabric-blocks/{delete_id}"
+                )
+                if resp.status_code in (200, 204):
+                    return fetch_fabric_blocks(), "", "Fabric block removed."
+                if resp.status_code == 404:
+                    return no_update, "", "Fabric block not found."
+                return (
+                    no_update,
+                    "",
+                    f"Error removing fabric block: {resp.status_code}",
+                )
+            except Exception as e:
+                return no_update, "", f"Error connecting to backend: {str(e)}"
+
+        return no_update, "", ""

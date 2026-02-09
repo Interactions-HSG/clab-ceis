@@ -15,7 +15,7 @@ def get_index_layout():
                 href="/add-recipe",
                 id="add-recipe-link",
             ),
-            html.H2("Fabric Block Inventory"),
+            html.H2("Second-hand Fabric Block Inventory"),
             html.Button(
                 "Refresh Fabric Blocks",
                 id="refresh-fabric-blocks",
@@ -43,7 +43,7 @@ def get_index_layout():
 
     fabric_form = html.Div(
         [
-            html.H2("Add Fabric Blocks to inventory"),
+            html.H2("Add Second-hand Fabric Blocks to inventory"),
             html.Div(
                 [
                     html.Label("Type"),
@@ -81,6 +81,28 @@ def get_index_layout():
             html.Button("Add Fabric Block", id="add-fabric-blocks", n_clicks=0),
             html.Div(
                 id="fabric-add-status", style={"marginTop": "8px", "color": "green"}
+            ),
+            html.H3("Remove Second-hand Fabric Block"),
+            html.Div(
+                [
+                    html.Label("Fabric block"),
+                    dcc.Dropdown(
+                        id="delete-fabric-block-id",
+                        options=[],
+                        placeholder="Select a fabric block",
+                        clearable=False,
+                    ),
+                    html.Button(
+                        "Remove Fabric Block",
+                        id="delete-fabric-block-button",
+                        n_clicks=0,
+                    ),
+                    html.Div(
+                        id="fabric-remove-status",
+                        style={"marginTop": "8px", "color": "green"},
+                    ),
+                ],
+                style={"marginTop": "12px", "maxWidth": "400px"},
             ),
         ],
         className="fabric-add-form",

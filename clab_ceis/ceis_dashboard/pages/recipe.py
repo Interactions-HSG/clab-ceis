@@ -263,6 +263,33 @@ def get_recipe_layout():
                         ],
                         style={"marginBottom": "20px"},
                     ),
+                    html.Br(),
+                    html.Br(),
+                    html.H2("Search Ecoinvent for activity ID of a resource"),
+                    html.Div(
+                        [
+                            html.Label("Search query"),
+                            dcc.Input(
+                                id="activity-search-query",
+                                type="text",
+                                placeholder="e.g., electricity",
+                            ),
+                            html.Button(
+                                "Search",
+                                id="activity-search-button",
+                                n_clicks=0,
+                            ),
+                            html.Div(
+                                id="activity-search-status",
+                                style={"marginTop": "6px", "color": "green"},
+                            ),
+                            html.Div(
+                                id="activity-search-results",
+                                style={"marginTop": "10px"},
+                            ),
+                        ],
+                        style={"marginBottom": "20px"},
+                    ),
                     # html.H2("Delete Resource Type"),
                     # html.Div(
                     #     [

@@ -78,3 +78,7 @@ class GarmentRecipeCreate(BaseModel):
     garment_type_id: int
     fabric_blocks: list[GarmentRecipeFabricBlockCreate]
     processes: Optional[list[GarmentRecipeProcessCreate]] = None
+
+
+class ActivitySearchRequest(BaseModel):
+    query: str

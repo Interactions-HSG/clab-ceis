@@ -4,7 +4,14 @@ from fastapi import HTTPException
 import requests
 import sqlite3
 import json
-from models import Co2Response, EmissionDetails, FabricBlock, GarmentRecipe, Process, Resource
+from models import (
+    Co2Response,
+    EmissionDetails,
+    FabricBlock,
+    GarmentRecipe,
+    Process,
+    Resource,
+)
 
 SPARQL_ENDPOINT = "http://graphdb:7200/repositories/ceis-dev-local"
 
@@ -78,7 +85,9 @@ def get_resources_data_for_process(process: Process) -> list[Resource]:
     result = cursor.fetchall()
     conn.close()
     if result:
-        return [Resource(name=row[0], activity_id=row[1], amount=row[2]) for row in result]
+        return [
+            Resource(name=row[0], activity_id=row[1], amount=row[2]) for row in result
+        ]
     return []
 
 
@@ -86,7 +95,6 @@ def get_co2(garment_type: str) -> Co2Response:
     wiser_token = get_wiser_token()
     print("wiser_token", wiser_token)
 
-    
     recipe = None
     if garment_type == "croptop":
         recipe = get_garment_recipe("croptop")
@@ -97,19 +105,17 @@ def get_co2(garment_type: str) -> Co2Response:
     if recipe is None:
         raise HTTPException(status_code=500, detail="Garment recipe not found")
 
-    activity_url = "https://api.wiser.ehealth.hevs.ch/ecoinvent/3.11-cutoff/activity/"
+    activity_url = "https://api.wiser.ehealth.hevs.ch/ecoinvent/3.12-cutoff/activity/"
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {wiser_token}",
     }
 
-    print("recipe", recipe)
-
     emission_details = Co2Response(
         fabric_blocks=EmissionDetails(details=[], total_emission=0),
         processes=EmissionDetails(details=[], total_emission=0),
     )
-    
+
     fabric_blocks_emissions = 0
     already_used_fabric_block_ids = []
     for fabric_block in recipe.fabric_blocks:
@@ -138,7 +144,7 @@ def get_co2(garment_type: str) -> Co2Response:
             fabric_block, already_used_fabric_block_ids
         )
         print("used fabric block", used_fabric_block)
-        
+
         used_fabric_block_alternative = {}
         if used_fabric_block:
             already_used_fabric_block_ids.append(used_fabric_block.id)
@@ -169,9 +175,13 @@ def get_co2(garment_type: str) -> Co2Response:
                         ),
                         None,
                     )
-                    print(f"CO2eq for resource {resource.name} activity id {resource.activity_id}: {resource_emission_per_unit}")
+                    print(
+                        f"CO2eq for resource {resource.name} activity id {resource.activity_id}: {resource_emission_per_unit}"
+                    )
                     if resource_emission_per_unit is not None:
-                        resource_emissions = resource_emission_per_unit * resource.amount * prep.time
+                        resource_emissions = (
+                            resource_emission_per_unit * resource.amount * prep.time
+                        )
                         resources_details.append(
                             {
                                 "name": resource.name,
@@ -183,15 +193,16 @@ def get_co2(garment_type: str) -> Co2Response:
                         process_emissions += resource_emissions
                 used_fabric_block_emissions += process_emissions
                 process_details = {
-                        "preparation": prep.activity,
-                        "duration": prep.time,
-                        "resources": resources_details,
-                        "emission": process_emissions
+                    "preparation": prep.activity,
+                    "duration": prep.time,
+                    "resources": resources_details,
+                    "emission": process_emissions,
                 }
-                used_fabric_block_alternative["preparation_details"].append(process_details)
+                used_fabric_block_alternative["preparation_details"].append(
+                    process_details
+                )
             used_fabric_block_alternative["emission"] = used_fabric_block_emissions
-                        
-        
+
         emission_details.fabric_blocks.details.append(
             {
                 "fabric_block": fabric_block,
@@ -199,7 +210,7 @@ def get_co2(garment_type: str) -> Co2Response:
                 "amount": amount,
                 "activity_id": activity_id,
                 "emission": emission * amount if emission is not None else None,
-                "alternative": used_fabric_block_alternative
+                "alternative": used_fabric_block_alternative,
             }
         )
         print(f"CO2eq per unit: {emission}")
@@ -235,7 +246,8 @@ def get_co2(garment_type: str) -> Co2Response:
                 ),
                 None,
             )
-            resource_emissions = (resource_emission_per_unit * resource.amount * process.time
+            resource_emissions = (
+                resource_emission_per_unit * resource.amount * process.time
                 if resource_emission_per_unit is not None
                 else 0
             )
@@ -249,7 +261,9 @@ def get_co2(garment_type: str) -> Co2Response:
                     "emission": resource_emissions,
                 }
             )
-            print(f"CO2eq for resource {resource.name} activity id {resource.activity_id}: {resource_emission_per_unit}")
+            print(
+                f"CO2eq for resource {resource.name} activity id {resource.activity_id}: {resource_emission_per_unit}"
+            )
             if resource_emission_per_unit is not None:
                 processes_emissions += resource_emissions
         emission_details.processes.details[-1]["emission"] = process_emissions
@@ -336,7 +350,7 @@ def get_used_fabric_block(
     if not result:
         conn.close()
         return None
-    
+
     fb_id, fb_type_id, fb_co2eq = result
     cursor.execute(
         """
@@ -353,4 +367,6 @@ def get_used_fabric_block(
         prep_name, prep_amount = prep
         preparations.append(Process(activity=prep_name, time=prep_amount))
     conn.close()
-    return FabricBlock(id=fb_id, type_id=fb_type_id, co2eq=fb_co2eq, processes=preparations)
+    return FabricBlock(
+        id=fb_id, type_id=fb_type_id, co2eq=fb_co2eq, processes=preparations
+    )

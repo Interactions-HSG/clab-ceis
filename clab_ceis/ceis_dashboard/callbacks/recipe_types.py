@@ -586,3 +586,51 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
             return f"Error saving garment recipe: {resp.status_code}"
         except Exception as e:
             return f"Error connecting to backend: {str(e)}"
+
+    @app.callback(
+        Output("activity-search-status", "children"),
+        Output("activity-search-results", "children"),
+        Input("activity-search-button", "n_clicks"),
+        State("activity-search-query", "value"),
+        prevent_initial_call=True,
+    )
+    def search_activities(n_clicks, query):
+        if not query:
+            return "Please enter a search term.", []
+
+        try:
+            resp = requests.post(
+                f"{config.BACKEND_API_URL}/activity-search", json={"query": query}
+            )
+            if resp.status_code != 200:
+                return f"Search failed: {resp.status_code}", []
+
+            results = resp.json().get("results", [])
+            if not results:
+                return "No results found.", []
+
+            header = html.Thead(
+                html.Tr(
+                    [
+                        html.Th("Activity ID"),
+                        html.Th("Location"),
+                        html.Th("Name"),
+                        html.Th("Reference Product"),
+                    ]
+                )
+            )
+            rows = [
+                html.Tr(
+                    [
+                        html.Td(item.get("id")),
+                        html.Td(item.get("location")),
+                        html.Td(item.get("name")),
+                        html.Td(item.get("reference_product")),
+                    ]
+                )
+                for item in results
+            ]
+            table = html.Table([header, html.Tbody(rows)])
+            return f"Found {len(results)} result(s).", table
+        except Exception as e:
+            return f"Error connecting to backend: {str(e)}", []
