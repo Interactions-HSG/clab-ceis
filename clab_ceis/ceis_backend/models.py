@@ -35,3 +35,46 @@ class Co2Response(BaseModel):
 class GarmentRecipe(BaseModel):
     fabric_blocks: list[str]
     processes: list[Process]
+
+
+class GarmentTypeCreate(BaseModel):
+    name: str
+
+
+class FabricBlockTypeCreate(BaseModel):
+    name: str
+    material: Optional[str] = None
+    amount_kg: Optional[float] = None
+    activity_id: int
+
+
+class ResourceTypeCreate(BaseModel):
+    name: str
+    unit: Optional[str] = None
+    activity_id: int
+
+
+class ProcessResourceConsumptionCreate(BaseModel):
+    resource_id: int
+    amount: float
+
+
+class ProcessTypeCreate(BaseModel):
+    name: str
+    resources: list[ProcessResourceConsumptionCreate]
+
+
+class GarmentRecipeFabricBlockCreate(BaseModel):
+    type_id: int
+    amount: int
+
+
+class GarmentRecipeProcessCreate(BaseModel):
+    process_id: int
+    time: float
+
+
+class GarmentRecipeCreate(BaseModel):
+    garment_type_id: int
+    fabric_blocks: list[GarmentRecipeFabricBlockCreate]
+    processes: Optional[list[GarmentRecipeProcessCreate]] = None
