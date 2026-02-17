@@ -285,6 +285,10 @@ def delete_fabric_block_type(type_id: int):
             (type_id,),
         )
         cursor.execute(
+            "DELETE FROM fabric_block_recipe_processes WHERE fabric_block_type = ?",
+            (type_id,),
+        )
+        cursor.execute(
             "DELETE FROM fabric_blocks_inventory WHERE type_id = ?",
             (type_id,),
         )

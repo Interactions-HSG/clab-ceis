@@ -58,15 +58,36 @@ def get_wiser_token():
 def get_recipe_for_fabric_block(fabric_block: str):
     conn = sqlite3.connect("ceis_backend.db")
     cursor = conn.cursor()
+
+    # Get fabric block type details
     cursor.execute(
-        "SELECT material, activity_id, amount_kg FROM fabric_block_types WHERE name = ?",
+        "SELECT id, material, activity_id, amount_kg FROM fabric_block_types WHERE name = ?",
         (fabric_block,),
     )
     result = cursor.fetchone()
-    if result:
-        material, activity_id, amount_kg = result
-        return material, activity_id, amount_kg
-    return None, None, 0
+    if not result:
+        conn.close()
+        return None, None, 0, []
+
+    fabric_block_type_id, material, activity_id, amount_kg = result
+
+    # Get processes for this fabric block type
+    cursor.execute(
+        """
+        SELECT pt.name, fbrp.time
+        FROM fabric_block_recipe_processes fbrp
+        JOIN process_types pt ON fbrp.process_id = pt.id
+        WHERE fbrp.fabric_block_type = ?
+        """,
+        (fabric_block_type_id,),
+    )
+    processes_data = cursor.fetchall()
+    processes: list[Process] = []
+    for proc_name, proc_time in processes_data:
+        processes.append(Process(activity=proc_name, time=proc_time))
+
+    conn.close()
+    return material, activity_id, amount_kg, processes
 
 
 def get_resources_data_for_process(process: Process) -> list[Resource]:
@@ -117,7 +138,9 @@ def get_co2(garment_type_id: int) -> Co2Response:
     already_used_fabric_block_ids = []
     for fabric_block in recipe.fabric_blocks:
         print("fabric block", fabric_block)
-        material, activity_id, amount = get_recipe_for_fabric_block(fabric_block)
+        material, activity_id, amount, fabric_block_processes = (
+            get_recipe_for_fabric_block(fabric_block)
+        )
 
         url = f"{activity_url}{activity_id}/"
 
@@ -136,6 +159,53 @@ def get_co2(garment_type_id: int) -> Co2Response:
             ),
             None,
         )
+
+        # Calculate emissions from fabric block production processes
+        fabric_block_production_emissions = 0
+        fabric_block_process_details = []
+        for fb_process in fabric_block_processes:
+            process_emissions = 0
+            resources_data = get_resources_data_for_process(fb_process)
+            resources_details = []
+            for resource in resources_data:
+                resource_url = f"{activity_url}{resource.activity_id}/"
+                try:
+                    response = requests.get(resource_url, headers=headers)
+                    response.raise_for_status()
+                    json_response = response.json()
+                except Exception as e:
+                    print("error", str(e))
+                    raise HTTPException(status_code=500, detail=str(e))
+                resource_emission_per_unit = next(
+                    (
+                        item["emissions"]
+                        for item in json_response["lcia_results"]
+                        if item["method"]["name"] == "IPCC 2021"
+                    ),
+                    None,
+                )
+                if resource_emission_per_unit is not None:
+                    resource_emissions = (
+                        resource_emission_per_unit * resource.amount * fb_process.time
+                    )
+                    resources_details.append(
+                        {
+                            "name": resource.name,
+                            "amount": resource.amount,
+                            "activity_id": resource.activity_id,
+                            "emission": resource_emissions,
+                        }
+                    )
+                    process_emissions += resource_emissions
+            fabric_block_production_emissions += process_emissions
+            fabric_block_process_details.append(
+                {
+                    "process": fb_process.activity,
+                    "duration": fb_process.time,
+                    "resources": resources_details,
+                    "emission": process_emissions,
+                }
+            )
 
         used_fabric_block = get_used_fabric_block(
             fabric_block, already_used_fabric_block_ids
@@ -200,19 +270,27 @@ def get_co2(garment_type_id: int) -> Co2Response:
                 )
             used_fabric_block_alternative["emission"] = used_fabric_block_emissions
 
+        # Calculate total emission for this fabric block (material + production processes)
+        material_emission = emission * amount if emission is not None else 0
+        total_fabric_block_emission = (
+            material_emission + fabric_block_production_emissions
+        )
+
         emission_details.fabric_blocks.details.append(
             {
                 "fabric_block": fabric_block,
                 "material": material,
                 "amount": amount,
                 "activity_id": activity_id,
-                "emission": emission * amount if emission is not None else None,
+                "emission": total_fabric_block_emission,
+                "material_emission": material_emission,
+                "production_emission": fabric_block_production_emissions,
                 "alternative": used_fabric_block_alternative,
             }
         )
-        print(f"CO2eq per unit: {emission}")
-        if emission is not None:
-            fabric_blocks_emissions += emission * amount
+        print(f"CO2eq per unit (material): {emission}")
+        print(f"CO2eq production processes: {fabric_block_production_emissions}")
+        fabric_blocks_emissions += total_fabric_block_emission
 
     emission_details.fabric_blocks.total_emission = fabric_blocks_emissions
 

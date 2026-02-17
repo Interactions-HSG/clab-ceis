@@ -87,6 +87,19 @@ def init_sqlite_db():
     """
     )
 
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS fabric_block_recipe_processes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fabric_block_type INTEGER NOT NULL,
+            process_id INTEGER NOT NULL,
+            time INTEGER,
+            FOREIGN KEY (fabric_block_type) REFERENCES fabric_block_types(id) ON DELETE CASCADE,
+            FOREIGN KEY (process_id) REFERENCES process_types(id) ON DELETE CASCADE
+        )
+    """
+    )
+
     # inventory tables
     cursor.execute(
         """
@@ -179,6 +192,10 @@ def init_sqlite_db():
             ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM process_types WHERE name='washing'), 3),
             ((SELECT id FROM garment_types WHERE name='Skirt'), (SELECT id FROM process_types WHERE name='sewing'), 1),
             ((SELECT id FROM garment_types WHERE name='Skirt'), (SELECT id FROM process_types WHERE name='dyeing'), 2);
+
+            INSERT OR IGNORE INTO fabric_block_recipe_processes (fabric_block_type, process_id, time) VALUES
+            ((SELECT id FROM fabric_block_types WHERE name='FB1'), (SELECT id FROM process_types WHERE name='dyeing'), 2),
+            ((SELECT id FROM fabric_block_types WHERE name='FB2'), (SELECT id FROM process_types WHERE name='washing'), 1);
         """
         )
         cursor.execute("UPDATE seed_meta SET seeded = 1 WHERE id = 1;")
