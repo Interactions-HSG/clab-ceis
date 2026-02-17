@@ -31,9 +31,19 @@ def fetch_fabric_blocks():
         return []
 
 
-def get_co2(garment_type: str) -> Co2Response | None:
+def fetch_garment_types():
     try:
-        resp = requests.get(f"{config.BACKEND_API_URL}/co2/{garment_type}")
+        resp = requests.get(f"{config.BACKEND_API_URL}/garment-types")
+        if resp.status_code != 200:
+            return []
+        return resp.json()
+    except Exception:
+        return []
+
+
+def get_co2(garment_type_id: int) -> Co2Response | None:
+    try:
+        resp = requests.get(f"{config.BACKEND_API_URL}/co2/{garment_type_id}")
         if resp.status_code != 200:
             return None
 

@@ -570,15 +570,9 @@ def delete_fabric_block(fabric_block_id: int):
         conn.close()
 
 
-@app.get("/co2/croptop")
-def get_co2_croptop():
-    co2_data = get_co2("croptop")
-    return co2_data
-
-
-@app.get("/co2/skirt")
-def get_co2_skirt():
-    co2_data = get_co2("skirt")
+@app.get("/co2/{garment_type_id}")
+def get_co2_for_garment(garment_type_id: int):
+    co2_data = get_co2(garment_type_id)
     return co2_data
 
 

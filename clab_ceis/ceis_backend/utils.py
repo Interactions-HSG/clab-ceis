@@ -91,19 +91,16 @@ def get_resources_data_for_process(process: Process) -> list[Resource]:
     return []
 
 
-def get_co2(garment_type: str) -> Co2Response:
+def get_co2(garment_type_id: int) -> Co2Response:
     wiser_token = get_wiser_token()
     print("wiser_token", wiser_token)
 
-    recipe = None
-    if garment_type == "croptop":
-        recipe = get_garment_recipe("croptop")
-    elif garment_type == "skirt":
-        recipe = get_garment_recipe("skirt")
-    else:
-        raise HTTPException(status_code=400, detail="Invalid garment type")
+    recipe = get_garment_recipe(garment_type_id)
     if recipe is None:
-        raise HTTPException(status_code=500, detail="Garment recipe not found")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Garment recipe not found for garment type ID: {garment_type_id}",
+        )
 
     activity_url = "https://api.wiser.ehealth.hevs.ch/ecoinvent/3.12-cutoff/activity/"
     headers = {
@@ -272,17 +269,13 @@ def get_co2(garment_type: str) -> Co2Response:
     return emission_details
 
 
-def get_garment_recipe(garment_type: str) -> GarmentRecipe | None:
+def get_garment_recipe(garment_type_id: int) -> GarmentRecipe | None:
     conn = sqlite3.connect("ceis_backend.db")
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id FROM garment_types WHERE name = ?", (garment_type,))
-    garment_type_id = cursor.fetchone()
-
-    if not garment_type_id:
+    cursor.execute("SELECT id FROM garment_types WHERE id = ?", (garment_type_id,))
+    if not cursor.fetchone():
         return None
-
-    garment_type_id = garment_type_id[0]
 
     cursor.execute(
         """

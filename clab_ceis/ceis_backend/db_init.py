@@ -142,8 +142,8 @@ def init_sqlite_db():
         cursor.executescript(
             """
             INSERT OR IGNORE INTO garment_types (name) VALUES
-            ('croptop'),
-            ('skirt');
+            ('Crop Top'),
+            ('Skirt');
 
             INSERT OR IGNORE INTO fabric_block_types (name, material, amount_kg, activity_id) VALUES
             ('FB1', 'cotton', 1.5, 3878),
@@ -169,16 +169,16 @@ def init_sqlite_db():
              (SELECT id FROM resource_types WHERE name='water'), 10.0);
 
             INSERT OR IGNORE INTO garment_recipe_fabric_blocks (garment_type, fabric_block_id, amount) VALUES
-            ((SELECT id FROM garment_types WHERE name='croptop'), (SELECT id FROM fabric_block_types WHERE name='FB1'), 2),
-            ((SELECT id FROM garment_types WHERE name='croptop'), (SELECT id FROM fabric_block_types WHERE name='FB2'), 1),
-            ((SELECT id FROM garment_types WHERE name='skirt'), (SELECT id FROM fabric_block_types WHERE name='FB1'), 1),
-            ((SELECT id FROM garment_types WHERE name='skirt'), (SELECT id FROM fabric_block_types WHERE name='FB2'), 2);
+            ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM fabric_block_types WHERE name='FB1'), 2),
+            ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM fabric_block_types WHERE name='FB2'), 1),
+            ((SELECT id FROM garment_types WHERE name='Skirt'), (SELECT id FROM fabric_block_types WHERE name='FB1'), 1),
+            ((SELECT id FROM garment_types WHERE name='Skirt'), (SELECT id FROM fabric_block_types WHERE name='FB2'), 2);
 
             INSERT OR IGNORE INTO garment_recipe_processes (garment_type, process_id, time) VALUES
-            ((SELECT id FROM garment_types WHERE name='croptop'), (SELECT id FROM process_types WHERE name='sewing'), 1),
-            ((SELECT id FROM garment_types WHERE name='croptop'), (SELECT id FROM process_types WHERE name='washing'), 3),
-            ((SELECT id FROM garment_types WHERE name='skirt'), (SELECT id FROM process_types WHERE name='sewing'), 1),
-            ((SELECT id FROM garment_types WHERE name='skirt'), (SELECT id FROM process_types WHERE name='dyeing'), 2);
+            ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM process_types WHERE name='sewing'), 1),
+            ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM process_types WHERE name='washing'), 3),
+            ((SELECT id FROM garment_types WHERE name='Skirt'), (SELECT id FROM process_types WHERE name='sewing'), 1),
+            ((SELECT id FROM garment_types WHERE name='Skirt'), (SELECT id FROM process_types WHERE name='dyeing'), 2);
         """
         )
         cursor.execute("UPDATE seed_meta SET seeded = 1 WHERE id = 1;")
