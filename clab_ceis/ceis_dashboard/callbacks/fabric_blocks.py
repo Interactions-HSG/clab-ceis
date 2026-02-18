@@ -30,6 +30,24 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
         return []
 
     @app.callback(
+        Output("fabric-location", "options"),
+        Input("url", "pathname"),
+    )
+    def load_locations(pathname):
+        try:
+            resp = requests.get(f"{config.BACKEND_API_URL}/locations")
+
+            if resp.status_code == 200:
+                data = resp.json()
+
+                return [{"label": loc["name"], "value": loc["id"]} for loc in data]
+
+        except Exception:
+            pass
+
+        return []
+
+    @app.callback(
         Output("delete-fabric-block-id", "options"),
         Input("url", "pathname"),
         Input("refresh-fabric-blocks", "n_clicks"),
@@ -138,6 +156,7 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
         ],
         [
             State("fabric-type", "value"),
+            State("fabric-location", "value"),
             State({"type": "prep-name", "index": ALL}, "value"),
             State({"type": "prep-count", "index": ALL}, "value"),
             State("delete-fabric-block-id", "value"),
@@ -149,6 +168,7 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
         add_clicks,
         delete_clicks,
         type_val,
+        location_val,
         prep_names,
         prep_counts,
         delete_id,
@@ -177,7 +197,11 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
 
                     preparations.append(PreparationInfo(type_id=name, time=cnt))
 
-            payload = FabricBlockInfo(type_id=type_val, processes=preparations)
+            payload = FabricBlockInfo(
+                type_id=type_val,
+                processes=preparations,
+                location_id=location_val
+            )
             print("Payload:", payload)
             try:
                 resp = requests.post(

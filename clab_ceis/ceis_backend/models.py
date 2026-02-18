@@ -19,10 +19,13 @@ class FabricBlock(BaseModel):
     type_id: int
     co2eq: Optional[int]
     processes: list[Process]
+    location_id: Optional[int] = None
+    location_name: Optional[str] = None
     
 class FabricBlockInfo(BaseModel):
     type_id: int
     processes: list[PreparationInfo]
+    location_id: Optional[int] = None
 
 class EmissionDetails(BaseModel):
     details: list[dict[str, Any]]

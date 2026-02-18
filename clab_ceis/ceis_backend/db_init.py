@@ -103,6 +103,15 @@ def init_sqlite_db():
     # inventory tables
     cursor.execute(
         """
+        CREATE TABLE IF NOT EXISTS locations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE
+        )
+    """
+    )
+
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS garments_inventory (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             type_id INTEGER NOT NULL,
@@ -120,8 +129,10 @@ def init_sqlite_db():
             type_id INTEGER NOT NULL,
             co2eq INTEGER,
             garment_id INTEGER,
+            location_id INTEGER,
             FOREIGN KEY (type_id) REFERENCES fabric_block_types (id) ON DELETE CASCADE,
-            FOREIGN KEY (garment_id) REFERENCES garments_inventory (id) ON DELETE CASCADE
+            FOREIGN KEY (garment_id) REFERENCES garments_inventory (id) ON DELETE CASCADE,
+            FOREIGN KEY (location_id) REFERENCES locations (id) ON DELETE SET NULL
         )
     """
     )
@@ -154,6 +165,12 @@ def init_sqlite_db():
     if cursor.fetchone()[0] == 0:
         cursor.executescript(
             """
+            INSERT OR IGNORE INTO locations (name) VALUES
+            ('St. Gallen'),
+            ('Sigmaringen'),
+            ('Dornbirn'),
+            ('Ravensburg');
+
             INSERT OR IGNORE INTO garment_types (name) VALUES
             ('Crop Top'),
             ('Skirt');
