@@ -40,7 +40,22 @@ def register_co2_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
                 for fb in co2_data.fabric_blocks.details
             )
             co2_from_preparations = sum(
-                (fb["alternative"]["emission"] if fb["alternative"] else 0)
+                (
+                    sum(
+                        prep["emission"]
+                        for prep in fb["alternative"]["preparation_details"]
+                    )
+                    if fb["alternative"]
+                    else 0
+                )
+                for fb in co2_data.fabric_blocks.details
+            )
+            co2_from_transport = sum(
+                (
+                    fb["alternative"].get("transport_emission", 0)
+                    if fb["alternative"]
+                    else 0
+                )
                 for fb in co2_data.fabric_blocks.details
             )
 
@@ -99,7 +114,11 @@ def register_co2_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
                             html.B(
                                 f"{round(co2_from_preparations, 2) if co2_from_preparations else 'N/A'}"
                             ),
-                            " kg CO2eq still remain.",
+                            " kg CO2eq and transport emissions of ",
+                            html.B(
+                                f"{round(co2_from_transport, 2) if co2_from_transport else 'N/A'}"
+                            ),
+                            " kg CO2eq need to be added.",
                         ]
                     ),
                 ]

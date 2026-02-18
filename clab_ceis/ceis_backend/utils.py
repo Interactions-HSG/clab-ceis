@@ -12,6 +12,7 @@ from models import (
     Process,
     Resource,
 )
+from location_details import distances_to_manufacturer, activity_id_transport
 
 SPARQL_ENDPOINT = "http://graphdb:7200/repositories/ceis-dev-local"
 
@@ -217,7 +218,43 @@ def get_co2(garment_type_id: int) -> Co2Response:
             already_used_fabric_block_ids.append(used_fabric_block.id)
             used_fabric_block_emissions = 0
             used_fabric_block_alternative["id"] = used_fabric_block.id
+            used_fabric_block_alternative["location"] = used_fabric_block.location_name
             used_fabric_block_alternative["preparation_details"] = []
+
+            # Calculate transport emissions if location is available
+            transport_emission = 0
+            if (
+                used_fabric_block.location_name
+                and used_fabric_block.location_name in distances_to_manufacturer
+            ):
+                distance = distances_to_manufacturer[used_fabric_block.location_name]
+                transport_url = f"{activity_url}{activity_id_transport}/"
+                try:
+                    response = requests.get(transport_url, headers=headers)
+                    response.raise_for_status()
+                    transport_json = response.json()
+                    transport_emission_per_unit = next(
+                        (
+                            item["emissions"]
+                            for item in transport_json["lcia_results"]
+                            if item["method"]["name"] == "IPCC 2021"
+                        ),
+                        None,
+                    )
+                    if transport_emission_per_unit is not None:
+                        # Multiply by distance and fabric block weight
+                        transport_emission = (
+                            transport_emission_per_unit / 1000 * distance * amount
+                        )
+                        print(
+                            f"Transport emission for {used_fabric_block.location_name}: {transport_emission}"
+                        )
+                except Exception as e:
+                    print(f"Error calculating transport emission: {str(e)}")
+
+            used_fabric_block_alternative["transport_emission"] = transport_emission
+            used_fabric_block_emissions += transport_emission
+
             for prep in used_fabric_block.processes:
                 print("preparation", prep)
                 resources_data = get_resources_data_for_process(prep)
@@ -400,9 +437,10 @@ def get_used_fabric_block(
     cursor = conn.cursor()
 
     base_query = """
-        SELECT fbi.id, fbi.type_id, fbi.co2eq
+        SELECT fbi.id, fbi.type_id, fbi.co2eq, fbi.location_id, l.name as location_name
         FROM fabric_blocks_inventory fbi
         JOIN fabric_block_types fbt ON fbi.type_id = fbt.id
+        LEFT JOIN locations l ON fbi.location_id = l.id
         WHERE fbt.name = ?
     """
 
@@ -422,7 +460,7 @@ def get_used_fabric_block(
         conn.close()
         return None
 
-    fb_id, fb_type_id, fb_co2eq = result
+    fb_id, fb_type_id, fb_co2eq, fb_location_id, fb_location_name = result
     cursor.execute(
         """
         SELECT pt.name, pufb.amount
@@ -439,5 +477,10 @@ def get_used_fabric_block(
         preparations.append(Process(activity=prep_name, time=prep_amount))
     conn.close()
     return FabricBlock(
-        id=fb_id, type_id=fb_type_id, co2eq=fb_co2eq, processes=preparations
+        id=fb_id,
+        type_id=fb_type_id,
+        co2eq=fb_co2eq,
+        processes=preparations,
+        location_id=fb_location_id,
+        location_name=fb_location_name,
     )

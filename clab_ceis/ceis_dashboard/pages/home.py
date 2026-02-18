@@ -28,6 +28,7 @@ def get_index_layout():
                     {"name": "type", "id": "type"},
                     {"name": "co2eq", "id": "co2eq"},
                     {"name": "garment_id", "id": "garment_id"},
+                    {"name": "location", "id": "location"},
                     {
                         "name": "preparations necessary",
                         "id": "preparations",
@@ -56,6 +57,18 @@ def get_index_layout():
                             # {"label": "Fabric Block 4", "value": "FB4"},
                         ],
                         placeholder="Select a fabric type",
+                    ),
+                ],
+                style={"marginBottom": "12px", "maxWidth": "400px"},
+            ),
+            html.Div(
+                [
+                    html.Label("Location"),
+                    dcc.Dropdown(
+                        id="fabric-location",
+                        options=[],
+                        placeholder="Select a location",
+                        clearable=True,
                     ),
                 ],
                 style={"marginBottom": "12px", "maxWidth": "400px"},

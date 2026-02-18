@@ -55,6 +55,16 @@ def get_garment_types():
     return [{"id": gt[0], "name": gt[1]} for gt in garment_types]
 
 
+@app.get("/locations")
+def get_locations():
+    conn = sqlite3.connect("ceis_backend.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, name FROM locations")
+    locations = cursor.fetchall()
+    conn.close()
+    return [{"id": loc[0], "name": loc[1]} for loc in locations]
+
+
 @app.delete("/garment-recipes/{garment_type_id}")
 def delete_garment_recipe(garment_type_id: int):
     conn = sqlite3.connect("ceis_backend.db")
@@ -476,10 +486,10 @@ async def create_fabric_block(fabric_block: FabricBlockInfo):
 
     cursor.execute(
         """
-        INSERT INTO fabric_blocks_inventory (type_id, co2eq)
-        VALUES (?, ?)
+        INSERT INTO fabric_blocks_inventory (type_id, co2eq, location_id)
+        VALUES (?, ?, ?)
         """,
-        (fabric_block.type_id, co2eq),
+        (fabric_block.type_id, co2eq, fabric_block.location_id),
     )
     fabric_block_id = cursor.lastrowid
     if not fabric_block_id:
@@ -507,8 +517,10 @@ def get_fabric_blocks(type: Optional[str] = None):
     cursor = conn.cursor()
     cursor.execute(
         """
-                   SELECT id, type_id, co2eq, garment_id FROM fabric_blocks_inventory
-                   WHERE type_id = ? OR ? IS NULL
+                   SELECT fbi.id, fbi.type_id, fbi.co2eq, fbi.garment_id, l.name as location_name
+                   FROM fabric_blocks_inventory fbi
+                   LEFT JOIN locations l ON fbi.location_id = l.id
+                   WHERE fbi.type_id = ? OR ? IS NULL
                    """,
         (type, type),
     )
@@ -517,7 +529,7 @@ def get_fabric_blocks(type: Optional[str] = None):
 
     fabric_blocks = []
     for fb in fabric_blocks_data:
-        fb_id, fb_type, fb_co2eq, garment_id = fb
+        fb_id, fb_type, fb_co2eq, garment_id, location_name = fb
         cursor.execute(
             "SELECT name FROM fabric_block_types WHERE id = ?",
             (fb_type,),
@@ -541,6 +553,7 @@ def get_fabric_blocks(type: Optional[str] = None):
                 "type": fb_type_name,
                 "co2eq": fb_co2eq,
                 "garment_id": garment_id,
+                "location": location_name,
                 "preparations": preparations,
             }
         )
