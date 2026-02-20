@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dash import Dash, Input, Output, html
 
-from clab_ceis.ceis_dashboard import ceis_data
+import ceis_data
 from .api import get_co2, fetch_garment_types
 
 

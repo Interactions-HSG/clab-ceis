@@ -19,14 +19,15 @@ dev = [
 ]
 
 [build-system]
-# Using hatchling as build backend - modern, PEP 517 compliant
-# Follows Python packaging best practices for editable installs
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
 
-[tool.hatch.build.targets.wheel]
-# Flat layout: package is in the current directory
-packages = ["."]
+[tool.setuptools]
+# Package root is one level up, so setuptools can find ceis_backend as a package package-dir = {"" = ".."}
+
+[tool.setuptools.packages.find]
+where = [".."]
+include = ["ceis_backend*"]
 
 [tool.pytest.ini_options]
 # Best practice: Configure pytest to find modules without sys.path manipulation

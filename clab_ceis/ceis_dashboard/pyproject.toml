@@ -1,0 +1,15 @@
+[project]
+name = "ceis-dashboard"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "ceis-backend",
+    "dash>=4.0.0",
+    "dash-cytoscape>=1.0.2",
+    "pandas>=3.0.1",
+]
+
+[tool.uv.sources]
+ceis-backend = { path = "../ceis_backend", editable = true }

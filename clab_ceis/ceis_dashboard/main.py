@@ -1,18 +1,13 @@
-from enum import Enum
-
 import pandas as pd
-from clab_ceis.ceis_dashboard.pages.home import get_index_layout
-from clab_ceis.ceis_dashboard.pages.old_dashboard import (
-    get_dashboard_layout,
-    get_flow_chart_data,
-)
-from clab_ceis.ceis_dashboard.pages.recipe import get_recipe_layout
-from dash import Dash, html, dcc, dash_table
+from dash import Dash, html, dcc
 from dash.dependencies import Input, Output
 from flask import request, jsonify
+from pages.recipe import get_recipe_layout
+from pages.flow import get_dashboard_layout
+from pages.home import get_index_layout
 
-from clab_ceis.ceis_dashboard import ceis_data, ceis_callbacks
-from clab_ceis import config
+import ceis_data, ceis_callbacks
+import config
 
 
 class CeisMonitor:
@@ -107,12 +102,12 @@ def main():
         __name__,
         # needed when callbacks and app are specified in different modules
         suppress_callback_exceptions=True,
-        assets_folder="/app/clab_ceis/assets",
+        assets_folder="../assets",
     )
     mon = CeisMonitor(app)
     # TODO: implement a good way to change the configuration
     # app.run_server(host="ceis", port="8051", debug=True)
-    app.run_server(
+    app.run(
         host=config.CEIS_MONITOR_HOSTNAME, port=config.CEIS_MONITOR_PORT, debug=True
     )
 

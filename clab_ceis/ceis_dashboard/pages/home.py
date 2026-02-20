@@ -5,7 +5,7 @@ def get_index_layout():
     inventory_form = html.Div(
         [
             dcc.Link(
-                "Go to old Dashboard",
+                "CE Flow Cockpit",
                 href="/dashboard",
                 id="dashboard-link",
             ),

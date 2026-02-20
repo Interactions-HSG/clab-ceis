@@ -4,7 +4,7 @@ import httpx
 from dash.dependencies import Input, Output, State
 
 from clab_ceis.ceis_dashboard import ceis_data as cd
-from clab_ceis import config
+from clab_ceis.ceis_dashboard import config
 
 
 def get_callbacks(app):

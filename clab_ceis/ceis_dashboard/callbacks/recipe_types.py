@@ -4,8 +4,8 @@ import requests
 from dash import Dash, Input, Output, State, callback_context, dcc, html
 from dash.dependencies import ALL
 
-from clab_ceis import config
-from clab_ceis.ceis_dashboard import ceis_data
+import config
+import ceis_data
 
 
 def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:

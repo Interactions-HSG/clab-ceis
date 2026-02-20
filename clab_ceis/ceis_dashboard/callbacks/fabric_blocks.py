@@ -4,9 +4,9 @@ import requests
 from dash import Dash, Input, Output, State, callback_context, html, dcc, no_update
 from dash.dependencies import ALL
 
-from clab_ceis import config
-from clab_ceis.ceis_backend.models import FabricBlockInfo, PreparationInfo
-from clab_ceis.ceis_dashboard import ceis_data
+import config
+from ceis_backend.models import FabricBlockInfo, PreparationInfo
+import ceis_data
 from .api import fetch_fabric_blocks
 
 
