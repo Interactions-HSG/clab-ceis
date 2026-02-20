@@ -253,27 +253,6 @@ def activity_search(payload: ActivitySearchRequest):
     return {"results": results}
 
 
-@app.get("/croptop")
-def get_info_croptop():
-    try:
-        bindings = get_bindings("getTopData")
-
-        print(bindings)
-        data = [
-            {
-                "recipe": item.get("recipeName", {}).get("value"),
-                "fabricBlockDesign": item.get("fabricBlockDesignName", {}).get("value"),
-                "requiredAmount": int(item.get("requiredAmount", {}).get("value", 0)),
-                "availableAmount": int(item.get("availableAmount", {}).get("value", 0)),
-            }
-            for item in bindings
-        ]
-        print("data", data)
-        return {}
-    except Exception as e:
-        return {"error": str(e)}
-
-
 @app.get("/fabric-block-types")
 def get_fabric_block_types():
     conn = sqlite3.connect("ceis_backend.db")
