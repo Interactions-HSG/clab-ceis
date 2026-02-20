@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dash import Dash, Input, Output
 
-from clab_ceis.ceis_dashboard import ceis_data
+import ceis_data
 
 
 def register_dashboard_table_callbacks(app: Dash, data: ceis_data.CeisData) -> None:

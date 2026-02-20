@@ -5,7 +5,7 @@ from clab_ceis.shop.layouts.top import top_page
 from clab_ceis.shop.layouts.dashboard import dashboard_page
 from clab_ceis.shop.callbacks import skirt_callbacks, top_callbacks, dashboard_callbacks
 from dash.dependencies import Input, Output
-from clab_ceis import config
+from clab_ceis.ceis_dashboard import config
 
 # Initialize the app
 app = Dash(__name__, assets_folder="/app/clab_ceis/assets", suppress_callback_exceptions=True)

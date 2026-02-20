@@ -1,6 +1,7 @@
 from dash import Dash, dcc, html
 
-from clab_ceis import shop_callbacks, config
+from clab_ceis import shop_callbacks
+from clab_ceis.ceis_dashboard import config
 
 
 class CeisShop:

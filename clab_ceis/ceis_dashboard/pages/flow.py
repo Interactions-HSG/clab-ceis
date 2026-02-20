@@ -1,9 +1,10 @@
 from enum import Enum
 from pydoc import html
-from clab_ceis.ceis_dashboard.ceis_data import CeisData
+
 from dash import Dash, html, dcc, dash_table
 import dash_cytoscape as cyto
 
+from ceis_data import CeisData
 
 def get_dashboard_layout():
     flow_chart_data = get_flow_chart_data()

@@ -1,0 +1,54 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Start CEIS Backend",
+            "type": "shell",
+            "command": "${workspaceFolder}/clab_ceis/ceis_backend/.venv/bin/uvicorn",
+            "args": [
+                "main:app",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8052",
+                "--reload"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/clab_ceis/ceis_backend"
+            },
+            "isBackground": true,
+            "problemMatcher": {
+                "pattern": {
+                    "regexp": "^.*$",
+                    "file": 1,
+                    "location": 2,
+                    "message": 3
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "^.*Starting.*",
+                    "endsPattern": "^.*Application startup complete.*"
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "group": "backend"
+            }
+        },
+        {
+            "label": "Stop CEIS Backend",
+            "type": "shell",
+            "command": "echo ${input:terminate}",
+            "problemMatcher": []
+        },
+    ],
+    "inputs": [
+        {
+            "id": "terminate",
+            "type": "command",
+            "command": "workbench.action.tasks.terminate",
+            "args": "Start CEIS Backend"
+        }
+    ]
+}
