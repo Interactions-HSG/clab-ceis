@@ -205,7 +205,7 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
             print("Payload:", payload)
             try:
                 resp = requests.post(
-                    f"{config.BACKEND_API_URL}/fabric-block", json=payload.dict()
+                    f"{config.BACKEND_API_URL}/fabric-blocks", json=payload.dict()
                 )
 
                 # Only update table if SUCCESS
