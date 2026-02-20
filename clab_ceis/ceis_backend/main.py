@@ -1,15 +1,17 @@
-from typing import Optional, Mapping, cast
-import base64
-from db_init import init_sqlite_db
-from utils import get_bindings, get_co2, get_wiser_token
+from typing import Optional
+import sqlite3
+from dotenv import load_dotenv
+
 from fastapi import FastAPI, Request, HTTPException
 from dotenv import load_dotenv
 import requests
-import sqlite3
-import json
+
+# Load environment variables from .env.secrets
+load_dotenv('.env.secrets')
+
+from db_init import init_sqlite_db
+from utils import get_co2, get_wiser_token
 from models import (
-    Co2Response,
-    FabricBlock,
     FabricBlockInfo,
     FabricBlockTypeCreate,
     ActivitySearchRequest,
