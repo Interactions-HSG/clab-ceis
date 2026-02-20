@@ -1,20 +1,41 @@
 {
-    "name": "CLab compose",
-    "dockerComposeFile": "../docker-compose.dev.yml",
+    "name": "CLab CEIS",
+    "dockerComposeFile": "../docker-compose.yml",
     "service": "ceis-dashboard",
     "workspaceFolder": "/app",
     "customizations": {
         "vscode": {
-            "extensions": ["ms-python.debugpy", "ms-python.black-formatter"],
+            "extensions": [
+                "ms-python.python",
+                "ms-python.debugpy",
+                "ms-python.black-formatter",
+                "charliermarsh.ruff",
+                "ms-azuretools.vscode-docker"
+            ],
             "settings": {
                 "editor.defaultFormatter": "ms-python.black-formatter",
-                "editor.formatOnSave": true
+                "editor.formatOnSave": true,
+                "python.defaultInterpreterPath": "/app/.venv/bin/python"
             }
         }
     },
-    "features": {
-        "ghcr.io/devcontainers/features/python:1": {
-            "installTools": true
+    "forwardPorts": [8050, 8051, 8052, 7200],
+    "portsAttributes": {
+        "8050": {
+            "label": "Shop",
+            "onAutoForward": "notify"
+        },
+        "8051": {
+            "label": "CEIS Dashboard",
+            "onAutoForward": "openBrowser"
+        },
+        "8052": {
+            "label": "CEIS Backend",
+            "onAutoForward": "notify"
+        },
+        "7200": {
+            "label": "GraphDB",
+            "onAutoForward": "notify"
         }
     },
     "shutdownAction": "stopCompose"

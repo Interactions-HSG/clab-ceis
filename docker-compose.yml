@@ -11,7 +11,7 @@ services:
         # Masks sourcecode in container so changes are synced to host
         volumes:
             - ./:/app/
-        entrypoint: ['poetry', 'run', 'shop']
+        entrypoint: ['uv', 'run', 'shop']
 
     ceis-dashboard:
         hostname: ceis-dashboard
@@ -24,7 +24,7 @@ services:
             - '8051:8051'
         volumes:
             - ./:/app/
-        entrypoint: ['poetry', 'run', 'ceis-dashboard']
+        entrypoint: ['uv', 'run', 'ceis-dashboard']
 
     ceis-backend:
         hostname: ceis-backend
@@ -37,7 +37,7 @@ services:
             - '8052:8052'
         volumes:
             - ./clab_ceis/ceis_backend:/app
-        command: ['poetry', 'run', 'uvicorn', 'main:app', '--host', '0.0.0.0', '--port', '8052', '--reload']
+        command: ['uv', 'run', 'uvicorn', 'main:app', '--host', '0.0.0.0', '--port', '8052', '--reload']
     graphdb:
         hostname: graphdb
         build:

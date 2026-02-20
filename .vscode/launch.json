@@ -5,13 +5,20 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "CEIS: Python Debugger",
+            "name": "CEIS: Dashboard",
             "type": "debugpy",
             "request": "launch",
-            "program": "clab_ceis/ceis.py",
+            "module": "clab_ceis.ceis_dashboard.ceis",
             "console": "integratedTerminal",
             "justMyCode": false
-            // "preLaunchTask": "activate poetry env"
+        },
+        {
+            "name": "CEIS: Shop",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "clab_ceis.shop.shop",
+            "console": "integratedTerminal",
+            "justMyCode": false
         }
     ]
 }

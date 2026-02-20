@@ -10,7 +10,7 @@ services:
       - "8050:8050"
     volumes:
       - .:/app
-    command: ["poetry", "run", "uvicorn", "shop.main:app", "--host", "0.0.0.0", "--port", "8050", "--reload"]
+    command: ["uv", "run", "uvicorn", "shop.main:app", "--host", "0.0.0.0", "--port", "8050", "--reload"]
 
   ceis-dashboard:
     hostname: ceis-dashboard
@@ -23,7 +23,7 @@ services:
       - "8051:8051"
     volumes:
       - .:/app
-    command: ["poetry", "run", "uvicorn", "ceis_dashboard.main:app", "--host", "0.0.0.0", "--port", "8051", "--reload"]
+    command: ["uv", "run", "uvicorn", "ceis_dashboard.main:app", "--host", "0.0.0.0", "--port", "8051", "--reload"]
 
   ceis-backend:
     hostname: ceis-backend
@@ -36,7 +36,7 @@ services:
       - "8052:8052"
     volumes:
       - ./clab_ceis/ceis_backend:/app
-    command: ["poetry", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8052", "--reload"]
+    command: ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8052", "--reload"]
   graphdb:
     hostname: graphdb
     build:
