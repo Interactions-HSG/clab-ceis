@@ -1,3 +1,4 @@
+import os
 from SPARQLWrapper import SPARQLWrapper, JSON
 from typing import Optional, Mapping, cast
 from fastapi import HTTPException
@@ -42,8 +43,8 @@ def get_wiser_token():
     payload = {
         "grant_type": "password",
         "client_id": "wiser-api-public",
-        "username": "simeon",
-        "password": "meWdis-sikfup-0josgi",
+        "username": os.getenv("WISER_SP3_API_USER", ""),
+        "password": os.getenv("WISER_SP3_API_KEY", ""),
     }
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
