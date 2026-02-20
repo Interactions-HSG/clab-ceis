@@ -3,6 +3,7 @@ import base64
 from db_init import init_sqlite_db
 from utils import get_bindings, get_co2, get_wiser_token
 from fastapi import FastAPI, Request, HTTPException
+from dotenv import load_dotenv
 import requests
 import sqlite3
 import json
@@ -17,6 +18,9 @@ from models import (
     ProcessTypeCreate,
     ResourceTypeCreate,
 )
+
+# Load environment variables from .env.secrets
+load_dotenv('.env.secrets')
 
 app = FastAPI()
 
