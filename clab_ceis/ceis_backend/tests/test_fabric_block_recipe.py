@@ -381,7 +381,7 @@ class TestCreateFabricBlockWithLocation:
         conn.close()
         
         # Create fabric block with location_id
-        response = client.post("/fabric-block", json={
+        response = client.post("/fabric-blocks", json={
             "type_id": fb_type_id,
             "processes": [],
             "location_id": location_id
@@ -416,7 +416,7 @@ class TestCreateFabricBlockWithLocation:
         fb_type_id = cursor.fetchone()[0]
         conn.close()
         
-        response = client.post("/fabric-block", json={
+        response = client.post("/fabric-blocks", json={
             "type_id": fb_type_id,
             "processes": []
         })

@@ -1,13 +1,11 @@
 from typing import Optional
+from pathlib import Path
 import sqlite3
 from dotenv import load_dotenv
 
 from fastapi import FastAPI, Request, HTTPException
 from dotenv import load_dotenv
 import requests
-
-# Load environment variables from .env.secrets
-load_dotenv('.env.secrets')
 
 from db_init import init_sqlite_db
 from utils import get_co2, get_wiser_token
@@ -21,8 +19,11 @@ from models import (
     ResourceTypeCreate,
 )
 
-# Load environment variables from .env.secrets
-load_dotenv('.env.secrets')
+
+# Load environment variables from ceis_backend/.env.secrets, regardless of CWD
+BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / ".env.secrets", override=True)
+
 
 app = FastAPI()
 
@@ -462,7 +463,7 @@ def create_garment_recipe(payload: GarmentRecipeCreate):
         conn.close()
 
 
-@app.post("/fabric-block")
+@app.post("/fabric-blocks")
 async def create_fabric_block(fabric_block: FabricBlockInfo):
     print("Received fabric block:", fabric_block)
     co2eq = None  # Placeholder
