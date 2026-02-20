@@ -1,14 +1,10 @@
 import sqlite3
 import pytest
 from unittest.mock import patch, MagicMock
-import sys
-import os
 
-# Add ceis_backend to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'clab_ceis', 'ceis_backend'))
-
+# Best Practice: Import directly from modules without sys.path manipulation
 from db_init import init_sqlite_db
-from utils import get_recipe_for_fabric_block, get_co2, get_resources_data_for_process
+from utils import get_recipe_for_fabric_block, get_co2
 from models import Process
 
 
