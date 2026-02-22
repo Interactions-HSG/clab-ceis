@@ -36,6 +36,57 @@ def get_wiser_token():
         return {"error": str(e)}
 
 
+def get_transport_emission_per_unit(
+    token: str, activity_url: str
+) -> float | None:
+    """
+    Fetch transport emission per unit (kg CO2eq per ton-km) from Wiser.
+    
+    Args:
+        token: Bearer token for Wiser authentication.
+        activity_url: Base activity URL (e.g., "https://api.wiser.ehealth.hevs.ch/ecoinvent/3.12-cutoff/activity/")
+    
+    Returns:
+        Transport emission per unit in kg CO2eq per ton-km, or None if unavailable.
+    """
+    transport_url = f"{activity_url}{activity_id_transport}/"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {token}",
+    }
+    try:
+        response = requests.get(transport_url, headers=headers)
+        response.raise_for_status()
+        transport_json = response.json()
+    except Exception as e:
+        print(f"Error fetching transport activity: {str(e)}")
+        return None
+
+    for item in transport_json.get("lcia_results", []):
+        if item.get("method", {}).get("name") == "IPCC 2021":
+            return item.get("emissions")
+    return None
+
+
+def calculate_transport_emission(
+    distance_km: float, amount_kg: float, emission_per_unit: float | None
+) -> float | None:
+    """
+    Calculate transport emission based on distance and weight.
+    
+    Args:
+        distance_km: Distance in kilometers.
+        amount_kg: Weight in kilograms.
+        emission_per_unit: Emission per unit from WISER (kg CO2eq per ton-km).
+    
+    Returns:
+        Total transport emission in kg CO2eq, or None if emission_per_unit is unavailable.
+    """
+    if emission_per_unit is None:
+        return None
+    return emission_per_unit / 1000 * distance_km * amount_kg
+
+
 def get_recipe_for_fabric_block(fabric_block: str):
     conn = sqlite3.connect("ceis_backend.db")
     cursor = conn.cursor()
@@ -208,32 +259,19 @@ def get_co2(garment_type_id: int) -> Co2Response:
                 and used_fabric_block.location_name in distances_to_manufacturer
             ):
                 distance = distances_to_manufacturer[used_fabric_block.location_name]
-                transport_url = f"{activity_url}{activity_id_transport}/"
-                try:
-                    response = requests.get(transport_url, headers=headers)
-                    response.raise_for_status()
-                    transport_json = response.json()
-                    transport_emission_per_unit = next(
-                        (
-                            item["emissions"]
-                            for item in transport_json["lcia_results"]
-                            if item["method"]["name"] == "IPCC 2021"
-                        ),
-                        None,
+                transport_emission_per_unit = get_transport_emission_per_unit(
+                    headers["Authorization"].split(" ")[1], activity_url
+                )
+                transport_emission = calculate_transport_emission(
+                    distance, amount, transport_emission_per_unit
+                )
+                if transport_emission is not None:
+                    print(
+                        f"Transport emission for {used_fabric_block.location_name}: {transport_emission}"
                     )
-                    if transport_emission_per_unit is not None:
-                        # Multiply by distance and fabric block weight
-                        transport_emission = (
-                            transport_emission_per_unit / 1000 * distance * amount
-                        )
-                        print(
-                            f"Transport emission for {used_fabric_block.location_name}: {transport_emission}"
-                        )
-                except Exception as e:
-                    print(f"Error calculating transport emission: {str(e)}")
 
-            used_fabric_block_alternative["transport_emission"] = transport_emission
-            used_fabric_block_emissions += transport_emission
+            used_fabric_block_alternative["transport_emission"] = transport_emission or 0
+            used_fabric_block_emissions += transport_emission or 0
 
             for prep in used_fabric_block.processes:
                 print("preparation", prep)

@@ -3,12 +3,18 @@ from pathlib import Path
 import sqlite3
 from dotenv import load_dotenv
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Query
 from dotenv import load_dotenv
 import requests
 
 from db_init import init_sqlite_db
-from utils import get_co2, get_wiser_token
+from utils import (
+    get_co2,
+    get_wiser_token,
+    get_transport_emission_per_unit,
+    calculate_transport_emission,
+)
+from location_details import distances_customer_sigmaringen, activity_id_transport
 from models import (
     FabricBlockInfo,
     FabricBlockTypeCreate,
@@ -573,53 +579,73 @@ def delete_fabric_block(fabric_block_id: int):
         conn.close()
 
 
+def _get_transport_emission_per_unit() -> float | None:
+    token = get_wiser_token()
+    if not token or isinstance(token, dict):
+        return None
+
+    activity_url = "https://api.wiser.ehealth.hevs.ch/ecoinvent/3.12-cutoff/activity/"
+    return get_transport_emission_per_unit(token, activity_url)
+
+
+@app.get("/co2/repair")
+def get_repair_co2(amount_kg: float = Query(1.0, description="Amount in kg")):
+    per_unit_emission = _get_transport_emission_per_unit()
+
+    distance_bucharest = distances_customer_sigmaringen.get("Bucharest")
+    distance_st_gallen = distances_customer_sigmaringen.get("St. Gallen")
+
+    scenarios = [
+        {
+            "use_case": "Self repair (materials shipped)",
+            "route": "Bucharest -> Sigmaringen",
+            "distance_km": distance_bucharest,
+            "co2_kg": (
+                calculate_transport_emission(
+                    distance_bucharest, amount_kg, per_unit_emission
+                )
+                if distance_bucharest is not None
+                else None
+            ),
+        },
+        {
+            "use_case": "Repair at shop",
+            "route": "Sigmaringen -> St. Gallen -> Sigmaringen",
+            "distance_km": (
+                distance_st_gallen * 2 if distance_st_gallen is not None else None
+            ),
+            "co2_kg": (
+                calculate_transport_emission(
+                    float(distance_st_gallen * 2),
+                    amount_kg,
+                    per_unit_emission,
+                )
+                if distance_st_gallen is not None
+                else None
+            ),
+        },
+        {
+            "use_case": "Send to manufacturer",
+            "route": "Sigmaringen -> Bucharest -> Sigmaringen",
+            "distance_km": (
+                distance_bucharest * 2 if distance_bucharest is not None else None
+            ),
+            "co2_kg": (
+                calculate_transport_emission(
+                    float(distance_bucharest * 2),
+                    amount_kg,
+                    per_unit_emission,
+                )
+                if distance_bucharest is not None
+                else None
+            ),
+        },
+    ]
+
+    return {"amount_kg": amount_kg, "scenarios": scenarios}
+
+
 @app.get("/co2/{garment_type_id}")
 def get_co2_for_garment(garment_type_id: int):
     co2_data = get_co2(garment_type_id)
     return co2_data
-
-
-@app.get("/test")
-def test_endpoint():
-    # token = get_wiser_token()
-    token = "eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJralFLN3FFYXl1cS1mM1NLU2FiaXV4Z3lpRG5IRnlSWXVQc3c3cEQyVDVFIn0.eyJleHAiOjE3NzA2MzU3MjUsImlhdCI6MTc3MDYzNTQyNSwianRpIjoiYTE3MDg4YmEtOTM4MC00ZTdmLWE3YTItNTM3YjhhZjQ1Zjk2IiwiaXNzIjoiaHR0cHM6Ly9hdXRoLndpc2VyLmVoZWFsdGguaGV2cy5jaC9yZWFsbXMvd2lzZXIiLCJhdWQiOlsic3A0LWtnIiwic3A1LWJhY2tlbmQtdGVzdCIsIndpc2VyLXNwMy1hcGkiLCJzcDUtc3dpc3MtcHJvZHVjdGlvbiIsInNwNS1zd2lzcy1wcm9kdWN0aW9uLXRlc3QiLCJzcDYtY2l0eS1pY3QiLCJhY2NvdW50Iiwic3A3LWRhdGEtY2VudGVycyJdLCJzdWIiOiIxN2E5ODUxMC0yMmRhLTQwZmMtYmJhNS0xMDYwMmQ2MWFkNzEiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJ3aXNlci1hcGktcHVibGljIiwic2Vzc2lvbl9zdGF0ZSI6ImQ5ZWFlMjUzLTM3MmUtNGYyMC1hYmFhLTdhYjA2ZmMwNWVhNCIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiLyoiXSwicmVhbG1fYWNjZXNzIjp7InJvbGVzIjpbIm9mZmxpbmVfYWNjZXNzIiwiZGVmYXVsdC1yb2xlcy13aXNlciIsInVtYV9hdXRob3JpemF0aW9uIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsic3A1LXN3aXNzLXByb2R1Y3Rpb24iOnsicm9sZXMiOlsiUk9MRV9TUDVfQURNSU4iXX0sInNwNS1zd2lzcy1wcm9kdWN0aW9uLXRlc3QiOnsicm9sZXMiOlsiUk9MRV9TUDVfQURNSU4iXX0sInNwNi1jaXR5LWljdCI6eyJyb2xlcyI6WyJST0xFX1NQNl9BRE1JTiJdfSwid2lzZXItc3AzLWFwaSI6eyJyb2xlcyI6WyJwbGFzdGljc2V1cm9wZV8qIiwiZWNvaW52ZW50XyoiLCJ1dmVrXyoiLCJrYm9iXyoiXX0sInNwNC1rZyI6eyJyb2xlcyI6WyJST0xFX0FETUlOIiwiUkVBRF9SRVBPXyoiXX0sImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfSwic3A3LWRhdGEtY2VudGVycyI6eyJyb2xlcyI6WyJST0xFX1NQN19BRE1JTiJdfX0sInNjb3BlIjoicHJvZmlsZSBlbWFpbCIsInNpZCI6ImQ5ZWFlMjUzLTM3MmUtNGYyMC1hYmFhLTdhYjA2ZmMwNWVhNCIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJ2ZXJzaW9ucyI6WyJwbGFzdGljc2V1cm9wZV8qIiwiZWNvaW52ZW50XyoiLCJ1dmVrXyoiLCJrYm9iXyoiXSwicm9sZXMiOlsiUk9MRV9BRE1JTiIsIlJFQURfUkVQT18qIl0sIm5hbWUiOiJTaW1lb24gUGlseiIsIm9yZ2FuaXphdGlvbnMiOlt7Imdyb3VwX2lkIjoiN2E1NGVlZDItNzc2Ny00MDdjLThhYjYtZjU5YmJkZjgxMzk3IiwiY29tcGFueV9uYW1lIjoiVW5pdmVyc2l0w6R0IFN0LiBHYWxsZW4iLCJhdWRpdG9yX2dyb3VwIjoiNTMwZTllNzMtNzdiMC00Njc5LWE3MGUtZDIyZDc4MzI3MWM3In1dLCJncm91cF9uYW1lcyI6WyIvSU5URVJOQUwvVU5JVkVSU0lUWV9TVF9HQUxMRU4vQURNSU5fR1JPVVAiLCIvSU5URVJOQUwvVU5JVkVSU0lUWV9TVF9HQUxMRU4iXSwiYWRtaW5fZ3JvdXBfaWRzIjpbIjdhNTRlZWQyLTc3NjctNDA3Yy04YWI2LWY1OWJiZGY4MTM5NyJdLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJzaW1lb24iLCJnaXZlbl9uYW1lIjoiU2ltZW9uIiwiZmFtaWx5X25hbWUiOiJQaWx6IiwibWFpbl9vcmdhbml6YXRpb25faWQiOiI3YTU0ZWVkMi03NzY3LTQwN2MtOGFiNi1mNTliYmRmODEzOTciLCJlbWFpbCI6InNpbWVvbi5waWx6QHVuaXNnLmNoIn0.U9joIYkESQvRa7yQY7Zxjk0BmVerzsu4QnPc4wHHsKRxoHc8IFs2oQAmfjfeDsF55tVNy0lckbUSgQWV5H6-F6GXsvhjekH7opCEmNcrfeLVvilltI6Qtco0liTAm_xa1YY-klLVhzYq0w7wuy1hrWQXbyPqU-udsJfTKnQAjX996arxPXAfJi2MOeOqq0t1dFEsgkaa4U6tzBSC7hBlclKDa8NBz-6PVa2_j6FWCTs82-0geDvNKtXUjvTg3d2Th2SlvsJ7g9nEOUddRmhYcmBd_7mGgw-_iB53Rc0oa1LBG32OM6aFvTFDP-DNiJQ94dDVZBPzTTQ5d3mrEIPxkw"
-    print("token:", token)
-    if isinstance(token, dict):
-        raise HTTPException(status_code=500, detail="Failed to fetch Wiser token")
-
-    url = "https://api.wiser.ehealth.hevs.ch/ecoinvent/3.12-cutoff/activity/search/"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        # "Content-Type": "application/json",
-    }
-    response = requests.post(url, headers=headers, json={"query": "electricity"})
-    print("History:", response.history)
-    if response.status_code != 200:
-        print("Activity search failed")
-        print("Request url:", url)
-        print("Query:", "electricity")
-        print("Status:", response.status_code)
-        print("Response headers:", dict(response.headers))
-        try:
-            print("Response body:", response.json())
-        except Exception:
-            print("Response body (text):", response.text)
-        raise HTTPException(
-            status_code=response.status_code,
-            detail="Activity search failed",
-        )
-
-    data = response.json()
-    results = []
-    for item in data.get("search_results", []):
-        location = item.get("location", {}) or {}
-        results.append(
-            {
-                "id": item.get("id"),
-                "location": location.get("code"),
-                "name": item.get("name"),
-                "reference_product": item.get("reference_product"),
-            }
-        )
-
-    return {"results": results}
