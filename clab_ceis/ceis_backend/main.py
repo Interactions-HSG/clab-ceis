@@ -1,14 +1,15 @@
-from typing import Optional, Mapping, cast
-import base64
-from db_init import init_sqlite_db
-from utils import get_bindings, get_co2, get_wiser_token
-from fastapi import FastAPI, Request, HTTPException
-import requests
+from typing import Optional
+from pathlib import Path
 import sqlite3
-import json
+from dotenv import load_dotenv
+
+from fastapi import FastAPI, Request, HTTPException
+from dotenv import load_dotenv
+import requests
+
+from db_init import init_sqlite_db
+from utils import get_co2, get_wiser_token
 from models import (
-    Co2Response,
-    FabricBlock,
     FabricBlockInfo,
     FabricBlockTypeCreate,
     ActivitySearchRequest,
@@ -17,6 +18,12 @@ from models import (
     ProcessTypeCreate,
     ResourceTypeCreate,
 )
+
+
+# Load environment variables from ceis_backend/.env.secrets, regardless of CWD
+BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / ".env.secrets", override=True)
+
 
 app = FastAPI()
 
@@ -247,27 +254,6 @@ def activity_search(payload: ActivitySearchRequest):
     return {"results": results}
 
 
-@app.get("/croptop")
-def get_info_croptop():
-    try:
-        bindings = get_bindings("getTopData")
-
-        print(bindings)
-        data = [
-            {
-                "recipe": item.get("recipeName", {}).get("value"),
-                "fabricBlockDesign": item.get("fabricBlockDesignName", {}).get("value"),
-                "requiredAmount": int(item.get("requiredAmount", {}).get("value", 0)),
-                "availableAmount": int(item.get("availableAmount", {}).get("value", 0)),
-            }
-            for item in bindings
-        ]
-        print("data", data)
-        return {}
-    except Exception as e:
-        return {"error": str(e)}
-
-
 @app.get("/fabric-block-types")
 def get_fabric_block_types():
     conn = sqlite3.connect("ceis_backend.db")
@@ -477,7 +463,7 @@ def create_garment_recipe(payload: GarmentRecipeCreate):
         conn.close()
 
 
-@app.post("/fabric-block")
+@app.post("/fabric-blocks")
 async def create_fabric_block(fabric_block: FabricBlockInfo):
     print("Received fabric block:", fabric_block)
     co2eq = None  # Placeholder

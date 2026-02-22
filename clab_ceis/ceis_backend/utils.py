@@ -1,9 +1,9 @@
-from SPARQLWrapper import SPARQLWrapper, JSON
-from typing import Optional, Mapping, cast
+import os
+import sqlite3
+
 from fastapi import HTTPException
 import requests
-import sqlite3
-import json
+
 from models import (
     Co2Response,
     EmissionDetails,
@@ -14,26 +14,6 @@ from models import (
 )
 from location_details import distances_to_manufacturer, activity_id_transport
 
-SPARQL_ENDPOINT = "http://graphdb:7200/repositories/ceis-dev-local"
-
-
-def get_bindings(file_name: str):
-    with open(f"./queries/{file_name}.rq", "r", encoding="utf-8") as file:
-        query = file.read()
-    client = SPARQLWrapper(SPARQL_ENDPOINT)
-    client.setQuery(query)
-    client.setReturnFormat(JSON)
-    results = client.query().convert()
-    # if not dict
-    if not isinstance(results, dict):
-        raise ValueError("Invalid response from SPARQL endpoint")
-
-    bindings = results.get("results", {}).get("bindings", [])
-    print(bindings)
-    if bindings and isinstance(bindings, list):
-        return bindings
-    raise ValueError("Invalid response from SPARQL endpoint")
-
 
 def get_wiser_token():
     url = (
@@ -42,8 +22,8 @@ def get_wiser_token():
     payload = {
         "grant_type": "password",
         "client_id": "wiser-api-public",
-        "username": "simeon",
-        "password": "meWdis-sikfup-0josgi",
+        "username": os.getenv("WISER_SP3_API_USER", ""),
+        "password": os.getenv("WISER_SP3_API_KEY", ""),
     }
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
