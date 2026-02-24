@@ -4,7 +4,6 @@ import sqlite3
 from dotenv import load_dotenv
 
 from fastapi import FastAPI, Request, HTTPException, Query
-from dotenv import load_dotenv
 import requests
 
 from db_init import init_sqlite_db
