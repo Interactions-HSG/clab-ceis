@@ -10,8 +10,9 @@ from db_init import init_sqlite_db
 from utils import (
     get_co2,
     get_wiser_token,
-    get_transport_emission_per_unit,
+    get_emission_per_unit,
     calculate_transport_emission,
+    get_resources_data_for_process,
 )
 from location_details import distances_customer_sigmaringen, activity_id_transport
 from models import (
@@ -22,6 +23,7 @@ from models import (
     GarmentTypeCreate,
     ProcessTypeCreate,
     ResourceTypeCreate,
+    Process,
 )
 
 
@@ -583,12 +585,37 @@ def _get_transport_emission_per_unit() -> float | None:
     if not token or isinstance(token, dict):
         return None
 
-    activity_url = "https://api.wiser.ehealth.hevs.ch/ecoinvent/3.12-cutoff/activity/"
-    return get_transport_emission_per_unit(token, activity_url)
+    return get_emission_per_unit(token, activity_id_transport)
+
+
+def _get_emission_per_unit_cached(
+    activity_id: int,
+    token: str,
+    emission_cache: dict[int, float | None],
+) -> float | None:
+    if activity_id in emission_cache:
+        return emission_cache[activity_id]
+
+    emission = get_emission_per_unit(token, activity_id)
+    if emission is None:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch emission for activity {activity_id}",
+        )
+    emission_cache[activity_id] = emission
+    return emission
 
 
 @app.get("/co2/repair")
-def get_repair_co2(amount_kg: float = Query(1.0, description="Amount in kg")):
+def get_repair_co2(
+    amount_kg: float = Query(None, description="Amount in kg"),
+    replacements: Optional[str] = Query(
+        None, description="Comma-separated list of fabric block types to replace"
+    ),
+):
+    if not amount_kg or amount_kg <= 0:
+        raise HTTPException(status_code=400, detail="Invalid amount_kg value")
+
     per_unit_emission = _get_transport_emission_per_unit()
 
     distance_bucharest = distances_customer_sigmaringen.get("Bucharest")
@@ -641,7 +668,110 @@ def get_repair_co2(amount_kg: float = Query(1.0, description="Amount in kg")):
         },
     ]
 
-    return {"amount_kg": amount_kg, "scenarios": scenarios}
+    replacement_names: list[str] = []
+    if replacements:
+        replacement_names = [
+            name.strip() for name in replacements.split(",") if name.strip()
+        ]
+
+    replacement_fabric_blocks = {"details": [], "total_emission": 0}
+
+    if replacement_names:
+        token = get_wiser_token()
+        if isinstance(token, dict):
+            raise HTTPException(status_code=500, detail="Failed to fetch Wiser token")
+
+        emission_cache: dict[int, float | None] = {}
+
+        conn = sqlite3.connect("ceis_backend.db")
+        cursor = conn.cursor()
+        try:
+            for fabric_block_name in replacement_names:
+                cursor.execute(
+                    """
+                    SELECT id, activity_id, amount_kg
+                    FROM fabric_block_types
+                    WHERE name = ?
+                    LIMIT 1
+                    """,
+                    (fabric_block_name,),
+                )
+                row = cursor.fetchone()
+                if not row:
+                    continue
+
+                fabric_block_type_id, activity_id, weight_per_block = row
+
+                material_emission_per_unit = _get_emission_per_unit_cached(
+                    activity_id, token, emission_cache
+                )
+                material_emission = (
+                    material_emission_per_unit * weight_per_block
+                    if material_emission_per_unit is not None
+                    else 0
+                )
+
+                cursor.execute(
+                    """
+                    SELECT pt.name, fbrp.time
+                    FROM fabric_block_recipe_processes fbrp
+                    JOIN process_types pt ON fbrp.process_id = pt.id
+                    WHERE fbrp.fabric_block_type = ?
+                    """,
+                    (fabric_block_type_id,),
+                )
+                processes_data = cursor.fetchall()
+
+                process_emissions_list = []
+                for process_name, process_time in processes_data:
+                    process_emissions = 0
+                    resources = get_resources_data_for_process(
+                        Process(activity=process_name, time=process_time)
+                    )
+                    for resource in resources:
+                        resource_emission_per_unit = _get_emission_per_unit_cached(
+                            resource.activity_id, token, emission_cache
+                        )
+                        resource_emissions = (
+                            resource_emission_per_unit * resource.amount * process_time
+                            if resource_emission_per_unit is not None
+                            else 0
+                        )
+                        process_emissions += resource_emissions
+
+                    process_emissions_list.append(
+                        {
+                            "process": process_name,
+                            "emission": process_emissions,
+                        }
+                    )
+
+                # Calculate total emissions for this fabric block
+                total_processes_emission = sum(
+                    p["emission"] for p in process_emissions_list
+                )
+                fabric_block_total_emission = (
+                    material_emission + total_processes_emission
+                )
+
+                replacement_fabric_blocks["details"].append(
+                    {
+                        "fabric_block": fabric_block_name,
+                        "material_emission": material_emission,
+                        "processes": process_emissions_list,
+                    }
+                )
+                replacement_fabric_blocks[
+                    "total_emission"
+                ] += fabric_block_total_emission
+        finally:
+            conn.close()
+
+    return {
+        "amount_kg": amount_kg,
+        "scenarios": scenarios,
+        "replacement_fabric_blocks": replacement_fabric_blocks,
+    }
 
 
 @app.get("/co2/{garment_type_id}")
