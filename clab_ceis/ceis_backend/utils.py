@@ -33,36 +33,35 @@ def get_wiser_token():
         json = response.json()
         return json["access_token"]
     except Exception as e:
-        return {"error": str(e)}
+        return str(e)
 
 
-def get_transport_emission_per_unit(
-    token: str, activity_url: str
-) -> float | None:
+def get_emission_per_unit(token: str, activity_id: int) -> float | None:
     """
-    Fetch transport emission per unit (kg CO2eq per ton-km) from Wiser.
-    
+    Fetch emission per unit from Wiser for a given activity ID.
+
     Args:
         token: Bearer token for Wiser authentication.
-        activity_url: Base activity URL (e.g., "https://api.wiser.ehealth.hevs.ch/ecoinvent/3.12-cutoff/activity/")
-    
+        activity_id: The activity ID to fetch emissions for.
+
     Returns:
-        Transport emission per unit in kg CO2eq per ton-km, or None if unavailable.
+        Emission per unit in kg CO2eq, or None if unavailable.
     """
-    transport_url = f"{activity_url}{activity_id_transport}/"
+    activity_url = "https://api.wiser.ehealth.hevs.ch/ecoinvent/3.12-cutoff/activity/"
+    url = f"{activity_url}{activity_id}/"
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {token}",
     }
     try:
-        response = requests.get(transport_url, headers=headers)
+        response = requests.get(url, headers=headers)
         response.raise_for_status()
-        transport_json = response.json()
+        json_response = response.json()
     except Exception as e:
-        print(f"Error fetching transport activity: {str(e)}")
+        print(f"Error fetching activity {activity_id}: {str(e)}")
         return None
 
-    for item in transport_json.get("lcia_results", []):
+    for item in json_response.get("lcia_results", []):
         if item.get("method", {}).get("name") == "IPCC 2021":
             return item.get("emissions")
     return None
@@ -73,12 +72,12 @@ def calculate_transport_emission(
 ) -> float | None:
     """
     Calculate transport emission based on distance and weight.
-    
+
     Args:
         distance_km: Distance in kilometers.
         amount_kg: Weight in kilograms.
         emission_per_unit: Emission per unit from WISER (kg CO2eq per ton-km).
-    
+
     Returns:
         Total transport emission in kg CO2eq, or None if emission_per_unit is unavailable.
     """
@@ -146,7 +145,6 @@ def get_resources_data_for_process(process: Process) -> list[Resource]:
 
 def get_co2(garment_type_id: int) -> Co2Response:
     wiser_token = get_wiser_token()
-    print("wiser_token", wiser_token)
 
     recipe = get_garment_recipe(garment_type_id)
     if recipe is None:
@@ -154,12 +152,6 @@ def get_co2(garment_type_id: int) -> Co2Response:
             status_code=404,
             detail=f"Garment recipe not found for garment type ID: {garment_type_id}",
         )
-
-    activity_url = "https://api.wiser.ehealth.hevs.ch/ecoinvent/3.12-cutoff/activity/"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {wiser_token}",
-    }
 
     emission_details = Co2Response(
         fabric_blocks=EmissionDetails(details=[], total_emission=0),
@@ -174,23 +166,9 @@ def get_co2(garment_type_id: int) -> Co2Response:
             get_recipe_for_fabric_block(fabric_block)
         )
 
-        url = f"{activity_url}{activity_id}/"
-
-        try:
-            response = requests.get(url, headers=headers)
-            response.raise_for_status()
-            json = response.json()
-        except Exception as e:
-            print("error", str(e))
-            raise HTTPException(status_code=500, detail=str(e))
-        emission = next(
-            (
-                item["emissions"]
-                for item in json["lcia_results"]
-                if item["method"]["name"] == "IPCC 2021"
-            ),
-            None,
-        )
+        emission = None
+        if activity_id is not None:
+            emission = get_emission_per_unit(wiser_token, activity_id)
 
         # Calculate emissions from fabric block production processes
         fabric_block_production_emissions = 0
@@ -200,21 +178,8 @@ def get_co2(garment_type_id: int) -> Co2Response:
             resources_data = get_resources_data_for_process(fb_process)
             resources_details = []
             for resource in resources_data:
-                resource_url = f"{activity_url}{resource.activity_id}/"
-                try:
-                    response = requests.get(resource_url, headers=headers)
-                    response.raise_for_status()
-                    json_response = response.json()
-                except Exception as e:
-                    print("error", str(e))
-                    raise HTTPException(status_code=500, detail=str(e))
-                resource_emission_per_unit = next(
-                    (
-                        item["emissions"]
-                        for item in json_response["lcia_results"]
-                        if item["method"]["name"] == "IPCC 2021"
-                    ),
-                    None,
+                resource_emission_per_unit = get_emission_per_unit(
+                    wiser_token, resource.activity_id
                 )
                 if resource_emission_per_unit is not None:
                     resource_emissions = (
@@ -259,8 +224,8 @@ def get_co2(garment_type_id: int) -> Co2Response:
                 and used_fabric_block.location_name in distances_to_manufacturer
             ):
                 distance = distances_to_manufacturer[used_fabric_block.location_name]
-                transport_emission_per_unit = get_transport_emission_per_unit(
-                    headers["Authorization"].split(" ")[1], activity_url
+                transport_emission_per_unit = get_emission_per_unit(
+                    wiser_token, activity_id_transport
                 )
                 transport_emission = calculate_transport_emission(
                     distance, amount, transport_emission_per_unit
@@ -270,7 +235,9 @@ def get_co2(garment_type_id: int) -> Co2Response:
                         f"Transport emission for {used_fabric_block.location_name}: {transport_emission}"
                     )
 
-            used_fabric_block_alternative["transport_emission"] = transport_emission or 0
+            used_fabric_block_alternative["transport_emission"] = (
+                transport_emission or 0
+            )
             used_fabric_block_emissions += transport_emission or 0
 
             for prep in used_fabric_block.processes:
@@ -281,21 +248,8 @@ def get_co2(garment_type_id: int) -> Co2Response:
                 process_emissions = 0
                 resources_details = []
                 for resource in resources_data:
-                    url = f"{activity_url}{resource.activity_id}/"
-                    try:
-                        response = requests.get(url, headers=headers)
-                        response.raise_for_status()
-                        json = response.json()
-                    except Exception as e:
-                        print("error", str(e))
-                        raise HTTPException(status_code=500, detail=str(e))
-                    resource_emission_per_unit = next(
-                        (
-                            item["emissions"]
-                            for item in json["lcia_results"]
-                            if item["method"]["name"] == "IPCC 2021"
-                        ),
-                        None,
+                    resource_emission_per_unit = get_emission_per_unit(
+                        wiser_token, resource.activity_id
                     )
                     print(
                         f"CO2eq for resource {resource.name} activity id {resource.activity_id}: {resource_emission_per_unit}"
@@ -360,21 +314,8 @@ def get_co2(garment_type_id: int) -> Co2Response:
         if not resources_data:
             continue
         for resource in resources_data:
-            url = f"{activity_url}{resource.activity_id}/"
-            try:
-                response = requests.get(url, headers=headers)
-                response.raise_for_status()
-                json = response.json()
-            except Exception as e:
-                print("error", str(e))
-                raise HTTPException(status_code=500, detail=str(e))
-            resource_emission_per_unit = next(
-                (
-                    item["emissions"]
-                    for item in json["lcia_results"]
-                    if item["method"]["name"] == "IPCC 2021"
-                ),
-                None,
+            resource_emission_per_unit = get_emission_per_unit(
+                wiser_token, resource.activity_id
             )
             resource_emissions = (
                 resource_emission_per_unit * resource.amount * process.time
