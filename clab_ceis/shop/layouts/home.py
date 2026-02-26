@@ -14,8 +14,7 @@ def home_page():
             html.Div(
                 className="card",
                 children=[
-                    html.H2("Order a Skirt or a Top"),
-                    html.P("Select the type of clothing you want to order:"),
+                    html.H2("Select the Type of Clothing You Want to Order"),
                     html.Div(
                         className="order-form",
                         children=[
@@ -29,7 +28,6 @@ def home_page():
                                             alt="Skirt",
                                             className="product-image",
                                         ),
-                                        html.Span("Skirt", className="product-label"),
                                     ],
                                 ),
                             ),
@@ -43,7 +41,6 @@ def home_page():
                                             alt="Top",
                                             className="product-image",
                                         ),
-                                        html.Span("Top", className="product-label"),
                                     ],
                                 ),
                             ),
@@ -52,6 +49,5 @@ def home_page():
                     ),
                 ],
             ),
-            html.Footer("© 2024 CeisShop. All rights reserved.", className="footer"),
         ],
     )

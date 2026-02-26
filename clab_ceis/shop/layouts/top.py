@@ -25,27 +25,6 @@ def top_page():
                                 "Loose fit with a T-shape geometric opening at the neck.",
                                 style={"font-size": "18px"},
                             ),
-                            # Button to trigger SPARQL query
-                            html.Button("Fetch Top Data", id="fetch-top-data"),
-                            # DataTable to display SPARQL results
-                            dash_table.DataTable(
-                                id="top-data-table",
-                                columns=[{"name": "Recipe", "id": "recipe"}],
-                                style_table={
-                                    "overflowX": "auto",
-                                    "width": "100%",
-                                    "margin-top": "20px",
-                                },
-                                style_cell={
-                                    "textAlign": "left",
-                                    "padding": "5px",
-                                },
-                                style_header={
-                                    "backgroundColor": "rgb(230, 230, 230)",
-                                    "fontWeight": "bold",
-                                },
-                                page_size=5,
-                            ),
                         ],
                     ),
                 ],
