@@ -1,29 +1,70 @@
 import copy
+import sys
+from pathlib import Path
 
 import httpx
+import requests
+from dash import html, dash_table
 from dash.dependencies import Input, Output, State
 
-from clab_ceis.ceis_dashboard import ceis_data as cd
-from clab_ceis.ceis_dashboard import config
+from . import config
+
+sys.path.insert(0, str(Path(__file__).parent.parent / "ceis_dashboard"))
 
 
 def get_callbacks(app):
-
     @app.callback(
-        Output("quote-result", "children"),
-        Input("btn-get-quote", "n_clicks"),
-        State("clothing-type", "value"),
-        prevent_initial_call=True,
+        Output("customer-repair-content", "children"),
+        Input("url", "pathname"),
     )
-    def display_quote(n_clicks, value):
-        quote_url = (
-            f"http://{config.CEIS_MONITOR_HOSTNAME}:{config.CEIS_MONITOR_PORT}/quote"
+    def load_customer_repair_content(pathname):
+        amount_kg = 1.0
+        try:
+            response = requests.get(
+                f"{config.BACKEND_API_URL}/co2/repair",
+                params={"amount_kg": amount_kg},
+                timeout=10,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            scenarios = payload.get("scenarios", [])
+        except Exception as e:
+            print(f"Error fetching repair CO2 data: {e}")
+            return html.Div("Unable to load repair CO2 comparison.")
+
+        rows = []
+        for scenario in scenarios:
+            co2_value = scenario.get("co2_kg")
+            rows.append(
+                {
+                    "use_case": scenario.get("use_case"),
+                    "route": scenario.get("route"),
+                    "distance_km": scenario.get("distance_km"),
+                    "co2_kg": round(co2_value, 4) if co2_value is not None else "N/A",
+                }
+            )
+
+        table = dash_table.DataTable(
+            columns=[
+                {"name": "End of Life Scenario", "id": "use_case"},
+                {"name": "Route", "id": "route"},
+                {"name": "Distance (km)", "id": "distance_km"},
+                {"name": "CO2 (kg CO2eq)", "id": "co2_kg"},
+            ],
+            data=rows,
+            style_table={"maxWidth": "900px"},
+            style_cell={"textAlign": "left", "padding": "6px"},
+            style_header={"fontWeight": "bold"},
         )
-        headers = {"Content-Type": "application/json"}
-        product_quote = copy.deepcopy(cd.CeisTrade.get_quote())
-        product_quote["CIType"] = value
-        if n_clicks > 0:
-            response = httpx.put(quote_url, json=product_quote, headers=headers).json()
-            return f"We can offer you the {value} for {response["price"]}{response["currency"]}, on the {response["date"]}, causing {response["co2eq"]} kg CO2eq"
-        else:
-            return ""
+
+        return html.Div(
+            [
+                html.P(
+                    "Assumes 1 kg of textile to be repaired and transported by truck. Excluding repair process emissions."
+                ),
+                html.P(
+                    "Sites: Manufacturer Bucharest, Repair Center St. Gallen, Consumer Sigmaringen."
+                ),
+                table,
+            ]
+        )
