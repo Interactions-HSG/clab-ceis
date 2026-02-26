@@ -1,4 +1,4 @@
-"""Dashboard configuration."""
+"""Shop configuration."""
 
 import os
 

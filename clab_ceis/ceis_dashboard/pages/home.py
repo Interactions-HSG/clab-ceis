@@ -133,25 +133,12 @@ def get_index_layout():
         ]
     )
 
-    customer_repair_form = html.Div(
-        [
-            html.H2("Customer Repair Requests"),
-            dcc.Loading(
-                id="customer-repair-loading",
-                type="circle",
-                children=html.Div(id="customer-repair-content"),
-                color="green",
-            ),
-        ]
-    )
-
     return html.Div(
         [
             html.Header([html.Div("Circular Lab Cockpit", className="logo")]),
             inventory_form,
             fabric_form,
             co2_form,
-            customer_repair_form,
         ],
         className="wrapper",
     )

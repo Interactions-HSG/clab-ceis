@@ -2,12 +2,11 @@ from dash import Dash, dcc, html
 from .layouts.home import home_page
 from .layouts.skirt import skirt_page
 from .layouts.top import top_page
+from .shop_callbacks import get_callbacks
 from dash.dependencies import Input, Output
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "ceis_dashboard"))
-import config
+from . import config
 
 # Initialize the app
 app = Dash(
@@ -24,6 +23,9 @@ app.layout = html.Div(
         html.Div(id="page-content", style={"padding": "20px"}),
     ]
 )
+
+# Register callbacks
+get_callbacks(app)
 
 
 # Page routing callback
