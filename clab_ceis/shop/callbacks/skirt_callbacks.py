@@ -1,5 +1,5 @@
 from dash.dependencies import Input, Output
-from clab_ceis.shop.sparql_queries import fetch_skirt_recipes
+from ..sparql_queries import fetch_skirt_recipes
 
 
 def register_callbacks(app):
