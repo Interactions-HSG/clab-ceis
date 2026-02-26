@@ -1,6 +1,6 @@
 from dash import html, dash_table
 from dash.dependencies import Input, Output
-from clab_ceis.shop.sparql_queries import fetch_material, fetch_location
+from ..sparql_queries import fetch_material, fetch_location
 
 
 def register_callbacks(app):
