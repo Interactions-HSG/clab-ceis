@@ -30,35 +30,6 @@ uv run --directory clab_ceis/shop ceis-shop
 
 Then connect to `http://localhost:8050` (shop) and `http://localhost:8051` (dashboard)
 
-<details>
-<summary>Alternative: Run from component directories</summary>
-
-### backend
-
-```bash
-cd clab_ceis/ceis_backend
-uv sync
-uv run uvicorn main:app --host 0.0.0.0 --port 8052 --reload
-```
-
-### dashboard
-
-```bash
-cd clab_ceis/ceis_dashboard
-uv sync
-uv run python main.py
-```
-
-### shop
-
-```bash
-cd clab_ceis/shop
-uv sync
-uv run ceis-shop
-```
-
-</details>
-
 ## Architecture
 
 The overall idea is presented by the following diagram:
