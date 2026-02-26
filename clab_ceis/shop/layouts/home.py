@@ -52,7 +52,10 @@ def home_page():
             html.Div(
                 className="card",
                 children=[
-                    html.H2("Customer Repair Requests"),
+                    html.H2("Customer Repair Scenarios"),
+                    html.P(
+                        "Sites: Manufacturer Bucharest, Repair Center St. Gallen, Consumer Sigmaringen."
+                    ),
                     dcc.Loading(
                         id="customer-repair-loading",
                         type="circle",
