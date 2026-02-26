@@ -91,7 +91,7 @@ def register_co2_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
                         [
                             f"Total CO2 Emissions for {garment_name}: ",
                             html.B(f"{total_emissions}"),
-                            " kg CO2eq, comprising of ",
+                            " kg CO2eq (excluding transportation to the customer), comprising of ",
                             html.B(
                                 f"{round(co2_data.fabric_blocks.total_emission, 2)}"
                             ),
