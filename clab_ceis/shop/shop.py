@@ -1,14 +1,20 @@
 from dash import Dash, dcc, html
-from clab_ceis.shop.layouts.home import home_page
-from clab_ceis.shop.layouts.skirt import skirt_page
-from clab_ceis.shop.layouts.top import top_page
-from clab_ceis.shop.layouts.dashboard import dashboard_page
-from clab_ceis.shop.callbacks import skirt_callbacks, top_callbacks, dashboard_callbacks
+from .layouts.home import home_page
+from .layouts.skirt import skirt_page
+from .layouts.top import top_page
+from .layouts.dashboard import dashboard_page
+from .callbacks import skirt_callbacks, top_callbacks, dashboard_callbacks
 from dash.dependencies import Input, Output
-from clab_ceis.ceis_dashboard import config
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent / "ceis_dashboard"))
+import config
 
 # Initialize the app
-app = Dash(__name__, assets_folder="/app/clab_ceis/assets", suppress_callback_exceptions=True)
+app = Dash(
+    __name__, assets_folder="/app/clab_ceis/assets", suppress_callback_exceptions=True
+)
 server = app.server
 
 # Define app layout
@@ -63,9 +69,7 @@ dashboard_callbacks.register_callbacks(app)
 
 
 def main():
-    app.run_server(
-        host=config.CEIS_SHOP_HOSTNAME, port=config.CEIS_SHOP_PORT, debug=True
-    )
+    app.run(host=config.CEIS_SHOP_HOSTNAME, port=config.CEIS_SHOP_PORT, debug=True)
 
 
 if __name__ == "__main__":

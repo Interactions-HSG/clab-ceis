@@ -8,6 +8,31 @@ Repository dedicated to prototypes for the Circular Lab. Currently it consits of
 
 ## How to run
 
+All components can be run from the workspace root using `uv`:
+
+### backend
+
+```bash
+uv run --directory clab_ceis/ceis_backend uvicorn main:app --host 0.0.0.0 --port 8052 --reload
+```
+
+### dashboard
+
+```bash
+uv run --directory clab_ceis/ceis_dashboard python main.py
+```
+
+### shop
+
+```bash
+uv run --directory clab_ceis/shop ceis-shop
+```
+
+Then connect to `http://localhost:8050` (shop) and `http://localhost:8051` (dashboard)
+
+<details>
+<summary>Alternative: Run from component directories</summary>
+
 ### backend
 
 ```bash
@@ -26,9 +51,13 @@ uv run python main.py
 
 ### shop
 
-currently unavailable
+```bash
+cd clab_ceis/shop
+uv sync
+uv run ceis-shop
+```
 
-Then connect to `http://localhost:8050` (shop) and `http://localhost:8051` (dashboard)
+</details>
 
 ## Architecture
 

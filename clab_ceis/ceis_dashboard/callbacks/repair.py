@@ -40,7 +40,7 @@ def register_repair_callbacks(app: Dash) -> None:
 
         table = dash_table.DataTable(
             columns=[
-                {"name": "Use case", "id": "use_case"},
+                {"name": "End of Life Scenario", "id": "use_case"},
                 {"name": "Route", "id": "route"},
                 {"name": "Distance (km)", "id": "distance_km"},
                 {"name": "CO2 (kg CO2eq)", "id": "co2_kg"},
