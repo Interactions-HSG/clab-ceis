@@ -23,7 +23,6 @@ class CeisMonitor:
         self._app = app
         self._model = ceis_data.CeisData()
         self.make_layout()
-        self.get_route(self._app.server)
         ceis_callbacks.get_callbacks(self._app, self._model)
 
     def make_layout(self) -> None:
@@ -74,27 +73,6 @@ class CeisMonitor:
                 return self._add_recipe_layout
             # default / or unknown paths -> index
             return self._index_layout
-
-    def get_route(self, server):
-        @server.route("/quote", methods=["PUT"])
-        def quote_endpoint():
-            # Retrieve data from the HTTP request
-            data = request.json
-            # Safely compute next EventID
-            last_id_series = self._model.get_data().get("EventID")
-            last_id = (
-                int(last_id_series.iloc[-1])
-                if (last_id_series is not None and not last_id_series.empty)
-                else 0
-            )
-            data["EventID"] = last_id + 1
-            self._model.set_data(
-                pd.concat(
-                    [self._model.get_data(), pd.DataFrame([data])], ignore_index=True
-                )
-            )
-
-            return jsonify(ceis_data.CeisTrade.get_offer(self._model.get_data()))
 
 
 def main():

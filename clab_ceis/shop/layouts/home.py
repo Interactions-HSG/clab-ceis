@@ -49,5 +49,17 @@ def home_page():
                     ),
                 ],
             ),
+            html.Div(
+                className="card",
+                children=[
+                    html.H2("Customer Repair Requests"),
+                    dcc.Loading(
+                        id="customer-repair-loading",
+                        type="circle",
+                        children=html.Div(id="customer-repair-content"),
+                        color="green",
+                    ),
+                ],
+            ),
         ],
     )
