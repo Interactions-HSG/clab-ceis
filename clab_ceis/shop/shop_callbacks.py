@@ -34,11 +34,48 @@ def get_callbacks(app):
             print(f"Error fetching repair CO2 data: {e}")
             return html.Div("Unable to load repair CO2 comparison.")
 
+        # Fetch CO2 data for new garment
+        new_garment_co2 = None
+        new_garment_fabric_blocks = []
+        new_garment_processes = []
+        try:
+            garment_response = requests.get(
+                f"{config.BACKEND_API_URL}/co2/1",
+                timeout=10,
+            )
+            garment_response.raise_for_status()
+            new_garment_data = garment_response.json()
+
+            fabric_blocks_data = new_garment_data.get("fabric_blocks", {})
+            processes_data = new_garment_data.get("processes", {})
+
+            new_garment_co2 = {
+                "fabric_total": fabric_blocks_data.get("total_emission", 0),
+                "processes_total": processes_data.get("total_emission", 0),
+                "fabric_details": fabric_blocks_data.get("details", []),
+                "process_details": processes_data.get("details", []),
+            }
+        except Exception as e:
+            print(f"Error fetching new garment CO2 data: {e}")
+
         scenario_labels = []
         scenario_values = []
         for scenario in scenarios:
             scenario_labels.append(scenario.get("use_case", "Scenario"))
             scenario_values.append(scenario.get("co2_kg", 0))
+
+        # Add "Buy New" scenario with transport emissions
+        # Use the same transport distance as shipping from production (Bucharest to customer)
+        buy_new_transport = 0
+        if new_garment_co2 and scenarios:
+            # Use transport emission from first scenario (Bucharest to customer) for new garment
+            buy_new_transport = (
+                scenarios[0].get("co2_kg", 0)
+                if scenarios[0].get("co2_kg") is not None
+                else 0
+            )
+            scenario_labels.append("Buy New")
+            scenario_values.append(buy_new_transport)
 
         block_details = replacement_blocks.get("details", [])
         block_material_emission = 0
@@ -53,25 +90,63 @@ def get_callbacks(app):
             x=scenario_labels,
             y=scenario_values,
         )
+
+        # Add replacement material emission
+        replacement_values = [block_material_emission] * (
+            len(scenario_labels) - (1 if new_garment_co2 else 0)
+        )
+        if new_garment_co2:
+            replacement_values.append(0)  # No replacement material for "Buy New"
         fig.add_bar(
             name="Replacement material emission",
             x=scenario_labels,
-            y=[block_material_emission] * len(scenario_labels),
+            y=replacement_values,
         )
+
+        # Add replacement process emissions
         for process in processes:
             process_name = process.get("process", "Unknown Process")
             process_emission = process.get("emission", 0)
+            process_values = [process_emission] * (
+                len(scenario_labels) - (1 if new_garment_co2 else 0)
+            )
+            if new_garment_co2:
+                process_values.append(0)  # No replacement process for "Buy New"
             fig.add_bar(
                 name=f"Replacement {process_name}",
                 x=scenario_labels,
-                y=[process_emission] * len(scenario_labels),
+                y=process_values,
             )
+
+        # Add new garment fabric blocks emissions (combined)
+        if new_garment_co2:
+            total_fabric_emission = sum(
+                detail.get("emission", 0) for detail in new_garment_co2["fabric_details"]
+            )
+            fabric_values = [0] * (len(scenario_labels) - 1) + [total_fabric_emission]
+            fig.add_bar(
+                name="New Garment Fabric",
+                x=scenario_labels,
+                y=fabric_values,
+            )
+
+            # Add new garment process emissions
+            for process_detail in new_garment_co2["process_details"]:
+                process_name = process_detail.get("process", "Unknown")
+                process_emission = process_detail.get("emission", 0)
+                process_values = [0] * (len(scenario_labels) - 1) + [process_emission]
+                fig.add_bar(
+                    name=f"New Garment Process: {process_name}",
+                    x=scenario_labels,
+                    y=process_values,
+                )
+
         fig.update_layout(
             barmode="stack",
-            title="Repairing a crop top using a new replacement fabric block (40x14).",
-            xaxis_title="End of Life Scenario",
+            title="CO2 Comparison: Repair vs Buy New Crop Top",
+            xaxis_title="Scenario",
             yaxis_title="CO2 (kg CO2eq)",
-            legend_title_text="Metric",
+            legend_title_text="Emission Source",
             margin=dict(l=20, r=20, t=40, b=20),
         )
 
