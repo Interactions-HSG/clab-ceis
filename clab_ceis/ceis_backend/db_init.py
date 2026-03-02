@@ -193,11 +193,11 @@ def init_sqlite_db():
             ((SELECT id FROM process_types WHERE name='sewing'),
              (SELECT id FROM resource_types WHERE name='electricity'), 1.0),
             ((SELECT id FROM process_types WHERE name='washing'),
-             (SELECT id FROM resource_types WHERE name='water'), 5.0),
+             (SELECT id FROM resource_types WHERE name='water'), 2.0),
             ((SELECT id FROM process_types WHERE name='washing'),
              (SELECT id FROM resource_types WHERE name='electricity'), 2.0),
             ((SELECT id FROM process_types WHERE name='dyeing'),
-             (SELECT id FROM resource_types WHERE name='water'), 10.0);
+             (SELECT id FROM resource_types WHERE name='water'), 1.0);
 
             INSERT OR IGNORE INTO garment_recipe_fabric_blocks (garment_type, fabric_block_id, amount) VALUES
             ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM fabric_block_types WHERE name='80x64'), 1),
@@ -207,15 +207,14 @@ def init_sqlite_db():
             ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM fabric_block_types WHERE name='64x40'), 4);
 
             INSERT OR IGNORE INTO garment_recipe_processes (garment_type, process_id, time) VALUES
-            ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM process_types WHERE name='sewing'), 1),
-            ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM process_types WHERE name='washing'), 3),
-            ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM process_types WHERE name='sewing'), 1),
-            ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM process_types WHERE name='dyeing'), 2);
+            ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM process_types WHERE name='sewing'), 0.1),
+            ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM process_types WHERE name='sewing'), 0.1),
+            ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM process_types WHERE name='dyeing'), 0.2);
 
             INSERT OR IGNORE INTO fabric_block_recipe_processes (fabric_block_type, process_id, time) VALUES
-            ((SELECT id FROM fabric_block_types WHERE name='80x64'), (SELECT id FROM process_types WHERE name='dyeing'), 1),
-            ((SELECT id FROM fabric_block_types WHERE name='40x14'), (SELECT id FROM process_types WHERE name='dyeing'), 1),
-            ((SELECT id FROM fabric_block_types WHERE name='64x40'), (SELECT id FROM process_types WHERE name='dyeing'), 1);
+            ((SELECT id FROM fabric_block_types WHERE name='80x64'), (SELECT id FROM process_types WHERE name='dyeing'), 0.2),
+            ((SELECT id FROM fabric_block_types WHERE name='40x14'), (SELECT id FROM process_types WHERE name='dyeing'), 0.2),
+            ((SELECT id FROM fabric_block_types WHERE name='64x40'), (SELECT id FROM process_types WHERE name='dyeing'), 0.2);
         """
         )
         cursor.execute("UPDATE seed_meta SET seeded = 1 WHERE id = 1;")
