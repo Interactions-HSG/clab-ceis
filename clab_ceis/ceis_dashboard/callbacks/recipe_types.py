@@ -13,7 +13,6 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
         Output("delete-garment-recipe-type", "options"),
         Output("delete-fabric-block-type", "options"),
         Output("delete-process-type", "options"),
-        Output("delete-resource-type", "options"),
         Input("url", "pathname"),
         Input("add-garment-recipe", "n_clicks"),
         Input("delete-garment-recipe", "n_clicks"),
@@ -21,8 +20,6 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
         Input("delete-fabric-block-type-button", "n_clicks"),
         Input("add-process-type", "n_clicks"),
         Input("delete-process-type-button", "n_clicks"),
-        Input("add-resource-type", "n_clicks"),
-        Input("delete-resource-type-button", "n_clicks"),
     )
     def load_delete_options(
         pathname,
@@ -32,13 +29,10 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
         delete_fabric_clicks,
         add_process_clicks,
         delete_process_clicks,
-        add_resource_clicks,
-        delete_resource_clicks,
     ):
         garment_options = []
         fabric_options = []
         process_options = []
-        resource_options = []
 
         try:
             resp = requests.get(f"{config.BACKEND_API_URL}/garment-types")
@@ -67,16 +61,7 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
         except Exception:
             pass
 
-        try:
-            resp = requests.get(f"{config.BACKEND_API_URL}/resource-types")
-            if resp.status_code == 200:
-                resource_options = [
-                    {"label": res["name"], "value": res["id"]} for res in resp.json()
-                ]
-        except Exception:
-            pass
-
-        return garment_options, fabric_options, process_options, resource_options
+        return garment_options, fabric_options, process_options
 
     @app.callback(
         Output("fabric-block-type-status", "children"),
@@ -116,128 +101,13 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
         Output("process-type-status", "children"),
         Input("add-process-type", "n_clicks"),
         State("process-type-name", "value"),
-        State({"type": "process-resource", "index": ALL}, "value"),
-        State({"type": "process-resource-amount", "index": ALL}, "value"),
+        State("process-type-unit", "value"),
+        State("process-type-activity-id", "value"),
         prevent_initial_call=True,
     )
-    def add_process_type(n_clicks, name, resource_ids, resource_amounts):
+    def add_process_type(n_clicks, name, unit, activity_id):
         if not name:
             return "Please enter a process type name."
-
-        resources = []
-        for resource_id, amount in zip(resource_ids, resource_amounts):
-            if resource_id is None:
-                continue
-            try:
-                resource_amount = float(amount) if amount is not None else 1.0
-            except (TypeError, ValueError):
-                resource_amount = 1.0
-            if resource_amount <= 0:
-                return "Resource amounts must be greater than 0."
-            resources.append({"resource_id": resource_id, "amount": resource_amount})
-
-        if not resources:
-            return "Please add at least one resource for this process type."
-
-        try:
-            resp = requests.post(
-                f"{config.BACKEND_API_URL}/process-types",
-                json={"name": name, "resources": resources},
-            )
-            if resp.status_code in (200, 201):
-                return f"Process type '{name}' added."
-            if resp.status_code == 409:
-                return f"Process type '{name}' already exists."
-            return f"Error adding process type: {resp.status_code}"
-        except Exception as e:
-            return f"Error connecting to backend: {str(e)}"
-
-    @app.callback(
-        Output("process-resources-container", "children"),
-        [
-            Input("add-process-resource", "n_clicks"),
-            Input("remove-process-resource", "n_clicks"),
-        ],
-        [State("process-resources-container", "children")],
-    )
-    def update_process_resource_fields(add_clicks, remove_clicks, children):
-        ctx = callback_context
-        triggered = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else None
-
-        if children is None:
-            children = []
-
-        if triggered == "add-process-resource":
-            options = []
-            try:
-                resp = requests.get(f"{config.BACKEND_API_URL}/resource-types")
-                if resp.status_code == 200:
-                    data = resp.json()
-                    options = [
-                        {"label": res["name"], "value": res["id"]} for res in data
-                    ]
-            except Exception:
-                pass
-
-            new_id = len(children)
-            children.append(
-                html.Div(
-                    [
-                        html.Div(
-                            [
-                                dcc.Dropdown(
-                                    id={"type": "process-resource", "index": new_id},
-                                    options=options,
-                                    placeholder="Select resource",
-                                    clearable=False,
-                                    style={"width": "220px"},
-                                ),
-                            ],
-                            style={"flex": "1"},
-                        ),
-                        html.Div(
-                            [
-                                dcc.Input(
-                                    id={
-                                        "type": "process-resource-amount",
-                                        "index": new_id,
-                                    },
-                                    placeholder="Amount",
-                                    type="number",
-                                    min=0,
-                                    step=0.1,
-                                    value=1,
-                                    style={"width": "120px"},
-                                ),
-                            ],
-                            style={"marginLeft": "12px"},
-                        ),
-                    ],
-                    style={
-                        "display": "flex",
-                        "alignItems": "center",
-                        "gap": "8px",
-                        "marginBottom": "8px",
-                    },
-                )
-            )
-
-        elif triggered == "remove-process-resource" and len(children) > 0:
-            children = children[:-1]
-
-        return children
-
-    @app.callback(
-        Output("resource-type-status", "children"),
-        Input("add-resource-type", "n_clicks"),
-        State("resource-type-name", "value"),
-        State("resource-type-unit", "value"),
-        State("resource-type-activity-id", "value"),
-        prevent_initial_call=True,
-    )
-    def add_resource_type(n_clicks, name, unit, activity_id):
-        if not name:
-            return "Please enter a resource type name."
         if activity_id is None:
             return "Please enter an activity id."
 
@@ -245,13 +115,14 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
 
         try:
             resp = requests.post(
-                f"{config.BACKEND_API_URL}/resource-types", json=payload
+                f"{config.BACKEND_API_URL}/process-types",
+                json=payload,
             )
             if resp.status_code in (200, 201):
-                return f"Resource type '{name}' added."
+                return f"Process type '{name}' added."
             if resp.status_code == 409:
-                return f"Resource type '{name}' already exists."
-            return f"Error adding resource type: {resp.status_code}"
+                return f"Process type '{name}' already exists."
+            return f"Error adding process type: {resp.status_code}"
         except Exception as e:
             return f"Error connecting to backend: {str(e)}"
 
@@ -325,27 +196,6 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
             if resp.status_code == 404:
                 return "Process type not found.", type_id
             return f"Error deleting process type: {resp.status_code}", type_id
-        except Exception as e:
-            return f"Error connecting to backend: {str(e)}", type_id
-
-    @app.callback(
-        Output("delete-resource-type-status", "children"),
-        Output("delete-resource-type", "value"),
-        Input("delete-resource-type-button", "n_clicks"),
-        State("delete-resource-type", "value"),
-        prevent_initial_call=True,
-    )
-    def delete_resource_type(n_clicks, type_id):
-        if type_id is None:
-            return "Please select a resource type.", type_id
-
-        try:
-            resp = requests.delete(f"{config.BACKEND_API_URL}/resource-types/{type_id}")
-            if resp.status_code in (200, 204):
-                return "Resource type deleted.", None
-            if resp.status_code == 404:
-                return "Resource type not found.", type_id
-            return f"Error deleting resource type: {resp.status_code}", type_id
         except Exception as e:
             return f"Error connecting to backend: {str(e)}", type_id
 
@@ -472,10 +322,10 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
                             [
                                 dcc.Input(
                                     id={
-                                        "type": "recipe-process-time",
+                                        "type": "recipe-process-amount",
                                         "index": new_id,
                                     },
-                                    placeholder="Time",
+                                    placeholder="Amount",
                                     type="number",
                                     min=0,
                                     step=0.5,
@@ -507,7 +357,7 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
         State({"type": "recipe-fabric-block", "index": ALL}, "value"),
         State({"type": "recipe-fabric-block-amount", "index": ALL}, "value"),
         State({"type": "recipe-process", "index": ALL}, "value"),
-        State({"type": "recipe-process-time", "index": ALL}, "value"),
+        State({"type": "recipe-process-amount", "index": ALL}, "value"),
         prevent_initial_call=True,
     )
     def add_garment_recipe(
@@ -516,7 +366,7 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
         fabric_block_ids,
         fabric_block_amounts,
         process_ids,
-        process_times,
+        process_amounts,
     ):
         if not garment_type_name:
             return "Please enter a garment type name."
@@ -537,16 +387,16 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
             return "Please add at least one fabric block."
 
         processes = []
-        for proc_id, time in zip(process_ids, process_times):
+        for proc_id, amount in zip(process_ids, process_amounts):
             if proc_id is None:
                 continue
             try:
-                proc_time = float(time) if time is not None else 1.0
+                proc_amount = float(amount) if amount is not None else 1.0
             except (TypeError, ValueError):
-                proc_time = 1.0
-            if proc_time <= 0:
-                return "Process time must be greater than 0."
-            processes.append({"process_id": proc_id, "time": proc_time})
+                proc_amount = 1.0
+            if proc_amount <= 0:
+                return "Process amount must be greater than 0."
+            processes.append({"process_id": proc_id, "amount": proc_amount})
 
         try:
             resp = requests.post(

@@ -6,6 +6,12 @@ Repository dedicated to prototypes for the Circular Lab. Currently it consits of
 - A dashboard: it interacts with the CEIS to provide relevant information to the manufacturer
 - A webshop: it interacts with the CEIS to get quote and register its orders
 
+## Architecture
+
+The overall idea is presented by the following diagram:
+
+![alt text](doc/assets/overview.drawio.svg)
+
 ## How to run
 
 All components can be run from the workspace root using `uv`:
@@ -30,8 +36,16 @@ uv run --directory clab_ceis/shop ceis-shop
 
 Then connect to `http://localhost:8050` (shop) and `http://localhost:8051` (dashboard)
 
-## Architecture
+## How to run tests
 
-The overall idea is presented by the following diagram:
+### backend
 
-![alt text](doc/assets/overview.drawio.svg)
+```bash
+uv run --directory clab_ceis/ceis_backend pytest
+```
+
+To run tests with verbose output:
+
+```bash
+uv run --directory clab_ceis/ceis_backend pytest -v
+```

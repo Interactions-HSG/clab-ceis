@@ -12,7 +12,6 @@ from utils import (
     get_wiser_token,
     get_emission_per_unit,
     calculate_transport_emission,
-    get_resources_data_for_process,
 )
 from location_details import distances_customer_sigmaringen, activity_id_transport
 from models import (
@@ -22,8 +21,6 @@ from models import (
     GarmentRecipeCreate,
     GarmentTypeCreate,
     ProcessTypeCreate,
-    ResourceTypeCreate,
-    Process,
 )
 
 
@@ -132,86 +129,22 @@ def create_fabric_block_type(payload: FabricBlockTypeCreate):
 
 @app.post("/process-types")
 def create_process_type(payload: ProcessTypeCreate):
-    if not payload.resources:
-        raise HTTPException(
-            status_code=400, detail="Process type must include at least one resource"
-        )
-
     conn = sqlite3.connect("ceis_backend.db")
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO process_types (name) VALUES (?)",
-            (payload.name,),
-        )
-        process_id = cursor.lastrowid
-
-        resource_ids = [res.resource_id for res in payload.resources]
-        if resource_ids:
-            cursor.execute(
-                f"SELECT COUNT(*) FROM resource_types WHERE id IN ({','.join('?' * len(resource_ids))})",
-                resource_ids,
-            )
-            if cursor.fetchone()[0] != len(set(resource_ids)):
-                conn.rollback()
-                raise HTTPException(status_code=400, detail="Invalid resource id")
-
-        cursor.executemany(
             """
-            INSERT INTO process_resource_consumption (process_id, resource_id, amount)
-            VALUES (?, ?, ?)
-            """,
-            [(process_id, res.resource_id, res.amount) for res in payload.resources],
-        )
-        conn.commit()
-        return {"id": process_id, "name": payload.name}
-    except sqlite3.IntegrityError:
-        raise HTTPException(status_code=409, detail="Process type already exists")
-    finally:
-        conn.close()
-
-
-@app.post("/resource-types")
-def create_resource_type(payload: ResourceTypeCreate):
-    conn = sqlite3.connect("ceis_backend.db")
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            "SELECT id FROM resource_types WHERE name = ?",
-            (payload.name,),
-        )
-        if cursor.fetchone():
-            raise HTTPException(status_code=409, detail="Resource type already exists")
-
-        cursor.execute(
-            """
-            INSERT INTO resource_types (name, unit, activity_id)
+            INSERT INTO process_types (name, unit, activity_id)
             VALUES (?, ?, ?)
             """,
             (payload.name, payload.unit, payload.activity_id),
         )
         conn.commit()
         return {"id": cursor.lastrowid, "name": payload.name}
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=409, detail="Process type already exists")
     finally:
         conn.close()
-
-
-@app.get("/resource-types")
-def get_resource_types():
-    conn = sqlite3.connect("ceis_backend.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, name, unit, activity_id FROM resource_types")
-    resource_types = cursor.fetchall()
-    conn.close()
-    return [
-        {
-            "id": res_type[0],
-            "name": res_type[1],
-            "unit": res_type[2],
-            "activity_id": res_type[3],
-        }
-        for res_type in resource_types
-    ]
 
 
 @app.post("/activity-search")
@@ -309,11 +242,17 @@ def delete_fabric_block_type(type_id: int):
 def get_preparation_types():
     conn = sqlite3.connect("ceis_backend.db")
     cursor = conn.cursor()
-    cursor.execute("SELECT id, name FROM process_types")
+    cursor.execute("SELECT id, name, unit, activity_id FROM process_types")
     preparation_types = cursor.fetchall()
     conn.close()
     return [
-        {"id": prep_type[0], "name": prep_type[1]} for prep_type in preparation_types
+        {
+            "id": prep_type[0],
+            "name": prep_type[1],
+            "unit": prep_type[2],
+            "activity_id": prep_type[3],
+        }
+        for prep_type in preparation_types
     ]
 
 
@@ -330,10 +269,6 @@ def delete_process_type(type_id: int):
             raise HTTPException(status_code=404, detail="Process type not found")
 
         cursor.execute(
-            "DELETE FROM process_resource_consumption WHERE process_id = ?",
-            (type_id,),
-        )
-        cursor.execute(
             "DELETE FROM garment_recipe_processes WHERE process_id = ?",
             (type_id,),
         )
@@ -347,32 +282,6 @@ def delete_process_type(type_id: int):
         )
         conn.commit()
         return {"message": "Process type deleted"}
-    finally:
-        conn.close()
-
-
-@app.delete("/resource-types/{type_id}")
-def delete_resource_type(type_id: int):
-    conn = sqlite3.connect("ceis_backend.db")
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            "SELECT id FROM resource_types WHERE id = ?",
-            (type_id,),
-        )
-        if cursor.fetchone() is None:
-            raise HTTPException(status_code=404, detail="Resource type not found")
-
-        cursor.execute(
-            "DELETE FROM process_resource_consumption WHERE resource_id = ?",
-            (type_id,),
-        )
-        cursor.execute(
-            "DELETE FROM resource_types WHERE id = ?",
-            (type_id,),
-        )
-        conn.commit()
-        return {"message": "Resource type deleted"}
     finally:
         conn.close()
 
@@ -421,10 +330,10 @@ def create_garment_recipe(payload: GarmentRecipeCreate):
                     detail="Fabric block amounts must be greater than 0",
                 )
         for proc in processes:
-            if proc.time <= 0:
+            if proc.amount <= 0:
                 raise HTTPException(
                     status_code=400,
-                    detail="Process time must be greater than 0",
+                    detail="Process amount must be greater than 0",
                 )
 
         cursor.execute(
@@ -452,11 +361,11 @@ def create_garment_recipe(payload: GarmentRecipeCreate):
             cursor.executemany(
                 """
                 INSERT INTO garment_recipe_processes
-                (garment_type, process_id, time)
+                (garment_type, process_id, amount)
                 VALUES (?, ?, ?)
                 """,
                 [
-                    (payload.garment_type_id, proc.process_id, proc.time)
+                    (payload.garment_type_id, proc.process_id, proc.amount)
                     for proc in processes
                 ],
             )
@@ -496,7 +405,7 @@ async def create_fabric_block(fabric_block: FabricBlockInfo):
             INSERT INTO preparations_used_fabric_blocks (type_id, amount, fabric_block_id)
             VALUES (?, ?, ?)
             """,
-            [(prep.type_id, prep.time, fabric_block_id) for prep in preparations],
+            [(prep.type_id, prep.amount, fabric_block_id) for prep in preparations],
         )
 
     conn.commit()
@@ -713,7 +622,7 @@ def get_repair_co2(
 
                 cursor.execute(
                     """
-                    SELECT pt.name, fbrp.time
+                    SELECT pt.name, fbrp.amount, pt.activity_id
                     FROM fabric_block_recipe_processes fbrp
                     JOIN process_types pt ON fbrp.process_id = pt.id
                     WHERE fbrp.fabric_block_type = ?
@@ -723,21 +632,17 @@ def get_repair_co2(
                 processes_data = cursor.fetchall()
 
                 process_emissions_list = []
-                for process_name, process_time in processes_data:
+                for process_name, process_amount, activity_id in processes_data:
                     process_emissions = 0
-                    resources = get_resources_data_for_process(
-                        Process(activity=process_name, time=process_time)
+                    resource_emission_per_unit = _get_emission_per_unit_cached(
+                        activity_id, token, emission_cache
                     )
-                    for resource in resources:
-                        resource_emission_per_unit = _get_emission_per_unit_cached(
-                            resource.activity_id, token, emission_cache
-                        )
-                        resource_emissions = (
-                            resource_emission_per_unit * resource.amount * process_time
-                            if resource_emission_per_unit is not None
-                            else 0
-                        )
-                        process_emissions += resource_emissions
+                    resource_emissions = (
+                        resource_emission_per_unit * process_amount
+                        if resource_emission_per_unit is not None
+                        else 0
+                    )
+                    process_emissions += resource_emissions
 
                     process_emissions_list.append(
                         {

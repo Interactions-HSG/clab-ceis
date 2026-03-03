@@ -118,17 +118,42 @@ def get_callbacks(app):
                 y=process_values,
             )
 
-        # Add new garment fabric blocks emissions (combined)
+        # Add new garment fabric blocks emissions (split into material and individual processes)
         if new_garment_co2:
-            total_fabric_emission = sum(
-                detail.get("emission", 0) for detail in new_garment_co2["fabric_details"]
+            # Add material emissions
+            total_material_emission = sum(
+                detail.get("material_emission", 0)
+                for detail in new_garment_co2["fabric_details"]
             )
-            fabric_values = [0] * (len(scenario_labels) - 1) + [total_fabric_emission]
+            material_values = [0] * (len(scenario_labels) - 1) + [
+                total_material_emission
+            ]
             fig.add_bar(
-                name="New Garment Fabric",
+                name="New Garment Fabric Material",
                 x=scenario_labels,
-                y=fabric_values,
+                y=material_values,
             )
+
+            # Add production emissions broken down by individual processes
+            production_processes_totals = {}
+            for detail in new_garment_co2["fabric_details"]:
+                production_processes = detail.get("production_processes", [])
+                for process in production_processes:
+                    process_name = process.get("process", "Unknown")
+                    process_emission = process.get("emission", 0)
+                    if process_name not in production_processes_totals:
+                        production_processes_totals[process_name] = 0
+                    production_processes_totals[process_name] += process_emission
+            
+            for process_name, total_emission in production_processes_totals.items():
+                production_process_values = [0] * (len(scenario_labels) - 1) + [
+                    total_emission
+                ]
+                fig.add_bar(
+                    name=f"New Garment Production: {process_name}",
+                    x=scenario_labels,
+                    y=production_process_values,
+                )
 
             # Add new garment process emissions
             for process_detail in new_garment_co2["process_details"]:

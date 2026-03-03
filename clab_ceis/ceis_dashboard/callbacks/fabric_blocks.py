@@ -93,7 +93,10 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
                     data = resp.json()
 
                     options = [
-                        {"label": prep["name"], "value": prep["id"]}
+                        {
+                            "label": f"{prep['name']} ({prep['unit']})",
+                            "value": prep["id"],
+                        }
                         for prep in data
                     ]
 
@@ -122,7 +125,7 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
                                     id={"type": "prep-count", "index": new_id},
                                     placeholder="Count",
                                     type="number",
-                                    min=1,
+                                    min=0,
                                     value=1,
                                     style={"width": "100px"},
                                 ),
@@ -189,18 +192,10 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
 
             preparations: list[PreparationInfo] = []
             for name, count in zip(prep_names, prep_counts):
-                if name:
-                    try:
-                        cnt = int(count) if count else 1
-                    except:
-                        cnt = 1
-
-                    preparations.append(PreparationInfo(type_id=name, time=cnt))
+                preparations.append(PreparationInfo(type_id=name, amount=count))
 
             payload = FabricBlockInfo(
-                type_id=type_val,
-                processes=preparations,
-                location_id=location_val
+                type_id=type_val, processes=preparations, location_id=location_val
             )
             print("Payload:", payload)
             try:

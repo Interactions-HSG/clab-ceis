@@ -1,18 +1,23 @@
 from typing import Any, Optional
 from pydantic import BaseModel
 
+
 class Process(BaseModel):
     activity: str
-    time: float
-    
+    amount: float
+    activity_id: int
+
+
 class PreparationInfo(BaseModel):
     type_id: int
-    time: float
-    
+    amount: float
+
+
 class Resource(BaseModel):
     name: str
     activity_id: int
     amount: float
+
 
 class FabricBlock(BaseModel):
     id: Optional[int]
@@ -21,20 +26,24 @@ class FabricBlock(BaseModel):
     processes: list[Process]
     location_id: Optional[int] = None
     location_name: Optional[str] = None
-    
+
+
 class FabricBlockInfo(BaseModel):
     type_id: int
     processes: list[PreparationInfo]
     location_id: Optional[int] = None
 
+
 class EmissionDetails(BaseModel):
     details: list[dict[str, Any]]
     total_emission: float
 
+
 class Co2Response(BaseModel):
     processes: EmissionDetails
     fabric_blocks: EmissionDetails
-    
+
+
 class GarmentRecipe(BaseModel):
     fabric_blocks: list[str]
     processes: list[Process]
@@ -51,20 +60,10 @@ class FabricBlockTypeCreate(BaseModel):
     activity_id: int
 
 
-class ResourceTypeCreate(BaseModel):
+class ProcessTypeCreate(BaseModel):
     name: str
     unit: Optional[str] = None
     activity_id: int
-
-
-class ProcessResourceConsumptionCreate(BaseModel):
-    resource_id: int
-    amount: float
-
-
-class ProcessTypeCreate(BaseModel):
-    name: str
-    resources: list[ProcessResourceConsumptionCreate]
 
 
 class GarmentRecipeFabricBlockCreate(BaseModel):
@@ -74,7 +73,7 @@ class GarmentRecipeFabricBlockCreate(BaseModel):
 
 class GarmentRecipeProcessCreate(BaseModel):
     process_id: int
-    time: float
+    amount: float
 
 
 class GarmentRecipeCreate(BaseModel):
