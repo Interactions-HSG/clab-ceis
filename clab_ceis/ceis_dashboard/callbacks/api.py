@@ -4,6 +4,7 @@ import requests
 
 import config
 from ceis_backend.models import Co2Response
+
 # from clab_ceis.ceis_backend.models import Co2Response
 
 
@@ -21,7 +22,7 @@ def fetch_fabric_blocks():
 
             if isinstance(preps, list):
                 block["preparations"] = ", ".join(
-                    f"{p.get('type','')}({p.get('amount',0)})" for p in preps
+                    f"{p.get('type','')}({p.get('amount')})" for p in preps
                 )
             else:
                 block["preparations"] = str(preps)

@@ -173,27 +173,19 @@ def get_recipe_layout():
                                 type="text",
                                 placeholder="e.g., ironing",
                             ),
-                            html.H3("Process resources"),
-                            html.Div(id="process-resources-container", children=[]),
-                            html.Div(
-                                [
-                                    html.Button(
-                                        "Add Resource",
-                                        id="add-process-resource",
-                                        n_clicks=0,
-                                    ),
-                                    html.Button(
-                                        "Remove Last Resource",
-                                        id="remove-process-resource",
-                                        n_clicks=0,
-                                    ),
-                                ],
-                                style={
-                                    "marginTop": "8px",
-                                    "marginBottom": "12px",
-                                    "display": "flex",
-                                    "gap": "8px",
-                                },
+                            html.Label("Unit"),
+                            dcc.Input(
+                                id="process-type-unit",
+                                type="text",
+                                placeholder="e.g., kWh",
+                            ),
+                            html.Label("Activity ID"),
+                            dcc.Input(
+                                id="process-type-activity-id",
+                                type="number",
+                                min=0,
+                                step=1,
+                                placeholder="e.g., 6566",
                             ),
                             html.Button(
                                 "Add Process Type",
@@ -204,7 +196,8 @@ def get_recipe_layout():
                                 id="process-type-status",
                                 style={"marginTop": "6px", "color": "green"},
                             ),
-                        ]
+                        ],
+                        style={"marginBottom": "20px"},
                     ),
                     # html.H2("Delete Process Type"),
                     # html.Div(
@@ -228,44 +221,8 @@ def get_recipe_layout():
                     #     ],
                     #     style={"marginBottom": "20px"},
                     # ),
-                    html.H2("Add Resource Type"),
-                    html.Div(
-                        [
-                            html.Label("Name"),
-                            dcc.Input(
-                                id="resource-type-name",
-                                type="text",
-                                placeholder="e.g., electricity",
-                            ),
-                            html.Label("Unit"),
-                            dcc.Input(
-                                id="resource-type-unit",
-                                type="text",
-                                placeholder="e.g., kWh",
-                            ),
-                            html.Label("Activity ID"),
-                            dcc.Input(
-                                id="resource-type-activity-id",
-                                type="number",
-                                min=0,
-                                step=1,
-                                placeholder="e.g., 6566",
-                            ),
-                            html.Button(
-                                "Add Resource Type",
-                                id="add-resource-type",
-                                n_clicks=0,
-                            ),
-                            html.Div(
-                                id="resource-type-status",
-                                style={"marginTop": "6px", "color": "green"},
-                            ),
-                        ],
-                        style={"marginBottom": "20px"},
-                    ),
                     html.Br(),
-                    html.Br(),
-                    html.H2("Search Ecoinvent for activity ID of a resource"),
+                    html.H2("Search Ecoinvent for activity ID of a process"),
                     html.Div(
                         [
                             html.Label("Search query"),

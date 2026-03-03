@@ -31,33 +31,11 @@ def init_sqlite_db():
         """
         CREATE TABLE IF NOT EXISTS process_types (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE
-        )
-    """
-    )
-
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS resource_types (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             unit TEXT,
-            activity_id INTEGER NOT NULL
+            activity_id INTEGER NOT NULL,
+            UNIQUE(name, unit)
         )
-    """
-    )
-
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS process_resource_consumption (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            process_id INTEGER NOT NULL,
-            resource_id INTEGER NOT NULL,
-            amount REAL NOT NULL,
-            FOREIGN KEY (process_id) REFERENCES process_types(id),
-            FOREIGN KEY (resource_id) REFERENCES resource_types(id),
-            UNIQUE(process_id, resource_id)
-    )
     """
     )
 
@@ -80,7 +58,7 @@ def init_sqlite_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             garment_type INTEGER NOT NULL,
             process_id INTEGER NOT NULL,
-            time INTEGER,
+            amount REAL,
             FOREIGN KEY (garment_type) REFERENCES garment_types(id) ON DELETE CASCADE,
             FOREIGN KEY (process_id) REFERENCES process_types(id) ON DELETE CASCADE
         )
@@ -93,7 +71,7 @@ def init_sqlite_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             fabric_block_type INTEGER NOT NULL,
             process_id INTEGER NOT NULL,
-            time INTEGER,
+            amount REAL,
             FOREIGN KEY (fabric_block_type) REFERENCES fabric_block_types(id) ON DELETE CASCADE,
             FOREIGN KEY (process_id) REFERENCES process_types(id) ON DELETE CASCADE
         )
@@ -142,7 +120,7 @@ def init_sqlite_db():
         CREATE TABLE IF NOT EXISTS preparations_used_fabric_blocks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             type_id INTEGER NOT NULL,
-            amount INTEGER,
+            amount REAL,
             fabric_block_id INTEGER,
             FOREIGN KEY (type_id) REFERENCES process_types (id) ON DELETE CASCADE,
             FOREIGN KEY (fabric_block_id) REFERENCES fabric_blocks_inventory (id) ON DELETE CASCADE
@@ -180,24 +158,11 @@ def init_sqlite_db():
             ('40x14', 'hemp', 0.012, 276186),
             ('64x40', 'hemp', 0.054, 276186);
 
-            INSERT OR IGNORE INTO process_types (name) VALUES
-            ('sewing'),
-            ('washing'),
-            ('dyeing');
-
-            INSERT OR IGNORE INTO resource_types (name, unit, activity_id) VALUES
-            ('electricity', 'kWh', 6566),
-            ('water', 'L', 20642);
-
-            INSERT OR IGNORE INTO process_resource_consumption (process_id, resource_id, amount) VALUES
-            ((SELECT id FROM process_types WHERE name='sewing'),
-             (SELECT id FROM resource_types WHERE name='electricity'), 1.0),
-            ((SELECT id FROM process_types WHERE name='washing'),
-             (SELECT id FROM resource_types WHERE name='water'), 2.0),
-            ((SELECT id FROM process_types WHERE name='washing'),
-             (SELECT id FROM resource_types WHERE name='electricity'), 2.0),
-            ((SELECT id FROM process_types WHERE name='dyeing'),
-             (SELECT id FROM resource_types WHERE name='water'), 1.0);
+            INSERT OR IGNORE INTO process_types (name, unit, activity_id) VALUES
+            ('sewing', 'kWh', 6566),
+            ('steaming', 'kWh', 6566),
+            ('washing', 'kWh', 6553),
+            ('dyeing', 'kg', 21893);
 
             INSERT OR IGNORE INTO garment_recipe_fabric_blocks (garment_type, fabric_block_id, amount) VALUES
             ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM fabric_block_types WHERE name='80x64'), 1),
@@ -206,15 +171,15 @@ def init_sqlite_db():
             ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM fabric_block_types WHERE name='40x14'), 1),
             ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM fabric_block_types WHERE name='64x40'), 4);
 
-            INSERT OR IGNORE INTO garment_recipe_processes (garment_type, process_id, time) VALUES
-            ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM process_types WHERE name='sewing'), 0.1),
-            ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM process_types WHERE name='sewing'), 0.1),
-            ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM process_types WHERE name='dyeing'), 0.2);
+            INSERT OR IGNORE INTO garment_recipe_processes (garment_type, process_id, amount) VALUES
+            ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
+            ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
+            ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM process_types WHERE name='steaming'), 0.22);
 
-            INSERT OR IGNORE INTO fabric_block_recipe_processes (fabric_block_type, process_id, time) VALUES
-            ((SELECT id FROM fabric_block_types WHERE name='80x64'), (SELECT id FROM process_types WHERE name='dyeing'), 0.2),
-            ((SELECT id FROM fabric_block_types WHERE name='40x14'), (SELECT id FROM process_types WHERE name='dyeing'), 0.2),
-            ((SELECT id FROM fabric_block_types WHERE name='64x40'), (SELECT id FROM process_types WHERE name='dyeing'), 0.2);
+            INSERT OR IGNORE INTO fabric_block_recipe_processes (fabric_block_type, process_id, amount) VALUES
+            ((SELECT id FROM fabric_block_types WHERE name='80x64'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
+            ((SELECT id FROM fabric_block_types WHERE name='40x14'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
+            ((SELECT id FROM fabric_block_types WHERE name='64x40'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01);
         """
         )
         cursor.execute("UPDATE seed_meta SET seeded = 1 WHERE id = 1;")
