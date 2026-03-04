@@ -1,8 +1,8 @@
 import sys
 import requests
+from pathlib import Path
 
 import plotly.graph_objects as go
-from pathlib import Path
 from dash import dcc, html
 from dash.dependencies import Input, Output
 

@@ -19,7 +19,7 @@ All components can be run from the workspace root using `uv`:
 ### backend
 
 ```bash
-uv run --directory clab_ceis/ceis_backend uvicorn main:app --host 0.0.0.0 --port 8052 --reload
+uv run --directory clab_ceis/ceis_backend python main.py
 ```
 
 ### dashboard

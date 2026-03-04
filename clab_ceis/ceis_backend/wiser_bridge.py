@@ -1,21 +1,24 @@
-import os
 import requests
+
+from ceis_backend.config import (
+    WISER_SP3_API_USER,
+    WISER_SP3_API_KEY,
+    WISER_AUTH_URL,
+    WISER_API_BASE_URL,
+)
 
 
 def get_wiser_token():
-    url = (
-        "https://auth.wiser.ehealth.hevs.ch/realms/wiser/protocol/openid-connect/token"
-    )
     payload = {
         "grant_type": "password",
         "client_id": "wiser-api-public",
-        "username": os.getenv("WISER_SP3_API_USER", ""),
-        "password": os.getenv("WISER_SP3_API_KEY", ""),
+        "username": WISER_SP3_API_USER,
+        "password": WISER_SP3_API_KEY,
     }
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
     try:
-        response = requests.post(url, data=payload, headers=headers)
+        response = requests.post(WISER_AUTH_URL, data=payload, headers=headers)
         response.raise_for_status()
         json = response.json()
         print(json["access_token"])
@@ -35,8 +38,7 @@ def get_emission_per_unit(token: str, activity_id: int) -> float | None:
     Returns:
         Emission per unit in kg CO2eq, or None if unavailable.
     """
-    activity_url = "https://api.wiser.ehealth.hevs.ch/ecoinvent/3.12-cutoff/activity/"
-    url = f"{activity_url}{activity_id}/"
+    url = f"{WISER_API_BASE_URL}/activity/{activity_id}/"
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {token}",
