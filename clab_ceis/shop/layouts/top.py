@@ -1,4 +1,4 @@
-from dash import html, dash_table, dcc
+from dash import html, dcc
 
 
 def top_page():

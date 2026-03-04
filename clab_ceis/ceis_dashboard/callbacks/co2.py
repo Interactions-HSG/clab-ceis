@@ -1,9 +1,8 @@
 from __future__ import annotations
-
 from dash import Dash, Input, Output, html
 
 import ceis_data
-from .api import get_co2, fetch_garment_types
+from ceis_dashboard.callbacks.api import get_co2, fetch_garment_types
 
 
 def register_co2_callbacks(app: Dash, data: ceis_data.CeisData) -> None:

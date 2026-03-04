@@ -1,8 +1,8 @@
 import os
 import sqlite3
+import requests
 
 from fastapi import HTTPException
-import requests
 
 from ceis_backend.models import (
     Co2Response,

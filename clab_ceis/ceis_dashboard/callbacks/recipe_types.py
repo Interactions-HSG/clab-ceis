@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import requests
 from dash import Dash, Input, Output, State, callback_context, dcc, html
 from dash.dependencies import ALL

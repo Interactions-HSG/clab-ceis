@@ -1,11 +1,8 @@
 from __future__ import annotations
-
 import requests
-
 import config
-from ceis_backend.models import Co2Response
 
-# from clab_ceis.ceis_backend.models import Co2Response
+from ceis_backend.models import Co2Response
 
 
 def fetch_fabric_blocks():

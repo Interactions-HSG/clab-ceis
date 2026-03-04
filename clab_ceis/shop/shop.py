@@ -1,12 +1,12 @@
 from dash import Dash, dcc, html
-from .layouts.home import home_page
-from .layouts.skirt import skirt_page
-from .layouts.top import top_page
-from .shop_callbacks import get_callbacks
-from dash.dependencies import Input, Output
 from pathlib import Path
+from dash.dependencies import Input, Output
 
-from . import config
+from shop.layouts.home import home_page
+from shop.layouts.skirt import skirt_page
+from shop.layouts.top import top_page
+from shop.shop_callbacks import get_callbacks
+from shop import config
 
 # Initialize the app
 app = Dash(

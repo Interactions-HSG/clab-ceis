@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 from dash import Dash, Input, Output
 
 import ceis_data
