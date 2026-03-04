@@ -31,7 +31,7 @@ uv run --directory clab_ceis/ceis_dashboard python main.py
 ### shop
 
 ```bash
-uv run --directory clab_ceis/shop ceis-shop
+uv run --directory clab_ceis/ceis_shop main.py
 ```
 
 Then connect to `http://localhost:8050` (shop) and `http://localhost:8051` (dashboard)

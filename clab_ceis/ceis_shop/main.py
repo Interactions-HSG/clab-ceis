@@ -2,11 +2,11 @@ from dash import Dash, dcc, html
 from pathlib import Path
 from dash.dependencies import Input, Output
 
-from shop.layouts.home import home_page
-from shop.layouts.skirt import skirt_page
-from shop.layouts.top import top_page
-from shop.shop_callbacks import get_callbacks
-from shop import config
+from ceis_shop.layouts.home import home_page
+from ceis_shop.layouts.skirt import skirt_page
+from ceis_shop.layouts.top import top_page
+from ceis_shop.shop_callbacks import get_callbacks
+from ceis_shop import config
 
 # Initialize the app
 app = Dash(

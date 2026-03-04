@@ -6,7 +6,7 @@ from pathlib import Path
 from dash import dcc, html
 from dash.dependencies import Input, Output
 
-from shop import config
+from ceis_shop import config
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "ceis_dashboard"))
 
