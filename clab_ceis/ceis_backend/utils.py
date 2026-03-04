@@ -2,6 +2,7 @@ import sqlite3
 
 from fastapi import HTTPException
 
+from ceis_backend.config import DB_PATH
 from ceis_backend.models import (
     Co2Response,
     EmissionDetails,
@@ -36,7 +37,7 @@ def calculate_transport_emission(
 
 
 def get_recipe_for_fabric_block(fabric_block: str):
-    conn = sqlite3.connect("ceis_backend.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     # Get fabric block type details
@@ -241,7 +242,7 @@ def get_co2(garment_type_id: int) -> Co2Response:
 
 
 def get_garment_recipe(garment_type_id: int) -> GarmentRecipe | None:
-    conn = sqlite3.connect("ceis_backend.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     cursor.execute("SELECT id FROM garment_types WHERE id = ?", (garment_type_id,))
@@ -291,7 +292,7 @@ def get_garment_recipe(garment_type_id: int) -> GarmentRecipe | None:
 def get_used_fabric_block(
     fabric_block_name: str, already_used_ids: list[int]
 ) -> FabricBlock | None:
-    conn = sqlite3.connect("ceis_backend.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     base_query = """

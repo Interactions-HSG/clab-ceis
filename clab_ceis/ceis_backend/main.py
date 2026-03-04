@@ -2,10 +2,11 @@ import requests
 from typing import Optional
 import sqlite3
 
-from pathlib import Path
-from dotenv import load_dotenv
+import uvicorn
 from fastapi import FastAPI, HTTPException, Query
 
+from ceis_backend.config import BACKEND_HOST, BACKEND_PORT
+from ceis_backend.config import DB_PATH
 from ceis_backend.db_init import init_sqlite_db
 from ceis_backend.utils import (
     get_co2,
@@ -26,12 +27,6 @@ from ceis_backend.models import (
     ProcessTypeCreate,
 )
 
-
-# Load environment variables from ceis_backend/.env.secrets, regardless of CWD
-BASE_DIR = Path(__file__).resolve().parent
-load_dotenv(BASE_DIR / ".env.secrets", override=True)
-
-
 app = FastAPI()
 
 init_sqlite_db()
@@ -44,7 +39,7 @@ def read_root():
 
 @app.post("/garment-types")
 def create_garment_type(payload: GarmentTypeCreate):
-    conn = sqlite3.connect("ceis_backend.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     try:
         cursor.execute(
@@ -61,7 +56,7 @@ def create_garment_type(payload: GarmentTypeCreate):
 
 @app.get("/garment-types")
 def get_garment_types():
-    conn = sqlite3.connect("ceis_backend.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT id, name FROM garment_types")
     garment_types = cursor.fetchall()
@@ -71,7 +66,7 @@ def get_garment_types():
 
 @app.get("/locations")
 def get_locations():
-    conn = sqlite3.connect("ceis_backend.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT id, name FROM locations")
     locations = cursor.fetchall()
@@ -81,7 +76,7 @@ def get_locations():
 
 @app.delete("/garment-recipes/{garment_type_id}")
 def delete_garment_recipe(garment_type_id: int):
-    conn = sqlite3.connect("ceis_backend.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     try:
         cursor.execute(
@@ -112,7 +107,7 @@ def delete_garment_recipe(garment_type_id: int):
 
 @app.post("/fabric-block-types")
 def create_fabric_block_type(payload: FabricBlockTypeCreate):
-    conn = sqlite3.connect("ceis_backend.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     try:
         cursor.execute(
@@ -132,7 +127,7 @@ def create_fabric_block_type(payload: FabricBlockTypeCreate):
 
 @app.post("/process-types")
 def create_process_type(payload: ProcessTypeCreate):
-    conn = sqlite3.connect("ceis_backend.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     try:
         cursor.execute(
@@ -199,7 +194,7 @@ def activity_search(payload: ActivitySearchRequest):
 
 @app.get("/fabric-block-types")
 def get_fabric_block_types():
-    conn = sqlite3.connect("ceis_backend.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT id, name FROM fabric_block_types")
     fabric_block_types = cursor.fetchall()
@@ -209,7 +204,7 @@ def get_fabric_block_types():
 
 @app.delete("/fabric-block-types/{type_id}")
 def delete_fabric_block_type(type_id: int):
-    conn = sqlite3.connect("ceis_backend.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     try:
         cursor.execute(
@@ -243,7 +238,7 @@ def delete_fabric_block_type(type_id: int):
 
 @app.get("/process-types")
 def get_preparation_types():
-    conn = sqlite3.connect("ceis_backend.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT id, name, unit, activity_id FROM process_types")
     preparation_types = cursor.fetchall()
@@ -261,7 +256,7 @@ def get_preparation_types():
 
 @app.delete("/process-types/{type_id}")
 def delete_process_type(type_id: int):
-    conn = sqlite3.connect("ceis_backend.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     try:
         cursor.execute(
@@ -297,7 +292,7 @@ def create_garment_recipe(payload: GarmentRecipeCreate):
             detail="Garment recipe must include at least one fabric block",
         )
 
-    conn = sqlite3.connect("ceis_backend.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     try:
@@ -386,7 +381,7 @@ def create_garment_recipe(payload: GarmentRecipeCreate):
 async def create_fabric_block(fabric_block: FabricBlockInfo):
     print("Received fabric block:", fabric_block)
     co2eq = None  # Placeholder
-    conn = sqlite3.connect("ceis_backend.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     cursor.execute(
@@ -418,7 +413,7 @@ async def create_fabric_block(fabric_block: FabricBlockInfo):
 
 @app.get("/fabric-blocks")
 def get_fabric_blocks(type: Optional[str] = None):
-    conn = sqlite3.connect("ceis_backend.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute(
         """
@@ -468,7 +463,7 @@ def get_fabric_blocks(type: Optional[str] = None):
 
 @app.delete("/fabric-blocks/{fabric_block_id}")
 def delete_fabric_block(fabric_block_id: int):
-    conn = sqlite3.connect("ceis_backend.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     try:
         cursor.execute(
@@ -595,7 +590,7 @@ def get_repair_co2(
 
         emission_cache: dict[int, float | None] = {}
 
-        conn = sqlite3.connect("ceis_backend.db")
+        conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         try:
             for fabric_block_name in replacement_names:
@@ -686,3 +681,16 @@ def get_repair_co2(
 def get_co2_for_garment(garment_type_id: int):
     co2_data = get_co2(garment_type_id)
     return co2_data
+
+
+def main():
+    uvicorn.run(
+        "ceis_backend.main:app",
+        host=BACKEND_HOST,
+        port=BACKEND_PORT,
+        reload=True,
+    )
+
+
+if __name__ == "__main__":
+    main()

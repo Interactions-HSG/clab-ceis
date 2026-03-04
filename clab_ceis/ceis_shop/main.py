@@ -1,5 +1,6 @@
-from dash import Dash, dcc, html
 from pathlib import Path
+
+from dash import Dash, dcc, html
 from dash.dependencies import Input, Output
 
 from ceis_shop.layouts.home import home_page

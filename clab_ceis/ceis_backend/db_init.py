@@ -1,8 +1,10 @@
 import sqlite3
 
+from ceis_backend.config import DB_PATH
+
 
 def init_sqlite_db():
-    conn = sqlite3.connect("ceis_backend.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     # recipes tables
