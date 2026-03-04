@@ -86,7 +86,7 @@ def get_callbacks(app):
 
         fig = go.Figure()
         fig.add_bar(
-            name="Scenario transport CO2",
+            name="Transport to/from customer",
             x=scenario_labels,
             y=scenario_values,
         )
@@ -98,7 +98,7 @@ def get_callbacks(app):
         if new_garment_co2:
             replacement_values.append(0)  # No replacement material for "Buy New"
         fig.add_bar(
-            name="Replacement material emission",
+            name="Fabric Block to be replaced fabric material",
             x=scenario_labels,
             y=replacement_values,
         )
@@ -113,7 +113,7 @@ def get_callbacks(app):
             if new_garment_co2:
                 process_values.append(0)  # No replacement process for "Buy New"
             fig.add_bar(
-                name=f"Replacement {process_name}",
+                name=f"Fabric Block to be replaced process: {process_name}",
                 x=scenario_labels,
                 y=process_values,
             )
@@ -129,7 +129,7 @@ def get_callbacks(app):
                 total_material_emission
             ]
             fig.add_bar(
-                name="New Garment Fabric Material",
+                name="New garment fabric material",
                 x=scenario_labels,
                 y=material_values,
             )
@@ -144,13 +144,13 @@ def get_callbacks(app):
                     if process_name not in production_processes_totals:
                         production_processes_totals[process_name] = 0
                     production_processes_totals[process_name] += process_emission
-            
+
             for process_name, total_emission in production_processes_totals.items():
                 production_process_values = [0] * (len(scenario_labels) - 1) + [
                     total_emission
                 ]
                 fig.add_bar(
-                    name=f"New Garment Production: {process_name}",
+                    name=f"New garment production process: {process_name}",
                     x=scenario_labels,
                     y=production_process_values,
                 )
@@ -161,7 +161,7 @@ def get_callbacks(app):
                 process_emission = process_detail.get("emission", 0)
                 process_values = [0] * (len(scenario_labels) - 1) + [process_emission]
                 fig.add_bar(
-                    name=f"New Garment Process: {process_name}",
+                    name=f"New garment production process: {process_name}",
                     x=scenario_labels,
                     y=process_values,
                 )
