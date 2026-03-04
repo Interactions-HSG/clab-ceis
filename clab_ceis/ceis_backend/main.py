@@ -6,15 +6,18 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request, HTTPException, Query
 import requests
 
-from db_init import init_sqlite_db
-from utils import (
+from ceis_backend.db_init import init_sqlite_db
+from ceis_backend.utils import (
     get_co2,
     get_wiser_token,
     get_emission_per_unit,
     calculate_transport_emission,
 )
-from location_details import distances_customer_sigmaringen, activity_id_transport
-from models import (
+from ceis_backend.location_details import (
+    distances_customer_sigmaringen,
+    activity_id_transport,
+)
+from ceis_backend.models import (
     FabricBlockInfo,
     FabricBlockTypeCreate,
     ActivitySearchRequest,

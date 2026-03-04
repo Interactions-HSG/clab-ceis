@@ -2,10 +2,9 @@ import sqlite3
 import pytest
 from unittest.mock import patch, MagicMock
 
-# Best Practice: Import directly from modules without sys.path manipulation
-from db_init import init_sqlite_db
-from utils import get_recipe_for_fabric_block, get_co2
-from models import Process
+from ceis_backend.db_init import init_sqlite_db
+from ceis_backend.utils import get_recipe_for_fabric_block, get_co2
+from ceis_backend.models import Process
 
 
 @pytest.fixture
@@ -220,7 +219,7 @@ class TestGetRecipeForFabricBlock:
 
         dyeing_process = next((p for p in processes if p.activity == "dyeing"), None)
         assert dyeing_process is not None
-        assert dyeing_process.amount == 0.2
+        assert dyeing_process.amount == 0.01
 
     def test_returns_empty_list_for_nonexistent_fabric_block(self, test_db):
         """Test case 3: Returns empty list for non-existent fabric block."""
@@ -261,6 +260,7 @@ class TestDeleteFabricBlockType:
             ("TestFB", "wool", 2.0, 1234),
         )
         fb_type_id = cursor.lastrowid
+        assert fb_type_id is not None
 
         cursor.execute(
             "INSERT INTO process_types (name, unit, activity_id) VALUES (?, ?, ?)",
@@ -284,7 +284,7 @@ class TestDeleteFabricBlockType:
         conn.close()
 
         # Import and call delete function
-        from main import delete_fabric_block_type
+        from ceis_backend.main import delete_fabric_block_type
 
         delete_fabric_block_type(fb_type_id)
 
@@ -316,6 +316,7 @@ class TestDeleteFabricBlockType:
             ("MultiFB", "silk", 1.0, 5678),
         )
         fb_type_id = cursor.lastrowid
+        assert fb_type_id is not None
 
         # Insert multiple processes
         for i, proc_name in enumerate(["cutting", "stitching", "finishing"]):
@@ -340,7 +341,7 @@ class TestDeleteFabricBlockType:
         conn.close()
 
         # Delete fabric block type
-        from main import delete_fabric_block_type
+        from ceis_backend.main import delete_fabric_block_type
 
         delete_fabric_block_type(fb_type_id)
 
@@ -361,7 +362,7 @@ class TestGetLocationsEndpoint:
     def test_returns_all_locations(self, test_db):
         """Verify GET /locations returns all seeded locations."""
         from fastapi.testclient import TestClient
-        from main import app
+        from ceis_backend.main import app
 
         client = TestClient(app)
         response = client.get("/locations")
@@ -381,7 +382,7 @@ class TestGetLocationsEndpoint:
     def test_returns_id_and_name_for_each_location(self, test_db):
         """Verify each location has id and name fields."""
         from fastapi.testclient import TestClient
-        from main import app
+        from ceis_backend.main import app
 
         client = TestClient(app)
         response = client.get("/locations")
@@ -396,7 +397,7 @@ class TestGetLocationsEndpoint:
     def test_returns_empty_list_when_no_locations(self, clean_db):
         """Verify returns empty list when no locations in database."""
         from fastapi.testclient import TestClient
-        from main import app
+        from ceis_backend.main import app
 
         # Add locations table to clean_db
         conn = sqlite3.connect("ceis_backend.db")
@@ -425,7 +426,7 @@ class TestCreateFabricBlockWithLocation:
     def test_creates_fabric_block_with_location_id(self, test_db):
         """Verify fabric block is stored with the specified location_id."""
         from fastapi.testclient import TestClient
-        from main import app
+        from ceis_backend.main import app
 
         client = TestClient(app)
 
@@ -463,7 +464,7 @@ class TestCreateFabricBlockWithLocation:
     def test_creates_fabric_block_without_location_id(self, test_db):
         """Verify fabric block can be created without location_id (NULL)."""
         from fastapi.testclient import TestClient
-        from main import app
+        from ceis_backend.main import app
 
         client = TestClient(app)
 
@@ -499,7 +500,7 @@ class TestGetFabricBlocksWithLocation:
     def test_returns_location_name_for_fabric_block(self, test_db):
         """Verify get_fabric_blocks returns location_name when location_id is set."""
         from fastapi.testclient import TestClient
-        from main import app
+        from ceis_backend.main import app
 
         client = TestClient(app)
 
@@ -533,7 +534,7 @@ class TestGetFabricBlocksWithLocation:
     def test_returns_null_location_for_fabric_block_without_location(self, test_db):
         """Verify get_fabric_blocks returns null location when location_id is not set."""
         from fastapi.testclient import TestClient
-        from main import app
+        from ceis_backend.main import app
 
         client = TestClient(app)
 
@@ -792,7 +793,8 @@ class TestGetCo2TransportEmissions:
 
         with patch("utils.get_wiser_token", return_value="mock_token"):
             with patch("utils.requests.get", side_effect=mock_get_response):
-                result = get_co2(garment_id)
+                assert garment_id is not None
+                result = get_co2(int(garment_id))
 
         fb_details = result.fabric_blocks.details[0]
         alternative = fb_details.get("alternative", {})
@@ -860,6 +862,7 @@ class TestGetCo2TransportEmissions:
             "INSERT INTO garment_types (name) VALUES ('UnknownLocationGarment')"
         )
         garment_id = cursor.lastrowid
+        assert garment_id is not None
 
         # Insert fabric block type
         cursor.execute(
@@ -1108,6 +1111,7 @@ class TestGetCo2FabricBlockProductionEmissions:
             "INSERT INTO garment_types (name) VALUES (?)", ("NoProcessGarment",)
         )
         garment_id = cursor.lastrowid
+        assert garment_id is not None
 
         # Insert fabric block type (no processes linked)
         cursor.execute(
@@ -1182,6 +1186,7 @@ class TestGetCo2FabricBlockProductionEmissions:
             "INSERT INTO garment_types (name) VALUES (?)", ("MultiProcessGarment",)
         )
         garment_id = cursor.lastrowid
+        assert garment_id is not None
 
         # Insert fabric block type
         cursor.execute(

@@ -161,8 +161,10 @@ def init_sqlite_db():
             INSERT OR IGNORE INTO process_types (name, unit, activity_id) VALUES
             ('sewing', 'kWh', 6566),
             ('steaming', 'kWh', 6566),
-            ('washing', 'kWh', 6553),
-            ('dyeing', 'kg', 21893);
+            ('washing', 'kWh', 6566),
+            ('dyeing', 'kg', 21893),
+            -- Transport of fabric to Cristina. Assumes lorry, >32 metric ton, diesel, EURO 5
+            ('transport', 'tkm', 17901);
 
             INSERT OR IGNORE INTO garment_recipe_fabric_blocks (garment_type, fabric_block_id, amount) VALUES
             ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM fabric_block_types WHERE name='80x64'), 1),
@@ -177,8 +179,12 @@ def init_sqlite_db():
             ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM process_types WHERE name='steaming'), 0.22);
 
             INSERT OR IGNORE INTO fabric_block_recipe_processes (fabric_block_type, process_id, amount) VALUES
+            -- transport to Cristina is calculated: Distance from Istanbul to Roermond to Bucharest: 4570 km / 1000 (because transport emission is per tkm) * weight of the fabric block (kg). This calculation might need to be automated.
+            ((SELECT id FROM fabric_block_types WHERE name='80x64'), (SELECT id FROM process_types WHERE name='transport'), 0.49),
             ((SELECT id FROM fabric_block_types WHERE name='80x64'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
+            ((SELECT id FROM fabric_block_types WHERE name='40x14'), (SELECT id FROM process_types WHERE name='transport'), 0.054),
             ((SELECT id FROM fabric_block_types WHERE name='40x14'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
+            ((SELECT id FROM fabric_block_types WHERE name='64x40'), (SELECT id FROM process_types WHERE name='transport'), 0.246),
             ((SELECT id FROM fabric_block_types WHERE name='64x40'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01);
         """
         )

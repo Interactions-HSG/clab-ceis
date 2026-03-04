@@ -4,14 +4,17 @@ import sqlite3
 from fastapi import HTTPException
 import requests
 
-from models import (
+from ceis_backend.models import (
     Co2Response,
     EmissionDetails,
     FabricBlock,
     GarmentRecipe,
     Process,
 )
-from location_details import distances_to_manufacturer, activity_id_transport
+from ceis_backend.location_details import (
+    distances_to_manufacturer,
+    activity_id_transport,
+)
 
 
 def get_wiser_token():
@@ -158,7 +161,12 @@ def get_co2(garment_type_id: int) -> Co2Response:
             process_emission_per_unit = get_emission_per_unit(
                 wiser_token, fb_process.activity_id
             )
-            process_emissions = process_emission_per_unit * fb_process.amount
+
+            process_emissions = (
+                process_emission_per_unit * fb_process.amount
+                if process_emission_per_unit is not None
+                else 0
+            )
             fabric_block_production_emissions += process_emissions
             fabric_block_process_details.append(
                 {
@@ -353,7 +361,7 @@ def get_used_fabric_block(
     if already_used_ids:
         placeholders = ",".join("?" * len(already_used_ids))
         base_query += f" AND fbi.id NOT IN ({placeholders})"
-        params.extend(already_used_ids)
+        params.extend(str(id) for id in already_used_ids)
 
     base_query += " LIMIT 1"
 
