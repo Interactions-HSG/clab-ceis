@@ -1,14 +1,12 @@
-import copy
 import sys
-from pathlib import Path
-
-import httpx
 import requests
-import plotly.graph_objects as go
-from dash import dcc, html
-from dash.dependencies import Input, Output, State
 
-from . import config
+import plotly.graph_objects as go
+from pathlib import Path
+from dash import dcc, html
+from dash.dependencies import Input, Output
+
+from shop import config
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "ceis_dashboard"))
 
@@ -36,8 +34,6 @@ def get_callbacks(app):
 
         # Fetch CO2 data for new garment
         new_garment_co2 = None
-        new_garment_fabric_blocks = []
-        new_garment_processes = []
         try:
             garment_response = requests.get(
                 f"{config.BACKEND_API_URL}/co2/1",

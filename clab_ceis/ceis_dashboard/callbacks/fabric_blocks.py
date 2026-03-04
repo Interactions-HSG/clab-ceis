@@ -1,13 +1,12 @@
 from __future__ import annotations
-
 import requests
 from dash import Dash, Input, Output, State, callback_context, html, dcc, no_update
 from dash.dependencies import ALL
 
 import config
-from ceis_backend.models import FabricBlockInfo, PreparationInfo
 import ceis_data
-from .api import fetch_fabric_blocks
+from ceis_dashboard.callbacks.api import fetch_fabric_blocks
+from ceis_backend.models import FabricBlockInfo, PreparationInfo
 
 
 def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None:

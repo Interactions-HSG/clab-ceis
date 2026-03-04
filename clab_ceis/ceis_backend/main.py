@@ -1,10 +1,10 @@
-from typing import Optional
-from pathlib import Path
-import sqlite3
-from dotenv import load_dotenv
-
-from fastapi import FastAPI, Request, HTTPException, Query
 import requests
+from typing import Optional
+import sqlite3
+
+from pathlib import Path
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, Query
 
 from ceis_backend.db_init import init_sqlite_db
 from ceis_backend.utils import (

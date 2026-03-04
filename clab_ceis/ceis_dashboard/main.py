@@ -1,12 +1,12 @@
 import pandas as pd
 from dash import Dash, html, dcc
 from dash.dependencies import Input, Output
-from flask import request, jsonify
+
 from pages.recipe import get_recipe_layout
 from pages.flow import get_dashboard_layout
 from pages.home import get_index_layout
-
-import ceis_data, ceis_callbacks
+import ceis_data
+import ceis_callbacks
 import config
 
 

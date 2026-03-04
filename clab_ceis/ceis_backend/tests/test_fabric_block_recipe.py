@@ -1,10 +1,14 @@
 import sqlite3
-import pytest
 from unittest.mock import patch, MagicMock
+
+import pytest
 
 from ceis_backend.db_init import init_sqlite_db
 from ceis_backend.utils import get_recipe_for_fabric_block, get_co2
 from ceis_backend.models import Process
+from ceis_backend.main import delete_fabric_block_type
+from fastapi.testclient import TestClient
+from ceis_backend.main import app
 
 
 @pytest.fixture
@@ -283,9 +287,6 @@ class TestDeleteFabricBlockType:
 
         conn.close()
 
-        # Import and call delete function
-        from ceis_backend.main import delete_fabric_block_type
-
         delete_fabric_block_type(fb_type_id)
 
         # Verify recipe processes are deleted
@@ -340,9 +341,6 @@ class TestDeleteFabricBlockType:
 
         conn.close()
 
-        # Delete fabric block type
-        from ceis_backend.main import delete_fabric_block_type
-
         delete_fabric_block_type(fb_type_id)
 
         # Verify all recipe processes are deleted
@@ -361,8 +359,6 @@ class TestGetLocationsEndpoint:
 
     def test_returns_all_locations(self, test_db):
         """Verify GET /locations returns all seeded locations."""
-        from fastapi.testclient import TestClient
-        from ceis_backend.main import app
 
         client = TestClient(app)
         response = client.get("/locations")
@@ -381,8 +377,6 @@ class TestGetLocationsEndpoint:
 
     def test_returns_id_and_name_for_each_location(self, test_db):
         """Verify each location has id and name fields."""
-        from fastapi.testclient import TestClient
-        from ceis_backend.main import app
 
         client = TestClient(app)
         response = client.get("/locations")
@@ -396,8 +390,6 @@ class TestGetLocationsEndpoint:
 
     def test_returns_empty_list_when_no_locations(self, clean_db):
         """Verify returns empty list when no locations in database."""
-        from fastapi.testclient import TestClient
-        from ceis_backend.main import app
 
         # Add locations table to clean_db
         conn = sqlite3.connect("ceis_backend.db")
@@ -425,8 +417,6 @@ class TestCreateFabricBlockWithLocation:
 
     def test_creates_fabric_block_with_location_id(self, test_db):
         """Verify fabric block is stored with the specified location_id."""
-        from fastapi.testclient import TestClient
-        from ceis_backend.main import app
 
         client = TestClient(app)
 
@@ -463,8 +453,6 @@ class TestCreateFabricBlockWithLocation:
 
     def test_creates_fabric_block_without_location_id(self, test_db):
         """Verify fabric block can be created without location_id (NULL)."""
-        from fastapi.testclient import TestClient
-        from ceis_backend.main import app
 
         client = TestClient(app)
 
@@ -499,8 +487,6 @@ class TestGetFabricBlocksWithLocation:
 
     def test_returns_location_name_for_fabric_block(self, test_db):
         """Verify get_fabric_blocks returns location_name when location_id is set."""
-        from fastapi.testclient import TestClient
-        from ceis_backend.main import app
 
         client = TestClient(app)
 
@@ -533,8 +519,6 @@ class TestGetFabricBlocksWithLocation:
 
     def test_returns_null_location_for_fabric_block_without_location(self, test_db):
         """Verify get_fabric_blocks returns null location when location_id is not set."""
-        from fastapi.testclient import TestClient
-        from ceis_backend.main import app
 
         client = TestClient(app)
 
