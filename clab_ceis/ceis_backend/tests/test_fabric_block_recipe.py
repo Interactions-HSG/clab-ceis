@@ -3,7 +3,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from ceis_backend.db_init import init_sqlite_db
+from ceis_backend.db_init import init_sqlite_db, create_tables
 from ceis_backend.utils import get_recipe_for_fabric_block, get_co2
 from ceis_backend.models import Process
 from ceis_backend.main import delete_fabric_block_type
@@ -29,121 +29,10 @@ def clean_db(tmp_path, monkeypatch):
     db_path = tmp_path / "ceis_backend.db"
     monkeypatch.chdir(tmp_path)
 
-    conn = sqlite3.connect(str(db_path))
-    cursor = conn.cursor()
-
     # Create tables without seeding
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS locations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE
-        )
-    """
-    )
-
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS garment_types (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE
-        )
-    """
-    )
-
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS fabric_block_types (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE,
-            material TEXT,
-            amount_kg INTEGER,
-            activity_id INTEGER NOT NULL
-        )
-    """
-    )
-
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS process_types (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            unit TEXT,
-            activity_id INTEGER NOT NULL,
-            UNIQUE(name, unit)
-        )
-    """
-    )
-
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS garment_recipe_fabric_blocks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            garment_type INTEGER NOT NULL,
-            fabric_block_id INTEGER NOT NULL,
-            amount INTEGER
-        )
-    """
-    )
-
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS garment_recipe_processes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            garment_type INTEGER NOT NULL,
-            process_id INTEGER NOT NULL,
-            amount REAL
-        )
-    """
-    )
-
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS fabric_block_recipe_processes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            fabric_block_type INTEGER NOT NULL,
-            process_id INTEGER NOT NULL,
-            amount REAL,
-            FOREIGN KEY (fabric_block_type) REFERENCES fabric_block_types(id) ON DELETE CASCADE,
-            FOREIGN KEY (process_id) REFERENCES process_types(id) ON DELETE CASCADE
-        )
-    """
-    )
-
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS garment_recipe_fabric_blocks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            garment_type INTEGER NOT NULL,
-            fabric_block_id INTEGER NOT NULL,
-            amount INTEGER
-        )
-    """
-    )
-
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS fabric_blocks_inventory (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            type_id INTEGER NOT NULL,
-            co2eq INTEGER,
-            garment_id INTEGER,
-            location_id INTEGER
-        )
-    """
-    )
-
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS preparations_used_fabric_blocks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            type_id INTEGER NOT NULL,
-            amount INTEGER,
-            fabric_block_id INTEGER
-        )
-    """
-    )
-
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    create_tables(cursor)
     conn.commit()
     conn.close()
 
@@ -674,8 +563,10 @@ class TestGetCo2TransportEmissions:
 
             return mock_response
 
-        with patch("utils.get_wiser_token", return_value="mock_token"):
-            with patch("utils.requests.get", side_effect=mock_get_response):
+        with patch("ceis_backend.utils.get_wiser_token", return_value="mock_token"):
+            with patch(
+                "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
+            ):
                 result = get_co2(test_data["garment_id"])
 
         # Check transport emission is calculated
@@ -775,8 +666,10 @@ class TestGetCo2TransportEmissions:
             }
             return mock_response
 
-        with patch("utils.get_wiser_token", return_value="mock_token"):
-            with patch("utils.requests.get", side_effect=mock_get_response):
+        with patch("ceis_backend.utils.get_wiser_token", return_value="mock_token"):
+            with patch(
+                "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
+            ):
                 assert garment_id is not None
                 result = get_co2(int(garment_id))
 
@@ -879,8 +772,10 @@ class TestGetCo2TransportEmissions:
             }
             return mock_response
 
-        with patch("utils.get_wiser_token", return_value="mock_token"):
-            with patch("utils.requests.get", side_effect=mock_get_response):
+        with patch("ceis_backend.utils.get_wiser_token", return_value="mock_token"):
+            with patch(
+                "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
+            ):
                 result = get_co2(garment_id)
 
         fb_details = result.fabric_blocks.details[0]
@@ -1041,8 +936,10 @@ class TestGetCo2FabricBlockProductionEmissions:
 
             return mock_response
 
-        with patch("utils.get_wiser_token", return_value="mock_token"):
-            with patch("utils.requests.get", side_effect=mock_get_response):
+        with patch("ceis_backend.utils.get_wiser_token", return_value="mock_token"):
+            with patch(
+                "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
+            ):
                 result = get_co2(test_data["garment_id"])
 
         # Verify fabric blocks emissions are calculated
@@ -1122,8 +1019,10 @@ class TestGetCo2FabricBlockProductionEmissions:
             }
             return mock_response
 
-        with patch("utils.get_wiser_token", return_value="mock_token"):
-            with patch("utils.requests.get", side_effect=mock_get_response):
+        with patch("ceis_backend.utils.get_wiser_token", return_value="mock_token"):
+            with patch(
+                "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
+            ):
                 result = get_co2(garment_id)
 
         # Verify production emissions is 0
@@ -1244,8 +1143,10 @@ class TestGetCo2FabricBlockProductionEmissions:
 
             return mock_response
 
-        with patch("utils.get_wiser_token", return_value="mock_token"):
-            with patch("utils.requests.get", side_effect=mock_get_response):
+        with patch("ceis_backend.utils.get_wiser_token", return_value="mock_token"):
+            with patch(
+                "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
+            ):
                 result = get_co2(garment_id)
 
         # Calculate expected production emissions:

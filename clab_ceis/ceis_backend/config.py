@@ -10,8 +10,9 @@ BASE_DIR = Path(__file__).resolve().parent
 # Load environment variables from ceis_backend/.env.secrets, regardless of CWD
 load_dotenv(BASE_DIR / ".env.secrets", override=True)
 
-# Database path - ensures DB is always created in the ceis_backend directory
-DB_PATH = str(BASE_DIR / "ceis_backend.db")
+# Database path. Defaults to current working directory for testability,
+# but can be overridden via environment variable.
+DB_PATH = os.getenv("CEIS_DB_PATH", "ceis_backend.db")
 
 # Backend server configuration
 BACKEND_HOST = os.getenv("BACKEND_HOST", "0.0.0.0")

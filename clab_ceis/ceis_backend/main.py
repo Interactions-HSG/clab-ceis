@@ -1,18 +1,31 @@
 import requests
 from typing import Optional
-import sqlite3
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Query
 
-from ceis_backend.config import BACKEND_HOST, BACKEND_PORT
-from ceis_backend.config import DB_PATH
 from ceis_backend.db_init import init_sqlite_db
+from ceis_backend.config import BACKEND_HOST, BACKEND_PORT
 from ceis_backend.utils import (
     get_co2,
     get_wiser_token,
     get_emission_per_unit,
     calculate_transport_emission,
+    db_create_garment_type,
+    db_get_garment_types,
+    db_get_locations,
+    db_delete_garment_recipe,
+    db_create_fabric_block_type,
+    db_create_process_type,
+    db_get_fabric_block_types,
+    db_delete_fabric_block_type,
+    db_get_process_types,
+    db_delete_process_type,
+    db_create_garment_recipe,
+    db_create_fabric_block,
+    db_get_fabric_blocks,
+    db_delete_fabric_block,
+    db_get_replacement_fabric_blocks_emissions,
 )
 from ceis_backend.location_details import (
     distances_customer_sigmaringen,
@@ -29,7 +42,11 @@ from ceis_backend.models import (
 
 app = FastAPI()
 
-init_sqlite_db()
+
+@app.on_event("startup")
+def startup_event():
+    """Initialize the database when the app starts."""
+    init_sqlite_db()
 
 
 @app.get("/")
@@ -39,110 +56,34 @@ def read_root():
 
 @app.post("/garment-types")
 def create_garment_type(payload: GarmentTypeCreate):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            "INSERT INTO garment_types (name) VALUES (?)",
-            (payload.name,),
-        )
-        conn.commit()
-        return {"id": cursor.lastrowid, "name": payload.name}
-    except sqlite3.IntegrityError:
-        raise HTTPException(status_code=409, detail="Garment type already exists")
-    finally:
-        conn.close()
+    return db_create_garment_type(payload.name)
 
 
 @app.get("/garment-types")
 def get_garment_types():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, name FROM garment_types")
-    garment_types = cursor.fetchall()
-    conn.close()
-    return [{"id": gt[0], "name": gt[1]} for gt in garment_types]
+    return db_get_garment_types()
 
 
 @app.get("/locations")
 def get_locations():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, name FROM locations")
-    locations = cursor.fetchall()
-    conn.close()
-    return [{"id": loc[0], "name": loc[1]} for loc in locations]
+    return db_get_locations()
 
 
 @app.delete("/garment-recipes/{garment_type_id}")
 def delete_garment_recipe(garment_type_id: int):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            "SELECT id FROM garment_types WHERE id = ?",
-            (garment_type_id,),
-        )
-        if cursor.fetchone() is None:
-            raise HTTPException(status_code=404, detail="Garment type not found")
-
-        cursor.execute(
-            "DELETE FROM garment_recipe_fabric_blocks WHERE garment_type = ?",
-            (garment_type_id,),
-        )
-        fabric_deleted = cursor.rowcount
-        cursor.execute(
-            "DELETE FROM garment_recipe_processes WHERE garment_type = ?",
-            (garment_type_id,),
-        )
-        processes_deleted = cursor.rowcount
-        if (fabric_deleted + processes_deleted) == 0:
-            raise HTTPException(status_code=404, detail="Garment recipe not found")
-
-        conn.commit()
-        return {"message": "Garment recipe deleted"}
-    finally:
-        conn.close()
+    return db_delete_garment_recipe(garment_type_id)
 
 
 @app.post("/fabric-block-types")
 def create_fabric_block_type(payload: FabricBlockTypeCreate):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            """
-            INSERT INTO fabric_block_types (name, material, amount_kg, activity_id)
-            VALUES (?, ?, ?, ?)
-            """,
-            (payload.name, payload.material, payload.amount_kg, payload.activity_id),
-        )
-        conn.commit()
-        return {"id": cursor.lastrowid, "name": payload.name}
-    except sqlite3.IntegrityError:
-        raise HTTPException(status_code=409, detail="Fabric block type already exists")
-    finally:
-        conn.close()
+    return db_create_fabric_block_type(
+        payload.name, payload.material, payload.amount_kg, payload.activity_id
+    )
 
 
 @app.post("/process-types")
 def create_process_type(payload: ProcessTypeCreate):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            """
-            INSERT INTO process_types (name, unit, activity_id)
-            VALUES (?, ?, ?)
-            """,
-            (payload.name, payload.unit, payload.activity_id),
-        )
-        conn.commit()
-        return {"id": cursor.lastrowid, "name": payload.name}
-    except sqlite3.IntegrityError:
-        raise HTTPException(status_code=409, detail="Process type already exists")
-    finally:
-        conn.close()
+    return db_create_process_type(payload.name, payload.unit, payload.activity_id)
 
 
 @app.post("/activity-search")
@@ -194,297 +135,51 @@ def activity_search(payload: ActivitySearchRequest):
 
 @app.get("/fabric-block-types")
 def get_fabric_block_types():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, name FROM fabric_block_types")
-    fabric_block_types = cursor.fetchall()
-    conn.close()
-    return [{"id": fb_type[0], "name": fb_type[1]} for fb_type in fabric_block_types]
+    return db_get_fabric_block_types()
 
 
 @app.delete("/fabric-block-types/{type_id}")
 def delete_fabric_block_type(type_id: int):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            "SELECT id FROM fabric_block_types WHERE id = ?",
-            (type_id,),
-        )
-        if cursor.fetchone() is None:
-            raise HTTPException(status_code=404, detail="Fabric block type not found")
-
-        cursor.execute(
-            "DELETE FROM garment_recipe_fabric_blocks WHERE fabric_block_id = ?",
-            (type_id,),
-        )
-        cursor.execute(
-            "DELETE FROM fabric_block_recipe_processes WHERE fabric_block_type = ?",
-            (type_id,),
-        )
-        cursor.execute(
-            "DELETE FROM fabric_blocks_inventory WHERE type_id = ?",
-            (type_id,),
-        )
-        cursor.execute(
-            "DELETE FROM fabric_block_types WHERE id = ?",
-            (type_id,),
-        )
-        conn.commit()
-        return {"message": "Fabric block type deleted"}
-    finally:
-        conn.close()
+    return db_delete_fabric_block_type(type_id)
 
 
 @app.get("/process-types")
 def get_preparation_types():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, name, unit, activity_id FROM process_types")
-    preparation_types = cursor.fetchall()
-    conn.close()
-    return [
-        {
-            "id": prep_type[0],
-            "name": prep_type[1],
-            "unit": prep_type[2],
-            "activity_id": prep_type[3],
-        }
-        for prep_type in preparation_types
-    ]
+    return db_get_process_types()
 
 
 @app.delete("/process-types/{type_id}")
 def delete_process_type(type_id: int):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            "SELECT id FROM process_types WHERE id = ?",
-            (type_id,),
-        )
-        if cursor.fetchone() is None:
-            raise HTTPException(status_code=404, detail="Process type not found")
-
-        cursor.execute(
-            "DELETE FROM garment_recipe_processes WHERE process_id = ?",
-            (type_id,),
-        )
-        cursor.execute(
-            "DELETE FROM preparations_used_fabric_blocks WHERE type_id = ?",
-            (type_id,),
-        )
-        cursor.execute(
-            "DELETE FROM process_types WHERE id = ?",
-            (type_id,),
-        )
-        conn.commit()
-        return {"message": "Process type deleted"}
-    finally:
-        conn.close()
+    return db_delete_process_type(type_id)
 
 
 @app.post("/garment-recipes")
 def create_garment_recipe(payload: GarmentRecipeCreate):
-    if not payload.fabric_blocks:
-        raise HTTPException(
-            status_code=400,
-            detail="Garment recipe must include at least one fabric block",
-        )
-
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
-    try:
-        cursor.execute(
-            "SELECT id FROM garment_types WHERE id = ?",
-            (payload.garment_type_id,),
-        )
-        if cursor.fetchone() is None:
-            raise HTTPException(status_code=400, detail="Invalid garment type")
-
-        fabric_block_ids = [fb.type_id for fb in payload.fabric_blocks]
-        cursor.execute(
-            f"SELECT COUNT(*) FROM fabric_block_types WHERE id IN ({','.join('?' * len(fabric_block_ids))})",
-            fabric_block_ids,
-        )
-        if cursor.fetchone()[0] != len(set(fabric_block_ids)):
-            raise HTTPException(status_code=400, detail="Invalid fabric block type")
-
-        processes = payload.processes or []
-        if processes:
-            process_ids = [proc.process_id for proc in processes]
-            cursor.execute(
-                f"SELECT COUNT(*) FROM process_types WHERE id IN ({','.join('?' * len(process_ids))})",
-                process_ids,
-            )
-            if cursor.fetchone()[0] != len(set(process_ids)):
-                raise HTTPException(status_code=400, detail="Invalid process type")
-
-        for fb in payload.fabric_blocks:
-            if fb.amount <= 0:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Fabric block amounts must be greater than 0",
-                )
-        for proc in processes:
-            if proc.amount <= 0:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Process amount must be greater than 0",
-                )
-
-        cursor.execute(
-            "DELETE FROM garment_recipe_fabric_blocks WHERE garment_type = ?",
-            (payload.garment_type_id,),
-        )
-        cursor.execute(
-            "DELETE FROM garment_recipe_processes WHERE garment_type = ?",
-            (payload.garment_type_id,),
-        )
-
-        cursor.executemany(
-            """
-            INSERT INTO garment_recipe_fabric_blocks
-            (garment_type, fabric_block_id, amount)
-            VALUES (?, ?, ?)
-            """,
-            [
-                (payload.garment_type_id, fb.type_id, int(fb.amount))
-                for fb in payload.fabric_blocks
-            ],
-        )
-
-        if processes:
-            cursor.executemany(
-                """
-                INSERT INTO garment_recipe_processes
-                (garment_type, process_id, amount)
-                VALUES (?, ?, ?)
-                """,
-                [
-                    (payload.garment_type_id, proc.process_id, proc.amount)
-                    for proc in processes
-                ],
-            )
-
-        conn.commit()
-        return {
-            "message": "Garment recipe saved",
-            "garment_type_id": payload.garment_type_id,
-        }
-    finally:
-        conn.close()
+    return db_create_garment_recipe(
+        payload.garment_type_id,
+        payload.fabric_blocks,
+        payload.processes or [],
+    )
 
 
 @app.post("/fabric-blocks")
 async def create_fabric_block(fabric_block: FabricBlockInfo):
     print("Received fabric block:", fabric_block)
-    co2eq = None  # Placeholder
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
-    cursor.execute(
-        """
-        INSERT INTO fabric_blocks_inventory (type_id, co2eq, location_id)
-        VALUES (?, ?, ?)
-        """,
-        (fabric_block.type_id, co2eq, fabric_block.location_id),
+    return db_create_fabric_block(
+        fabric_block.type_id,
+        fabric_block.location_id,
+        fabric_block.processes or [],
     )
-    fabric_block_id = cursor.lastrowid
-    if not fabric_block_id:
-        conn.close()
-        return {"error": "Invalid fabric block type"}
-
-    preparations = fabric_block.processes or []
-    if preparations:
-        cursor.executemany(
-            """
-            INSERT INTO preparations_used_fabric_blocks (type_id, amount, fabric_block_id)
-            VALUES (?, ?, ?)
-            """,
-            [(prep.type_id, prep.amount, fabric_block_id) for prep in preparations],
-        )
-
-    conn.commit()
-    conn.close()
-    return {"message": "Fabric block created successfully", "id": fabric_block_id}
 
 
 @app.get("/fabric-blocks")
 def get_fabric_blocks(type: Optional[str] = None):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-                   SELECT fbi.id, fbi.type_id, fbi.co2eq, fbi.garment_id, l.name as location_name
-                   FROM fabric_blocks_inventory fbi
-                   LEFT JOIN locations l ON fbi.location_id = l.id
-                   WHERE fbi.type_id = ? OR ? IS NULL
-                   """,
-        (type, type),
-    )
-    fabric_blocks_data = cursor.fetchall()
-    print("fabric_blocks_data:", fabric_blocks_data)
-
-    fabric_blocks = []
-    for fb in fabric_blocks_data:
-        fb_id, fb_type, fb_co2eq, garment_id, location_name = fb
-        cursor.execute(
-            "SELECT name FROM fabric_block_types WHERE id = ?",
-            (fb_type,),
-        )
-        fb_type_name = cursor.fetchone()
-        fb_type_name = fb_type_name[0] if fb_type_name else None
-        cursor.execute(
-            """
-            SELECT pt.name, pufb.amount
-            FROM preparations_used_fabric_blocks pufb
-            JOIN process_types pt ON pufb.type_id = pt.id
-            WHERE pufb.fabric_block_id = ?
-            """,
-            (fb_id,),
-        )
-        preparations_data = cursor.fetchall()
-        preparations = [{"type": p[0], "amount": p[1]} for p in preparations_data]
-        fabric_blocks.append(
-            {
-                "id": fb_id,
-                "type": fb_type_name,
-                "co2eq": fb_co2eq,
-                "garment_id": garment_id,
-                "location": location_name,
-                "preparations": preparations,
-            }
-        )
-    conn.close()
-    return fabric_blocks
+    return db_get_fabric_blocks(type)
 
 
 @app.delete("/fabric-blocks/{fabric_block_id}")
 def delete_fabric_block(fabric_block_id: int):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            "SELECT id FROM fabric_blocks_inventory WHERE id = ?",
-            (fabric_block_id,),
-        )
-        if cursor.fetchone() is None:
-            raise HTTPException(status_code=404, detail="Fabric block not found")
-
-        cursor.execute(
-            "DELETE FROM preparations_used_fabric_blocks WHERE fabric_block_id = ?",
-            (fabric_block_id,),
-        )
-        cursor.execute(
-            "DELETE FROM fabric_blocks_inventory WHERE id = ?",
-            (fabric_block_id,),
-        )
-        conn.commit()
-        return {"message": "Fabric block deleted"}
-    finally:
-        conn.close()
+    return db_delete_fabric_block(fabric_block_id)
 
 
 def _get_transport_emission_per_unit() -> float | None:
@@ -493,24 +188,6 @@ def _get_transport_emission_per_unit() -> float | None:
         return None
 
     return get_emission_per_unit(token, activity_id_transport)
-
-
-def _get_emission_per_unit_cached(
-    activity_id: int,
-    token: str,
-    emission_cache: dict[int, float | None],
-) -> float | None:
-    if activity_id in emission_cache:
-        return emission_cache[activity_id]
-
-    emission = get_emission_per_unit(token, activity_id)
-    if emission is None:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch emission for activity {activity_id}",
-        )
-    emission_cache[activity_id] = emission
-    return emission
 
 
 @app.get("/co2/repair")
@@ -581,94 +258,14 @@ def get_repair_co2(
             name.strip() for name in replacements.split(",") if name.strip()
         ]
 
-    replacement_fabric_blocks = {"details": [], "total_emission": 0}
+    token = get_wiser_token()
+    if isinstance(token, dict):
+        raise HTTPException(status_code=500, detail="Failed to fetch Wiser token")
 
-    if replacement_names:
-        token = get_wiser_token()
-        if isinstance(token, dict):
-            raise HTTPException(status_code=500, detail="Failed to fetch Wiser token")
-
-        emission_cache: dict[int, float | None] = {}
-
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        try:
-            for fabric_block_name in replacement_names:
-                cursor.execute(
-                    """
-                    SELECT id, activity_id, amount_kg
-                    FROM fabric_block_types
-                    WHERE name = ?
-                    LIMIT 1
-                    """,
-                    (fabric_block_name,),
-                )
-                row = cursor.fetchone()
-                if not row:
-                    continue
-
-                fabric_block_type_id, activity_id, weight_per_block = row
-
-                material_emission_per_unit = _get_emission_per_unit_cached(
-                    activity_id, token, emission_cache
-                )
-                material_emission = (
-                    material_emission_per_unit * weight_per_block
-                    if material_emission_per_unit is not None
-                    else 0
-                )
-
-                cursor.execute(
-                    """
-                    SELECT pt.name, fbrp.amount, pt.activity_id
-                    FROM fabric_block_recipe_processes fbrp
-                    JOIN process_types pt ON fbrp.process_id = pt.id
-                    WHERE fbrp.fabric_block_type = ?
-                    """,
-                    (fabric_block_type_id,),
-                )
-                processes_data = cursor.fetchall()
-
-                process_emissions_list = []
-                for process_name, process_amount, activity_id in processes_data:
-                    process_emissions = 0
-                    resource_emission_per_unit = _get_emission_per_unit_cached(
-                        activity_id, token, emission_cache
-                    )
-                    resource_emissions = (
-                        resource_emission_per_unit * process_amount
-                        if resource_emission_per_unit is not None
-                        else 0
-                    )
-                    process_emissions += resource_emissions
-
-                    process_emissions_list.append(
-                        {
-                            "process": process_name,
-                            "emission": process_emissions,
-                        }
-                    )
-
-                # Calculate total emissions for this fabric block
-                total_processes_emission = sum(
-                    p["emission"] for p in process_emissions_list
-                )
-                fabric_block_total_emission = (
-                    material_emission + total_processes_emission
-                )
-
-                replacement_fabric_blocks["details"].append(
-                    {
-                        "fabric_block": fabric_block_name,
-                        "material_emission": material_emission,
-                        "processes": process_emissions_list,
-                    }
-                )
-                replacement_fabric_blocks[
-                    "total_emission"
-                ] += fabric_block_total_emission
-        finally:
-            conn.close()
+    emission_cache: dict[int, float | None] = {}
+    replacement_fabric_blocks = db_get_replacement_fabric_blocks_emissions(
+        replacement_names, token, emission_cache
+    )
 
     return {
         "amount_kg": amount_kg,

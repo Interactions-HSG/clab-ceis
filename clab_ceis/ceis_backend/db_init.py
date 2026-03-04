@@ -3,11 +3,7 @@ import sqlite3
 from ceis_backend.config import DB_PATH
 
 
-def init_sqlite_db():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
-    # recipes tables
+def create_tables(cursor):
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS garment_types (
@@ -80,7 +76,6 @@ def init_sqlite_db():
     """
     )
 
-    # inventory tables
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS locations (
@@ -130,7 +125,6 @@ def init_sqlite_db():
     """
     )
 
-    # seeding
     cursor.executescript(
         """
         CREATE TABLE IF NOT EXISTS seed_meta (
@@ -141,58 +135,69 @@ def init_sqlite_db():
     """
     )
 
+
+def seed_data(cursor):
     cursor.execute("SELECT seeded FROM seed_meta WHERE id = 1;")
-    if cursor.fetchone()[0] == 0:
-        cursor.executescript(
-            """
-            INSERT OR IGNORE INTO locations (name) VALUES
-            ('St. Gallen'),
-            ('Sigmaringen'),
-            ('Dornbirn'),
-            ('Ravensburg');
-
-            INSERT OR IGNORE INTO garment_types (name) VALUES
-            ('Crop Top'),
-            ('Shirt');
-
-            INSERT OR IGNORE INTO fabric_block_types (name, material, amount_kg, activity_id) VALUES
-            ('80x64', 'hemp', 0.108, 276186),
-            ('40x14', 'hemp', 0.012, 276186),
-            ('64x40', 'hemp', 0.054, 276186);
-
-            INSERT OR IGNORE INTO process_types (name, unit, activity_id) VALUES
-            ('sewing', 'kWh', 6566),
-            ('steaming', 'kWh', 6566),
-            ('washing', 'kWh', 6566),
-            ('dyeing', 'kg', 21893),
-            -- Transport of fabric to Cristina. Assumes lorry, >32 metric ton, diesel, EURO 5
-            ('transport', 'tkm', 17901);
-
-            INSERT OR IGNORE INTO garment_recipe_fabric_blocks (garment_type, fabric_block_id, amount) VALUES
-            ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM fabric_block_types WHERE name='80x64'), 1),
-            ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM fabric_block_types WHERE name='40x14'), 2),
-            ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM fabric_block_types WHERE name='80x64'), 1),
-            ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM fabric_block_types WHERE name='40x14'), 1),
-            ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM fabric_block_types WHERE name='64x40'), 4);
-
-            INSERT OR IGNORE INTO garment_recipe_processes (garment_type, process_id, amount) VALUES
-            ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
-            ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
-            ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM process_types WHERE name='steaming'), 0.22);
-
-            INSERT OR IGNORE INTO fabric_block_recipe_processes (fabric_block_type, process_id, amount) VALUES
-            -- transport to Cristina is calculated: Distance from Istanbul to Roermond to Bucharest: 4570 km / 1000 (because transport emission is per tkm) * weight of the fabric block (kg). This calculation might need to be automated.
-            ((SELECT id FROM fabric_block_types WHERE name='80x64'), (SELECT id FROM process_types WHERE name='transport'), 0.49),
-            ((SELECT id FROM fabric_block_types WHERE name='80x64'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
-            ((SELECT id FROM fabric_block_types WHERE name='40x14'), (SELECT id FROM process_types WHERE name='transport'), 0.054),
-            ((SELECT id FROM fabric_block_types WHERE name='40x14'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
-            ((SELECT id FROM fabric_block_types WHERE name='64x40'), (SELECT id FROM process_types WHERE name='transport'), 0.246),
-            ((SELECT id FROM fabric_block_types WHERE name='64x40'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01);
-        """
-        )
-        cursor.execute("UPDATE seed_meta SET seeded = 1 WHERE id = 1;")
-    else:
+    if cursor.fetchone()[0] != 0:
         print("Database already seeded, skipping seeding.")
+        return
+
+    cursor.executescript(
+        """
+        INSERT OR IGNORE INTO locations (name) VALUES
+        ('St. Gallen'),
+        ('Sigmaringen'),
+        ('Dornbirn'),
+        ('Ravensburg');
+
+        INSERT OR IGNORE INTO garment_types (name) VALUES
+        ('Crop Top'),
+        ('Shirt');
+
+        INSERT OR IGNORE INTO fabric_block_types (name, material, amount_kg, activity_id) VALUES
+        ('80x64', 'hemp', 0.108, 276186),
+        ('40x14', 'hemp', 0.012, 276186),
+        ('64x40', 'hemp', 0.054, 276186);
+
+        INSERT OR IGNORE INTO process_types (name, unit, activity_id) VALUES
+        ('sewing', 'kWh', 6566),
+        ('steaming', 'kWh', 6566),
+        ('washing', 'kWh', 6566),
+        ('dyeing', 'kg', 21893),
+        -- Transport of fabric to Cristina. Assumes lorry, >32 metric ton, diesel, EURO 5
+        ('transport', 'tkm', 17901);
+
+        INSERT OR IGNORE INTO garment_recipe_fabric_blocks (garment_type, fabric_block_id, amount) VALUES
+        ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM fabric_block_types WHERE name='80x64'), 1),
+        ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM fabric_block_types WHERE name='40x14'), 2),
+        ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM fabric_block_types WHERE name='80x64'), 1),
+        ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM fabric_block_types WHERE name='40x14'), 1),
+        ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM fabric_block_types WHERE name='64x40'), 4);
+
+        INSERT OR IGNORE INTO garment_recipe_processes (garment_type, process_id, amount) VALUES
+        ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
+        ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
+        ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM process_types WHERE name='steaming'), 0.22);
+
+        INSERT OR IGNORE INTO fabric_block_recipe_processes (fabric_block_type, process_id, amount) VALUES
+        -- transport to Cristina is calculated: Distance from Istanbul to Roermond to Bucharest: 4570 km / 1000 (because transport emission is per tkm) * weight of the fabric block (kg). This calculation might need to be automated.
+        ((SELECT id FROM fabric_block_types WHERE name='80x64'), (SELECT id FROM process_types WHERE name='transport'), 0.49),
+        ((SELECT id FROM fabric_block_types WHERE name='80x64'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
+        ((SELECT id FROM fabric_block_types WHERE name='40x14'), (SELECT id FROM process_types WHERE name='transport'), 0.054),
+        ((SELECT id FROM fabric_block_types WHERE name='40x14'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
+        ((SELECT id FROM fabric_block_types WHERE name='64x40'), (SELECT id FROM process_types WHERE name='transport'), 0.246),
+        ((SELECT id FROM fabric_block_types WHERE name='64x40'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01);
+    """
+    )
+    cursor.execute("UPDATE seed_meta SET seeded = 1 WHERE id = 1;")
+
+
+def init_sqlite_db():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    create_tables(cursor)
+    seed_data(cursor)
 
     conn.commit()
     conn.close()
