@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 
 class Process(BaseModel):
-    activity: str
+    name: str
     amount: float
     activity_id: int
 
@@ -13,14 +13,17 @@ class PreparationInfo(BaseModel):
     amount: float
 
 
-class Resource(BaseModel):
-    name: str
-    activity_id: int
-    amount: float
-
-
 class FabricBlock(BaseModel):
-    id: Optional[int]
+    id: int
+    name: str
+    material: str
+    amount_kg: float
+    activity_id: int
+    processes: list[Process]
+
+
+class SecondLifeFabricBlock(BaseModel):
+    id: int
     type_id: int
     co2eq: Optional[int]
     processes: list[Process]
@@ -28,7 +31,7 @@ class FabricBlock(BaseModel):
     location_name: Optional[str] = None
 
 
-class FabricBlockInfo(BaseModel):
+class SecondLifeFabricBlockInfo(BaseModel):
     type_id: int
     processes: list[PreparationInfo]
     location_id: Optional[int] = None
@@ -39,13 +42,13 @@ class EmissionDetails(BaseModel):
     total_emission: float
 
 
-class Co2Response(BaseModel):
+class GarmentCo2Response(BaseModel):
     processes: EmissionDetails
     fabric_blocks: EmissionDetails
 
 
 class GarmentRecipe(BaseModel):
-    fabric_blocks: list[str]
+    fabric_blocks: list[FabricBlock]
     processes: list[Process]
 
 

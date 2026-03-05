@@ -52,9 +52,9 @@ def home_page():
             html.Div(
                 className="card",
                 children=[
-                    html.H2("Customer Repair Scenarios"),
+                    html.H2("End of Life Options"),
                     html.P(
-                        "Sites: Manufacturer Bucharest, Repair Center St. Gallen, Consumer Sigmaringen."
+                        "Manufacturer: Bucharest, Repair Center: St. Gallen, Consumer: Sigmaringen."
                     ),
                     dcc.Loading(
                         id="customer-repair-loading",

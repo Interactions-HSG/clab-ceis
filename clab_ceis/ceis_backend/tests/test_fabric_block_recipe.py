@@ -4,7 +4,7 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 from ceis_backend.db_init import init_sqlite_db, create_tables
-from ceis_backend.utils import get_recipe_for_fabric_block, get_co2
+from ceis_backend.utils import get_fabric_block_recipe, get_co2_for_garment
 from ceis_backend.models import Process
 from ceis_backend.main import delete_fabric_block_type
 from fastapi.testclient import TestClient
@@ -88,54 +88,50 @@ class TestFabricBlockRecipeProcessesTableCreation:
 
 
 class TestGetRecipeForFabricBlock:
-    """Test cases 2 & 3: get_recipe_for_fabric_block function."""
+    """Test cases 2 & 3: get_fabric_block_recipe function."""
 
     def test_returns_processes_for_existing_fabric_block(self, test_db):
         """Test case 2: Returns associated processes for a given fabric block."""
-        material, activity_id, amount_kg, processes = get_recipe_for_fabric_block(
-            "80x64"
-        )
+        fabric_block = get_fabric_block_recipe("80x64")
 
-        assert material == "hemp"
-        assert activity_id == 276186
-        assert amount_kg == 0.108
-        assert len(processes) > 0
-        assert all(isinstance(p, Process) for p in processes)
+        assert fabric_block is not None
+        assert fabric_block.material == "hemp"
+        assert fabric_block.activity_id == 276186
+        assert fabric_block.amount_kg == 0.108
+        assert len(fabric_block.processes) > 0
+        assert all(isinstance(p, Process) for p in fabric_block.processes)
 
         # Verify 80x64 has the 'dyeing' process from seeded data
-        process_names = [p.activity for p in processes]
+        process_names = [p.name for p in fabric_block.processes]
         assert "dyeing" in process_names
 
     def test_returns_correct_process_details(self, test_db):
         """Verify process details match seeded data."""
-        _, _, _, processes = get_recipe_for_fabric_block("80x64")
+        fabric_block = get_fabric_block_recipe("80x64")
+        assert fabric_block is not None
 
-        dyeing_process = next((p for p in processes if p.activity == "dyeing"), None)
+        dyeing_process = next(
+            (p for p in fabric_block.processes if p.name == "dyeing"), None
+        )
         assert dyeing_process is not None
         assert dyeing_process.amount == 0.01
 
     def test_returns_empty_list_for_nonexistent_fabric_block(self, test_db):
-        """Test case 3: Returns empty list for non-existent fabric block."""
-        material, activity_id, amount_kg, processes = get_recipe_for_fabric_block(
-            "NonExistent"
-        )
+        """Test case 3: Returns None for non-existent fabric block."""
+        fabric_block = get_fabric_block_recipe("NonExistent")
 
-        assert material is None
-        assert activity_id is None
-        assert amount_kg == 0
-        assert processes == []
+        assert fabric_block is None
 
     def test_returns_processes_for_fb2(self, test_db):
         """Verify 40x14 returns its associated dyeing process."""
-        material, activity_id, amount_kg, processes = get_recipe_for_fabric_block(
-            "40x14"
-        )
+        fabric_block = get_fabric_block_recipe("40x14")
+        assert fabric_block is not None
 
-        assert material == "hemp"
-        assert activity_id == 276186
-        assert amount_kg == 0.012
+        assert fabric_block.material == "hemp"
+        assert fabric_block.activity_id == 276186
+        assert fabric_block.amount_kg == 0.012
 
-        process_names = [p.activity for p in processes]
+        process_names = [p.name for p in fabric_block.processes]
         assert "dyeing" in process_names
 
 
@@ -567,7 +563,7 @@ class TestGetCo2TransportEmissions:
             with patch(
                 "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
             ):
-                result = get_co2(test_data["garment_id"])
+                result = get_co2_for_garment(test_data["garment_id"])
 
         # Check transport emission is calculated
         # St. Gallen distance = 10 km, amount_kg = 2.0
@@ -671,7 +667,7 @@ class TestGetCo2TransportEmissions:
                 "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
             ):
                 assert garment_id is not None
-                result = get_co2(int(garment_id))
+                result = get_co2_for_garment(int(garment_id))
 
         fb_details = result.fabric_blocks.details[0]
         alternative = fb_details.get("alternative", {})
@@ -776,7 +772,7 @@ class TestGetCo2TransportEmissions:
             with patch(
                 "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
             ):
-                result = get_co2(garment_id)
+                result = get_co2_for_garment(garment_id)
 
         fb_details = result.fabric_blocks.details[0]
         alternative = fb_details.get("alternative", {})
@@ -940,7 +936,7 @@ class TestGetCo2FabricBlockProductionEmissions:
             with patch(
                 "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
             ):
-                result = get_co2(test_data["garment_id"])
+                result = get_co2_for_garment(test_data["garment_id"])
 
         # Verify fabric blocks emissions are calculated
         assert result.fabric_blocks.total_emission > 0
@@ -1023,7 +1019,7 @@ class TestGetCo2FabricBlockProductionEmissions:
             with patch(
                 "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
             ):
-                result = get_co2(garment_id)
+                result = get_co2_for_garment(garment_id)
 
         # Verify production emissions is 0
         fb_details = result.fabric_blocks.details[0]
@@ -1147,7 +1143,7 @@ class TestGetCo2FabricBlockProductionEmissions:
             with patch(
                 "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
             ):
-                result = get_co2(garment_id)
+                result = get_co2_for_garment(garment_id)
 
         # Calculate expected production emissions:
         # process 1 (dyeing): 0.4 * 2.0 = 0.8

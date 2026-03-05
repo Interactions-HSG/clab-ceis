@@ -4,9 +4,10 @@ from fastapi import HTTPException
 
 from ceis_backend.config import DB_PATH
 from ceis_backend.models import (
-    Co2Response,
+    GarmentCo2Response,
     EmissionDetails,
     FabricBlock,
+    SecondLifeFabricBlock,
     GarmentRecipe,
     Process,
 )
@@ -36,19 +37,169 @@ def calculate_transport_emission(
     return emission_per_unit / 1000 * distance_km * amount_kg
 
 
-def get_recipe_for_fabric_block(fabric_block: str):
+def calculate_process_emissions(
+    wiser_token: str, processes: list[Process]
+) -> tuple[float, list[dict]]:
+    """
+    Calculate total emissions and details for a list of processes.
+
+    Args:
+        wiser_token: Token for WISER API.
+        processes: List of Process objects to calculate emissions for.
+
+    Returns:
+        Tuple of (total_emission, process_details_list).
+    """
+    total_emission = 0
+    process_details = []
+
+    for process in processes:
+        emission_per_unit = get_emission_per_unit(wiser_token, process.activity_id)
+        emissions = (
+            emission_per_unit * process.amount if emission_per_unit is not None else 0
+        )
+        total_emission += emissions
+        process_details.append(
+            {
+                "process": process.name,
+                "amount": process.amount,
+                "emission": emissions,
+                "activity_id": process.activity_id,
+            }
+        )
+
+    return total_emission, process_details
+
+
+def calculate_used_fabric_block_alternative(
+    wiser_token: str,
+    used_fabric_block: SecondLifeFabricBlock,
+    fabric_block_amount_kg: float,
+) -> dict:
+    """
+    Calculate emissions and details for a used/secondhand fabric block.
+
+    Args:
+        wiser_token: Token for WISER API.
+        used_fabric_block: The SecondLifeFabricBlock to analyze.
+        fabric_block_amount_kg: Weight of the fabric block in kg.
+
+    Returns:
+        Dictionary with alternative fabric block details and emissions.
+    """
+    alternative = {
+        "id": used_fabric_block.id,
+        "location": used_fabric_block.location_name,
+        "preparation_details": [],
+        "transport_emission": 0,
+    }
+
+    # Calculate transport emissions
+    transport_emission = 0
+    if (
+        used_fabric_block.location_name
+        and used_fabric_block.location_name in distances_to_manufacturer
+    ):
+        distance = distances_to_manufacturer[used_fabric_block.location_name]
+        transport_emission_per_unit = get_emission_per_unit(
+            wiser_token, activity_id_transport
+        )
+        transport_emission = calculate_transport_emission(
+            distance, fabric_block_amount_kg, transport_emission_per_unit
+        )
+
+    alternative["transport_emission"] = transport_emission or 0
+
+    # Calculate preparation emissions
+    prep_emissions, prep_details = calculate_process_emissions(
+        wiser_token, used_fabric_block.processes
+    )
+    alternative["preparation_details"] = [
+        {
+            "preparation": detail["process"],
+            "amount": detail["amount"],
+            "emission": detail["emission"],
+            "activity_id": detail["activity_id"],
+        }
+        for detail in prep_details
+    ]
+    alternative["emission"] = (transport_emission or 0) + prep_emissions
+
+    return alternative
+
+
+def process_fabric_block_emissions(
+    wiser_token: str,
+    fabric_block_name: str,
+    fabric_block_data: FabricBlock,
+    already_used_ids: list[int],
+) -> dict:
+    """
+    Calculate total emissions for a fabric block including material, production, and alternatives.
+
+    Args:
+        wiser_token: Token for WISER API.
+        fabric_block_name: Name of the fabric block.
+        fabric_block_data: FabricBlock object with material and process info.
+        already_used_ids: List of already-used fabric block IDs.
+
+    Returns:
+        Dictionary with fabric block emission details.
+    """
+    # Material emission
+    material_emission_per_unit = get_emission_per_unit(
+        wiser_token, fabric_block_data.activity_id
+    )
+    material_emission = (
+        material_emission_per_unit * fabric_block_data.amount_kg
+        if material_emission_per_unit is not None
+        else 0
+    )
+
+    # Production process emissions
+    production_emission, production_details = calculate_process_emissions(
+        wiser_token, fabric_block_data.processes
+    )
+
+    # Total fabric block emission
+    total_emission = material_emission + production_emission
+
+    # Used/alternative fabric block
+    used_fabric_block = get_used_fabric_block(fabric_block_name, already_used_ids)
+    used_fabric_block_alternative = {}
+
+    if used_fabric_block:
+        already_used_ids.append(used_fabric_block.id)
+        used_fabric_block_alternative = calculate_used_fabric_block_alternative(
+            wiser_token, used_fabric_block, fabric_block_data.amount_kg
+        )
+
+    return {
+        "fabric_block": fabric_block_name,
+        "material": fabric_block_data.material,
+        "amount": fabric_block_data.amount_kg,
+        "activity_id": fabric_block_data.activity_id,
+        "emission": total_emission,
+        "material_emission": material_emission,
+        "production_emission": production_emission,
+        "production_processes": production_details,
+        "alternative": used_fabric_block_alternative,
+    }
+
+
+def get_fabric_block_recipe(fabric_block_name: str) -> FabricBlock | None:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     # Get fabric block type details
     cursor.execute(
         "SELECT id, material, activity_id, amount_kg FROM fabric_block_types WHERE name = ?",
-        (fabric_block,),
+        (fabric_block_name,),
     )
     result = cursor.fetchone()
     if not result:
         conn.close()
-        return None, None, 0, []
+        return None
 
     fabric_block_type_id, material, activity_id, amount_kg = result
 
@@ -66,182 +217,80 @@ def get_recipe_for_fabric_block(fabric_block: str):
     processes: list[Process] = []
     for proc_name, proc_amount, activity_id_process in processes_data:
         processes.append(
-            Process(
-                activity=proc_name, amount=proc_amount, activity_id=activity_id_process
-            )
+            Process(name=proc_name, amount=proc_amount, activity_id=activity_id_process)
         )
 
     conn.close()
-    return material, activity_id, amount_kg, processes
+    return FabricBlock(
+        id=fabric_block_type_id,
+        name=fabric_block_name,
+        material=material,
+        amount_kg=amount_kg,
+        activity_id=activity_id,
+        processes=processes,
+    )
 
 
-def get_co2(garment_type_id: int) -> Co2Response:
+def get_co2_for_garment(garment_type_id: int) -> GarmentCo2Response:
+    """
+    Calculate CO2 emissions for a garment, including fabric blocks and assembly processes.
+
+    Args:
+        garment_type_id: The ID of the garment type to calculate emissions for.
+
+    Returns:
+        GarmentCo2Response with detailed emission breakdowns for fabric blocks and processes.
+
+    Raises:
+        HTTPException: If the garment recipe is not found.
+    """
     wiser_token = get_wiser_token()
 
-    recipe = get_garment_recipe(garment_type_id)
+    recipe = get_full_garment_recipe(garment_type_id)
     if recipe is None:
         raise HTTPException(
             status_code=404,
             detail=f"Garment recipe not found for garment type ID: {garment_type_id}",
         )
 
-    emission_details = Co2Response(
+    emission_details = GarmentCo2Response(
         fabric_blocks=EmissionDetails(details=[], total_emission=0),
         processes=EmissionDetails(details=[], total_emission=0),
     )
 
-    fabric_blocks_emissions = 0
+    # Process fabric block emissions
     already_used_fabric_block_ids = []
-    for fabric_block in recipe.fabric_blocks:
-        print("fabric block", fabric_block)
-        material, activity_id, amount, fabric_block_processes = (
-            get_recipe_for_fabric_block(fabric_block)
+    for fabric_block_data in recipe.fabric_blocks:
+        fabric_block_detail = process_fabric_block_emissions(
+            wiser_token,
+            fabric_block_data.name,
+            fabric_block_data,
+            already_used_fabric_block_ids,
         )
+        emission_details.fabric_blocks.details.append(fabric_block_detail)
+        emission_details.fabric_blocks.total_emission += fabric_block_detail["emission"]
 
-        emission = None
-        if activity_id is not None:
-            emission = get_emission_per_unit(wiser_token, activity_id)
-        # Calculate emissions from fabric block production processes
-        fabric_block_production_emissions = 0
-        fabric_block_process_details = []
-        for fb_process in fabric_block_processes:
-            process_emission_per_unit = get_emission_per_unit(
-                wiser_token, fb_process.activity_id
-            )
-
-            process_emissions = (
-                process_emission_per_unit * fb_process.amount
-                if process_emission_per_unit is not None
-                else 0
-            )
-            fabric_block_production_emissions += process_emissions
-            fabric_block_process_details.append(
-                {
-                    "process": fb_process.activity,
-                    "amount": fb_process.amount,
-                    "emission": process_emissions,
-                    "activity_id": fb_process.activity_id,
-                }
-            )
-        # Calculate total emission for this fabric block (material + production processes)
-        material_emission = emission * amount if emission is not None else 0
-        total_fabric_block_emission = (
-            material_emission + fabric_block_production_emissions
-        )
-
-        # Calculating alternative fabric block emissions if available
-        used_fabric_block = get_used_fabric_block(
-            fabric_block, already_used_fabric_block_ids
-        )
-        print("used fabric block", used_fabric_block)
-        used_fabric_block_alternative = {}
-        if used_fabric_block:
-            already_used_fabric_block_ids.append(used_fabric_block.id)
-            used_fabric_block_emissions = 0
-            used_fabric_block_alternative["id"] = used_fabric_block.id
-            used_fabric_block_alternative["location"] = used_fabric_block.location_name
-            used_fabric_block_alternative["preparation_details"] = []
-
-            # Calculate transport emissions if location is available
-            transport_emission = 0
-            if (
-                used_fabric_block.location_name
-                and used_fabric_block.location_name in distances_to_manufacturer
-            ):
-                distance = distances_to_manufacturer[used_fabric_block.location_name]
-                transport_emission_per_unit = get_emission_per_unit(
-                    wiser_token, activity_id_transport
-                )
-                transport_emission = calculate_transport_emission(
-                    distance, amount, transport_emission_per_unit
-                )
-                if transport_emission is not None:
-                    print(
-                        f"Transport emission for {used_fabric_block.location_name}: {transport_emission}"
-                    )
-
-            used_fabric_block_alternative["transport_emission"] = (
-                transport_emission or 0
-            )
-            used_fabric_block_emissions += transport_emission or 0
-
-            for prep in used_fabric_block.processes:
-                process_emission_per_unit = get_emission_per_unit(
-                    wiser_token, prep.activity_id
-                )
-                process_emissions = (
-                    process_emission_per_unit * prep.amount
-                    if process_emission_per_unit is not None
-                    else 0
-                )
-                used_fabric_block_emissions += process_emissions
-                used_fabric_block_alternative["preparation_details"].append(
-                    {
-                        "preparation": prep.activity,
-                        "amount": prep.amount,
-                        "emission": process_emissions,
-                        "activity_id": prep.activity_id,
-                    }
-                )
-            used_fabric_block_alternative["emission"] = used_fabric_block_emissions
-
-        emission_details.fabric_blocks.details.append(
-            {
-                "fabric_block": fabric_block,
-                "material": material,
-                "amount": amount,
-                "activity_id": activity_id,
-                "emission": total_fabric_block_emission,
-                "material_emission": material_emission,
-                "production_emission": fabric_block_production_emissions,
-                "production_processes": fabric_block_process_details,
-                "alternative": used_fabric_block_alternative,
-            }
-        )
-        print(f"CO2eq material emission: {material_emission}")
-        print(f"CO2eq production processes: {fabric_block_production_emissions}")
-        fabric_blocks_emissions += total_fabric_block_emission
-
-    emission_details.fabric_blocks.total_emission = fabric_blocks_emissions
-
-    # Calculate emissions from garment assembly processes
-    processes_emissions = 0
+    # Process garment assembly process emissions
     for process in recipe.processes:
-        process_emissions = 0
-        print("process", process)
+        emission_per_unit = get_emission_per_unit(wiser_token, process.activity_id)
+        process_emission = (
+            emission_per_unit * process.amount if emission_per_unit is not None else 0
+        )
+
         emission_details.processes.details.append(
-            {"process": process.activity, "duration": process.amount, "resources": []}
-        )
-        resource_emission_per_unit = get_emission_per_unit(
-            wiser_token, process.activity_id
-        )
-        resource_emissions = (
-            resource_emission_per_unit * process.amount
-            if resource_emission_per_unit is not None
-            else 0
-        )
-        process_emissions += resource_emissions
-        # append emission details
-        emission_details.processes.details[-1]["resources"].append(
             {
-                "name": process.activity,
-                "amount": 1.0,
+                "process": process.name,
+                "duration": process.amount,
                 "activity_id": process.activity_id,
-                "emission": resource_emissions,
+                "emission": process_emission,
             }
         )
-        print(
-            f"CO2eq for resource {process.activity} activity id {process.activity_id}: {resource_emission_per_unit}"
-        )
-        if resource_emission_per_unit is not None:
-            processes_emissions += resource_emissions
-        emission_details.processes.details[-1]["emission"] = process_emissions
-    emission_details.processes.total_emission = processes_emissions
+        emission_details.processes.total_emission += process_emission
 
     return emission_details
 
 
-def get_garment_recipe(garment_type_id: int) -> GarmentRecipe | None:
+def get_full_garment_recipe(garment_type_id: int) -> GarmentRecipe | None:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
@@ -260,10 +309,14 @@ def get_garment_recipe(garment_type_id: int) -> GarmentRecipe | None:
 
     fabric_blocks_data = cursor.fetchall()
 
-    fabric_blocks: list[str] = []
+    fabric_blocks: list[FabricBlock] = []
     for fb in fabric_blocks_data:
         fb_name, fb_amount = fb
-        fabric_blocks.extend([fb_name] * fb_amount)
+        # Get full fabric block details
+        fabric_block = get_fabric_block_recipe(fb_name)
+        if fabric_block:
+            # Add the fabric block multiple times based on amount
+            fabric_blocks.extend([fabric_block] * fb_amount)
 
     cursor.execute(
         """
@@ -280,7 +333,7 @@ def get_garment_recipe(garment_type_id: int) -> GarmentRecipe | None:
     for proc in processes_data:
         proc_name, proc_amount, activity_id = proc
         processes.append(
-            Process(activity=proc_name, amount=proc_amount, activity_id=activity_id)
+            Process(name=proc_name, amount=proc_amount, activity_id=activity_id)
         )
 
     conn.close()
@@ -291,7 +344,7 @@ def get_garment_recipe(garment_type_id: int) -> GarmentRecipe | None:
 
 def get_used_fabric_block(
     fabric_block_name: str, already_used_ids: list[int]
-) -> FabricBlock | None:
+) -> SecondLifeFabricBlock | None:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
@@ -334,10 +387,10 @@ def get_used_fabric_block(
     for prep in preparations_data:
         prep_name, prep_amount, activity_id = prep
         preparations.append(
-            Process(activity=prep_name, amount=prep_amount, activity_id=activity_id)
+            Process(name=prep_name, amount=prep_amount, activity_id=activity_id)
         )
     conn.close()
-    return FabricBlock(
+    return SecondLifeFabricBlock(
         id=fb_id,
         type_id=fb_type_id,
         co2eq=fb_co2eq,
@@ -854,3 +907,63 @@ def db_get_replacement_fabric_blocks_emissions(
         conn.close()
 
     return replacement_fabric_blocks
+
+
+def build_scenario_activities(
+    transport_distance: float | None,
+    amount_kg: float,
+    per_unit_emission: float | None,
+    replacement_fabric_blocks_data: dict,
+) -> list[dict]:
+    """
+    Build activities list for a scenario, aggregated by activity name.
+
+    Args:
+        transport_distance: Distance in km for transport, or None.
+        amount_kg: Weight of fabric blocks in kg.
+        per_unit_emission: Emission per unit from WISER, or None.
+        replacement_fabric_blocks_data: Dictionary with replacement fabric blocks details.
+
+    Returns:
+        List of activities with emissions for the scenario.
+    """
+    activity_map: dict[str, float] = {}
+
+    # Add transport activity
+    if transport_distance is not None:
+        transport_emission = calculate_transport_emission(
+            transport_distance, amount_kg, per_unit_emission
+        )
+        if transport_emission is not None:
+            activity_map["transport_to_customer"] = transport_emission
+
+    # Aggregate replacement fabric block activities by activity name
+    for detail in replacement_fabric_blocks_data.get("details", []):
+        material_emission = detail.get("material_emission", 0)
+        if material_emission > 0:
+            # Add material emission under the name "fabric_block_material"
+            activity_map["fabric_block_material"] = (
+                activity_map.get("fabric_block_material", 0) + material_emission
+            )
+
+        # Aggregate process emissions by process name
+        for process in detail.get("processes", []):
+            process_name = f"fabric_block_{process.get('process', 'Unknown Process')}"
+            process_emission = process.get("emission", 0)
+            activity_map[process_name] = (
+                activity_map.get(process_name, 0) + process_emission
+            )
+
+    # Convert aggregated map to activities list
+    activities = [
+        {
+            "name": name,
+            "costs": {
+                "economic": 0,
+                "co2_kg": emission,
+            },
+        }
+        for name, emission in sorted(activity_map.items())
+    ]
+
+    return activities
