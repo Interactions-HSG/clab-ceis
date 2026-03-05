@@ -2,7 +2,7 @@ from __future__ import annotations
 import requests
 import config
 
-from ceis_backend.models import Co2Response
+from ceis_backend.models import GarmentCo2Response
 
 
 def fetch_fabric_blocks():
@@ -40,14 +40,14 @@ def fetch_garment_types():
         return []
 
 
-def get_co2(garment_type_id: int) -> Co2Response | None:
+def get_co2(garment_type_id: int) -> GarmentCo2Response | None:
     try:
         resp = requests.get(f"{config.BACKEND_API_URL}/co2/{garment_type_id}")
         if resp.status_code != 200:
             return None
 
         data = resp.json()
-        return Co2Response(**data)
+        return GarmentCo2Response(**data)
 
     except Exception as e:
         print(e)

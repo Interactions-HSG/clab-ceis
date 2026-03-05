@@ -6,7 +6,7 @@ from dash.dependencies import ALL
 import config
 import ceis_data
 from ceis_dashboard.callbacks.api import fetch_fabric_blocks
-from ceis_backend.models import FabricBlockInfo, PreparationInfo
+from ceis_backend.models import SecondLifeFabricBlockInfo, PreparationInfo
 
 
 def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
@@ -193,7 +193,7 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
             for name, count in zip(prep_names, prep_counts):
                 preparations.append(PreparationInfo(type_id=name, amount=count))
 
-            payload = FabricBlockInfo(
+            payload = SecondLifeFabricBlockInfo(
                 type_id=type_val, processes=preparations, location_id=location_val
             )
             print("Payload:", payload)

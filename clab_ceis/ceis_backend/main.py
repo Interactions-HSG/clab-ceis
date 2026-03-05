@@ -1,16 +1,18 @@
 import requests
+from contextlib import asynccontextmanager
 from typing import Optional
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException
 
 from ceis_backend.db_init import init_sqlite_db
 from ceis_backend.config import BACKEND_HOST, BACKEND_PORT
 from ceis_backend.utils import (
-    get_co2,
+    get_co2_for_garment,
     get_wiser_token,
     get_emission_per_unit,
     calculate_transport_emission,
+    get_full_garment_recipe,
     db_create_garment_type,
     db_get_garment_types,
     db_get_locations,
@@ -32,7 +34,7 @@ from ceis_backend.location_details import (
     activity_id_transport,
 )
 from ceis_backend.models import (
-    FabricBlockInfo,
+    SecondLifeFabricBlockInfo,
     FabricBlockTypeCreate,
     ActivitySearchRequest,
     GarmentRecipeCreate,
@@ -40,13 +42,15 @@ from ceis_backend.models import (
     ProcessTypeCreate,
 )
 
-app = FastAPI()
 
-
-@app.on_event("startup")
-def startup_event():
-    """Initialize the database when the app starts."""
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Handle startup and shutdown events."""
     init_sqlite_db()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 @app.get("/")
@@ -163,7 +167,7 @@ def create_garment_recipe(payload: GarmentRecipeCreate):
 
 
 @app.post("/fabric-blocks")
-async def create_fabric_block(fabric_block: FabricBlockInfo):
+async def create_fabric_block(fabric_block: SecondLifeFabricBlockInfo):
     print("Received fabric block:", fabric_block)
     return db_create_fabric_block(
         fabric_block.type_id,
@@ -190,67 +194,21 @@ def _get_transport_emission_per_unit() -> float | None:
     return get_emission_per_unit(token, activity_id_transport)
 
 
-@app.get("/co2/repair")
-def get_repair_co2(
-    amount_kg: float = Query(None, description="Amount in kg"),
-    replacements: Optional[str] = Query(
-        None, description="Comma-separated list of fabric block types to replace"
-    ),
-):
-    if not amount_kg or amount_kg <= 0:
-        raise HTTPException(status_code=400, detail="Invalid amount_kg value")
+@app.get("/scenarios")
+def get_co2_scenarios():
+    # Hardcoded values for crop top repair scenario
+    replacements = "40x14"
+    recipe = get_full_garment_recipe(1)
+    if not recipe:
+        raise HTTPException(status_code=404, detail="Garment recipe not found")
+    amount_kg = 0.0
+    for block in recipe.fabric_blocks:
+        amount_kg += block.amount_kg
 
     per_unit_emission = _get_transport_emission_per_unit()
 
     distance_bucharest = distances_customer_sigmaringen.get("Bucharest")
     distance_st_gallen = distances_customer_sigmaringen.get("St. Gallen")
-
-    scenarios = [
-        {
-            "use_case": "Self repair (materials shipped)",
-            "route": "Bucharest -> Sigmaringen",
-            "distance_km": distance_bucharest,
-            "co2_kg": (
-                calculate_transport_emission(
-                    distance_bucharest, amount_kg, per_unit_emission
-                )
-                if distance_bucharest is not None
-                else None
-            ),
-        },
-        {
-            "use_case": "Repair at shop",
-            "route": "Sigmaringen -> St. Gallen -> Sigmaringen",
-            "distance_km": (
-                distance_st_gallen * 2 if distance_st_gallen is not None else None
-            ),
-            "co2_kg": (
-                calculate_transport_emission(
-                    float(distance_st_gallen * 2),
-                    amount_kg,
-                    per_unit_emission,
-                )
-                if distance_st_gallen is not None
-                else None
-            ),
-        },
-        {
-            "use_case": "Send to manufacturer",
-            "route": "Sigmaringen -> Bucharest -> Sigmaringen",
-            "distance_km": (
-                distance_bucharest * 2 if distance_bucharest is not None else None
-            ),
-            "co2_kg": (
-                calculate_transport_emission(
-                    float(distance_bucharest * 2),
-                    amount_kg,
-                    per_unit_emission,
-                )
-                if distance_bucharest is not None
-                else None
-            ),
-        },
-    ]
 
     replacement_names: list[str] = []
     if replacements:
@@ -263,20 +221,141 @@ def get_repair_co2(
         raise HTTPException(status_code=500, detail="Failed to fetch Wiser token")
 
     emission_cache: dict[int, float | None] = {}
-    replacement_fabric_blocks = db_get_replacement_fabric_blocks_emissions(
+    replacement_fabric_blocks_data = db_get_replacement_fabric_blocks_emissions(
         replacement_names, token, emission_cache
     )
 
-    return {
-        "amount_kg": amount_kg,
-        "scenarios": scenarios,
-        "replacement_fabric_blocks": replacement_fabric_blocks,
-    }
+    # Helper function to build activities list for a scenario, aggregated by activity name
+    def build_scenario_activities(transport_distance: float | None) -> list[dict]:
+        activity_map: dict[str, float] = {}
+
+        # Add transport activity
+        if transport_distance is not None:
+            transport_emission = calculate_transport_emission(
+                transport_distance, amount_kg, per_unit_emission
+            )
+            if transport_emission is not None:
+                activity_map["transport_to_customer"] = transport_emission
+
+        # Aggregate replacement fabric block activities by activity name
+        for detail in replacement_fabric_blocks_data.get("details", []):
+            material_emission = detail.get("material_emission", 0)
+            if material_emission > 0:
+                # Add material emission under the name "fabric_block_material"
+                activity_map["fabric_block_material"] = (
+                    activity_map.get("fabric_block_material", 0) + material_emission
+                )
+
+            # Aggregate process emissions by process name
+            for process in detail.get("processes", []):
+                process_name = (
+                    f"fabric_block_{process.get('process', 'Unknown Process')}"
+                )
+                process_emission = process.get("emission", 0)
+                activity_map[process_name] = (
+                    activity_map.get(process_name, 0) + process_emission
+                )
+
+        # Convert aggregated map to activities list
+        activities = [
+            {
+                "name": name,
+                "costs": {
+                    "economic": 0,
+                    "co2_kg": emission,
+                },
+            }
+            for name, emission in sorted(activity_map.items())
+        ]
+
+        return activities
+
+    scenarios = [
+        {
+            "label": "Self repair (materials shipped)",
+            "activities": build_scenario_activities(distance_bucharest),
+        },
+        {
+            "label": "Repair at shop",
+            "activities": build_scenario_activities(
+                float(distance_st_gallen * 2)
+                if distance_st_gallen is not None
+                else None
+            ),
+        },
+        {
+            "label": "Send to manufacturer",
+            "activities": build_scenario_activities(
+                float(distance_bucharest * 2)
+                if distance_bucharest is not None
+                else None
+            ),
+        },
+    ]
+
+    # Add "Buy New" scenario using garment type 1
+    buy_new_co2_data = get_co2_for_garment(1)
+    buy_new_activity_map: dict[str, float] = {}
+
+    # Add transport to customer
+    if distance_bucharest is not None:
+        transport_to_customer_emission = calculate_transport_emission(
+            distance_bucharest, amount_kg, per_unit_emission
+        )
+        if transport_to_customer_emission is not None:
+            buy_new_activity_map["Transport to Customer"] = (
+                transport_to_customer_emission
+            )
+
+    # Aggregate fabric block activities by process name
+    for detail in buy_new_co2_data.fabric_blocks.details:
+        # Add material emission under the fabric block name
+        material_emission = detail.get("material_emission", 0)
+        if material_emission > 0:
+            buy_new_activity_map["garment_material"] = (
+                buy_new_activity_map.get("garment_material", 0) + material_emission
+            )
+
+        # Aggregate production processes by process name
+        for process in detail.get("production_processes", []):
+            process_name = f"garment_{process.get('process', 'Unknown Process')}"
+            process_emission = process.get("emission", 0)
+            buy_new_activity_map[process_name] = (
+                buy_new_activity_map.get(process_name, 0) + process_emission
+            )
+
+    # Aggregate assembly process activities by process name
+    for detail in buy_new_co2_data.processes.details:
+        process_name = f"garment_{detail.get('process', 'Unknown Process')}"
+        process_emission = detail.get("emission", 0)
+        buy_new_activity_map[process_name] = (
+            buy_new_activity_map.get(process_name, 0) + process_emission
+        )
+
+    buy_new_activities = [
+        {
+            "name": name,
+            "costs": {
+                "economic": 0,
+                "co2_kg": emission,
+            },
+        }
+        for name, emission in sorted(buy_new_activity_map.items())
+    ]
+
+    scenarios.append(
+        {
+            "label": "Buy New",
+            "activities": buy_new_activities,
+        }
+    )
+
+    return scenarios
 
 
 @app.get("/co2/{garment_type_id}")
-def get_co2_for_garment(garment_type_id: int):
-    co2_data = get_co2(garment_type_id)
+def get_co2_for_garment_endpoint(garment_type_id: int):
+    co2_data = get_co2_for_garment(garment_type_id)
     return co2_data
 
 
