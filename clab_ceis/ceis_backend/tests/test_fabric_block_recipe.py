@@ -4,7 +4,8 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 from ceis_backend.db_init import init_sqlite_db, create_tables
-from ceis_backend.utils import get_fabric_block_recipe, get_co2_for_garment
+from ceis_backend.utils import get_co2_for_garment
+from ceis_backend.queries import get_fabric_block_recipe
 from ceis_backend.models import Process
 from ceis_backend.main import delete_fabric_block_type
 from fastapi.testclient import TestClient

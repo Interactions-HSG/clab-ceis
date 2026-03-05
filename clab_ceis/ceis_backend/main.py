@@ -12,7 +12,10 @@ from ceis_backend.utils import (
     get_wiser_token,
     get_emission_per_unit,
     calculate_transport_emission,
-    get_full_garment_recipe,
+    build_scenario_activities,
+    calculate_replacement_fabric_blocks_emissions,
+)
+from ceis_backend.queries import (
     db_create_garment_type,
     db_get_garment_types,
     db_get_locations,
@@ -27,7 +30,7 @@ from ceis_backend.utils import (
     db_create_fabric_block,
     db_get_fabric_blocks,
     db_delete_fabric_block,
-    db_get_replacement_fabric_blocks_emissions,
+    get_full_garment_recipe,
 )
 from ceis_backend.location_details import (
     distances_customer_sigmaringen,
@@ -221,74 +224,50 @@ def get_co2_scenarios():
         raise HTTPException(status_code=500, detail="Failed to fetch Wiser token")
 
     emission_cache: dict[int, float | None] = {}
-    replacement_fabric_blocks_data = db_get_replacement_fabric_blocks_emissions(
+    replacement_fabric_blocks_data = calculate_replacement_fabric_blocks_emissions(
         replacement_names, token, emission_cache
     )
 
-    # Helper function to build activities list for a scenario, aggregated by activity name
-    def build_scenario_activities(transport_distance: float | None) -> list[dict]:
-        activity_map: dict[str, float] = {}
-
-        # Add transport activity
-        if transport_distance is not None:
-            transport_emission = calculate_transport_emission(
-                transport_distance, amount_kg, per_unit_emission
-            )
-            if transport_emission is not None:
-                activity_map["transport_to_customer"] = transport_emission
-
-        # Aggregate replacement fabric block activities by activity name
-        for detail in replacement_fabric_blocks_data.get("details", []):
-            material_emission = detail.get("material_emission", 0)
-            if material_emission > 0:
-                # Add material emission under the name "fabric_block_material"
-                activity_map["fabric_block_material"] = (
-                    activity_map.get("fabric_block_material", 0) + material_emission
-                )
-
-            # Aggregate process emissions by process name
-            for process in detail.get("processes", []):
-                process_name = (
-                    f"fabric_block_{process.get('process', 'Unknown Process')}"
-                )
-                process_emission = process.get("emission", 0)
-                activity_map[process_name] = (
-                    activity_map.get(process_name, 0) + process_emission
-                )
-
-        # Convert aggregated map to activities list
-        activities = [
-            {
-                "name": name,
-                "costs": {
-                    "economic": 0,
-                    "co2_kg": emission,
-                },
-            }
-            for name, emission in sorted(activity_map.items())
-        ]
-
-        return activities
-
+    # def build_scenario_activities(
+    #     transport_distance: float | None,
+    #     amount_kg: float,
+    #     per_unit_emission: float | None,
+    #     replacement_fabric_blocks_data: dict,
+    # ) -> list[dict]:
     scenarios = [
         {
             "label": "Self repair (materials shipped)",
-            "activities": build_scenario_activities(distance_bucharest),
+            "activities": build_scenario_activities(
+                distance_bucharest,
+                amount_kg,
+                per_unit_emission,
+                replacement_fabric_blocks_data,
+            ),
         },
         {
             "label": "Repair at shop",
             "activities": build_scenario_activities(
-                float(distance_st_gallen * 2)
-                if distance_st_gallen is not None
-                else None
+                (
+                    float(distance_st_gallen * 2)
+                    if distance_st_gallen is not None
+                    else None
+                ),
+                amount_kg,
+                per_unit_emission,
+                replacement_fabric_blocks_data,
             ),
         },
         {
             "label": "Send to manufacturer",
             "activities": build_scenario_activities(
-                float(distance_bucharest * 2)
-                if distance_bucharest is not None
-                else None
+                (
+                    float(distance_bucharest * 2)
+                    if distance_bucharest is not None
+                    else None
+                ),
+                amount_kg,
+                per_unit_emission,
+                replacement_fabric_blocks_data,
             ),
         },
     ]
@@ -303,7 +282,7 @@ def get_co2_scenarios():
             distance_bucharest, amount_kg, per_unit_emission
         )
         if transport_to_customer_emission is not None:
-            buy_new_activity_map["Transport to Customer"] = (
+            buy_new_activity_map["Transport To Customer"] = (
                 transport_to_customer_emission
             )
 
@@ -312,13 +291,13 @@ def get_co2_scenarios():
         # Add material emission under the fabric block name
         material_emission = detail.get("material_emission", 0)
         if material_emission > 0:
-            buy_new_activity_map["garment_material"] = (
-                buy_new_activity_map.get("garment_material", 0) + material_emission
+            buy_new_activity_map["Garment Material"] = (
+                buy_new_activity_map.get("Garment Material", 0) + material_emission
             )
 
         # Aggregate production processes by process name
         for process in detail.get("production_processes", []):
-            process_name = f"garment_{process.get('process', 'Unknown Process')}"
+            process_name = f"Garment {process.get('process', 'Unknown Process')}"
             process_emission = process.get("emission", 0)
             buy_new_activity_map[process_name] = (
                 buy_new_activity_map.get(process_name, 0) + process_emission
@@ -326,7 +305,7 @@ def get_co2_scenarios():
 
     # Aggregate assembly process activities by process name
     for detail in buy_new_co2_data.processes.details:
-        process_name = f"garment_{detail.get('process', 'Unknown Process')}"
+        process_name = f"Garment {detail.get('process', 'Unknown Process')}"
         process_emission = detail.get("emission", 0)
         buy_new_activity_map[process_name] = (
             buy_new_activity_map.get(process_name, 0) + process_emission
