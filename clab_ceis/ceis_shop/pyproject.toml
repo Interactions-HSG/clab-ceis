@@ -8,6 +8,11 @@ dependencies = [
     "dash>=4.0.0",
 ]
 
+[dependency-groups]
+dev = [
+    "pytest>=8.3.4",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -18,3 +23,9 @@ only-include = ["callbacks", "layouts", "shop.py", "sparql_queries.py", "__init_
 
 [tool.uv.sources]
 ceis-dashboard = { path = "../ceis_dashboard", editable = true }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: tests that require running CEIS backend and external dependencies",
+]
