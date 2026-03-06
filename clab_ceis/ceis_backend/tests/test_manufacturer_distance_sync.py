@@ -81,10 +81,21 @@ def test_sync_skips_when_csv_unchanged(tmp_path, monkeypatch):
     monkeypatch.setattr(sync, "DB_PATH", str(db_path))
     monkeypatch.setattr(sync, "CSV_PATH", csv_path)
 
-    with patch("ceis_backend.manufacturer_distance_sync.requests.get") as mocked:
-        mocked.return_value.status_code = 200
-        mocked.return_value.raise_for_status = MagicMock()
-        mocked.return_value.json.return_value = [{"lat": "47.0", "lon": "9.0"}]
+    def mock_get(url, params=None, headers=None, timeout=None):
+        response = MagicMock()
+        response.status_code = 200
+        response.raise_for_status = MagicMock()
+        if "nominatim" in url:
+            q = params.get("q", "")
+            if "City A" in q:
+                response.json.return_value = [{"lat": "47.0", "lon": "9.0"}]
+            else:
+                response.json.return_value = [{"lat": "47.1", "lon": "9.1"}]
+            return response
+        response.json.return_value = {"routes": [{"distance": 10000.0}]}
+        return response
+
+    with patch("ceis_backend.manufacturer_distance_sync.requests.get", side_effect=mock_get):
         first = sync.sync_manufacturer_distances_if_changed()
         assert first["updated"] is True
 
