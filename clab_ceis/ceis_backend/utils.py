@@ -8,7 +8,7 @@ from ceis_backend.models import (
     Process,
 )
 from ceis_backend.wiser_bridge import get_emission_per_unit, get_wiser_token
-from ceis_backend.location_details import (
+from ceis_backend.data.location_details import (
     distances_to_manufacturer,
     activity_id_transport,
 )
@@ -316,9 +316,7 @@ def calculate_replacement_fabric_blocks_emissions(
             )
 
         # Calculate total emissions for this fabric block
-        total_processes_emission = sum(
-            p["emission"] for p in process_emissions_list
-        )
+        total_processes_emission = sum(p["emission"] for p in process_emissions_list)
         fabric_block_total_emission = material_emission + total_processes_emission
 
         replacement_fabric_blocks["details"].append(
