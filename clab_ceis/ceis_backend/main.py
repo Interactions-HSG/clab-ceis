@@ -32,7 +32,7 @@ from ceis_backend.queries import (
     db_delete_fabric_block,
     get_full_garment_recipe,
 )
-from ceis_backend.location_details import (
+from ceis_backend.data.location_details import (
     distances_customer_sigmaringen,
     activity_id_transport,
 )

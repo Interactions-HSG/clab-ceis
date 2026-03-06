@@ -1,6 +1,8 @@
 import sqlite3
+import os
 
 from ceis_backend.config import DB_PATH
+from ceis_backend.manufacturer_distance_sync import sync_manufacturer_distances_if_changed
 
 
 def create_tables(cursor):
@@ -125,6 +127,53 @@ def create_tables(cursor):
     """
     )
 
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS manufacturers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company TEXT NOT NULL UNIQUE,
+            role TEXT NOT NULL,
+            role_group TEXT NOT NULL,
+            location TEXT NOT NULL
+        )
+    """
+    )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS manufacturer_distances (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_company TEXT NOT NULL,
+            source_role_group TEXT NOT NULL,
+            source_location TEXT NOT NULL,
+            destination_company TEXT NOT NULL,
+            destination_role_group TEXT NOT NULL,
+            destination_location TEXT NOT NULL,
+            distance_km REAL NOT NULL,
+            UNIQUE(source_company, destination_company)
+        )
+    """
+    )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS sync_state (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+    """
+    )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS geocode_cache (
+            address TEXT PRIMARY KEY,
+            lat REAL NOT NULL,
+            lon REAL NOT NULL
+        )
+    """
+    )
+
     cursor.executescript(
         """
         CREATE TABLE IF NOT EXISTS seed_meta (
@@ -201,3 +250,18 @@ def init_sqlite_db():
 
     conn.commit()
     conn.close()
+
+    disable_sync = os.getenv("CEIS_DISABLE_DISTANCE_SYNC", "0") == "1"
+    is_pytest = "PYTEST_CURRENT_TEST" in os.environ
+    print(f"Database path: {DB_PATH}")
+    print(f"Manufacturer distance sync enabled: {not disable_sync and not is_pytest}")
+    if disable_sync or is_pytest:
+        print("Manufacturer distance sync skipped by environment.")
+        return
+    try:
+        sync_result = sync_manufacturer_distances_if_changed()
+        print(f"Manufacturer distance sync result: {sync_result}")
+    except Exception:
+        # Distance sync is best-effort and must not block DB startup.
+        print("Manufacturer distance sync failed unexpectedly.")
+        return
