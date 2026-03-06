@@ -229,11 +229,17 @@ def _distance_km(
         )
         response.raise_for_status()
         body = response.json()
+        if not isinstance(body, dict):
+            return None
         routes = body.get("routes", [])
+        if not routes:
+            return None
         meters = routes[0].get("distance")
+        if meters is None:
+            return None
         return round(float(meters) / 1000, 2)
-    except ():
-        pass
+    except (requests.RequestException, ValueError, TypeError, KeyError, IndexError):
+        return None
 
 
 def _build_distance_rows(

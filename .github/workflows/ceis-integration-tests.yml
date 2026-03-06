@@ -1,0 +1,41 @@
+name: CEIS Integration Tests
+
+on:
+  push:
+    paths:
+      - "clab_ceis/**"
+      - ".github/workflows/ceis-integration-tests.yml"
+  pull_request:
+    paths:
+      - "clab_ceis/**"
+      - ".github/workflows/ceis-integration-tests.yml"
+
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        component:
+          - clab_ceis/ceis_dashboard
+          - clab_ceis/ceis_shop
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync --directory "${{ matrix.component }}" --group dev
+
+      - name: Run integration tests
+        env:
+          CEIS_DISABLE_DISTANCE_SYNC: "1"
+        run: uv run --directory "${{ matrix.component }}" pytest -m integration

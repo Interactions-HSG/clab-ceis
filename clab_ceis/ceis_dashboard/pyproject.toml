@@ -10,6 +10,11 @@ dependencies = [
     "pandas>=3.0.1",
 ]
 
+[dependency-groups]
+dev = [
+    "pytest>=8.3.4",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -20,3 +25,9 @@ only-include = ["pages", "callbacks", "*.py"]
 
 [tool.uv.sources]
 ceis-backend = { path = "../ceis_backend", editable = true }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: tests that require running CEIS backend and external dependencies",
+]
