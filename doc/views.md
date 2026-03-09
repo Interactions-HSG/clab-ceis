@@ -2,13 +2,13 @@
 
 The CEIS view are determined by the use cases it is demonstrating.
 
-1. Customers compare of End of Life (EOL) scenarios with respect to their economical and environmental costs proxied by CO2eq.
+1. Customers compare of End of Life (EoL) scenarios with respect to their economical and environmental costs proxied by CO2eq.
 2. Customers weigh delivery speed against environmental impact proxied by CO2eq.
 3. Strategist review progress towards the company's goals.
 4. Designer balance design, longevity, and costs of a product.
 
 
-## Comparison of End of Life (EOL) Scenarios:
+## Comparison of End of Life (EoL) Scenarios:
 
 Sooner or later, all products reach their end of life. In this use case, owners of a product are interested in end of life scenarios of that product. They either need to start a new life cycle or dispose the product entirely. Currently, the following EoL scenarios are covered in CEIS:
 
