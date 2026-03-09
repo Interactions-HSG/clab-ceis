@@ -25,12 +25,14 @@ Even in the linear economic model, delivery times are sometimes weighted against
 
 CEIS requires a view that presents these alternatives, specifically the delivery time versus environmental costs trade-off, during the ordering process of a new product initiated by a human customer. To this end, they are interested in a list of products as well as the delivery time, both environmental and ecological costs and resulting quality.
 
-## Strategist
+## Strategist Review Progress towards the Company's Goals.
 
 A company might employ various strategies to meet environmental, economical, and circularity goals. At any given time, they want to be able to see the company's progress towards their goal. Based on the state, they want to make adjustments to the company's employed strategies. To meet economic goals, they might take circularity debt. Similar to technical debt in Software Engineering, the latter describes costs that are accepted as a workaround to achieve short term goals at the expense of higher dependency to suppliers, weakening their supply chain. However, the debt might never manifest into actual costs.
 
 CEIS requires a view that presents progress towards the company's goals. To this end, they interested in the summed up exceeds of a circularity index threshold, the summed up economical costs, and the summed up environmental costs.
 
-## Designer's Choice
+## Designer Balance Design, Longevity, and Costs of a Product.
 
-Designers balance different aspects of the product against the design. For example, the longevity and costs of the product is impacted by their choice of materials and fabric blocks. Based on cost calculation and statistics, they make a choice a design time that must be aligned with corporate strategy.
+Designers balance different aspects of the product against the design. For example, the longevity and costs of the product is impacted by their choice of materials, fabric blocks, and suppliers. Based on cost calculation and statistics, they make a choice at design time that must be aligned with corporate strategy. 
+
+CEIS requires a view that allows designers to investigate the contribution of the parts and processes to the cost balance of the whole product. To this end, they are interested in the bill of materials, bill of processes, environmental costs proxied by CO2eq and the supply chain configuration. This view should allow them to select different suppliers and the selection would eventually lead to an updated balance.
