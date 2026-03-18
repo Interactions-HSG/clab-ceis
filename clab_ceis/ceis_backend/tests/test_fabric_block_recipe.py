@@ -98,7 +98,6 @@ class TestGetRecipeForFabricBlock:
         assert fabric_block is not None
         assert fabric_block.material == "hemp"
         assert fabric_block.activity_id == 276186
-        assert fabric_block.amount_kg == 0.108
         assert len(fabric_block.processes) > 0
         assert all(isinstance(p, Process) for p in fabric_block.processes)
 
@@ -130,7 +129,6 @@ class TestGetRecipeForFabricBlock:
 
         assert fabric_block.material == "hemp"
         assert fabric_block.activity_id == 276186
-        assert fabric_block.amount_kg == 0.012
 
         process_names = [p.name for p in fabric_block.processes]
         assert "dyeing" in process_names
@@ -146,8 +144,8 @@ class TestDeleteFabricBlockType:
 
         # Insert test data
         cursor.execute(
-            "INSERT INTO fabric_block_types (name, material, amount_kg, activity_id) VALUES (?, ?, ?, ?)",
-            ("TestFB", "wool", 2.0, 1234),
+            "INSERT INTO fabric_block_types (name, sqm) VALUES (?, ?)",
+            ("TestFB", 2.0),
         )
         fb_type_id = cursor.lastrowid
         assert fb_type_id is not None
@@ -199,8 +197,8 @@ class TestDeleteFabricBlockType:
 
         # Insert fabric block type
         cursor.execute(
-            "INSERT INTO fabric_block_types (name, material, amount_kg, activity_id) VALUES (?, ?, ?, ?)",
-            ("MultiFB", "silk", 1.0, 5678),
+            "INSERT INTO fabric_block_types (name, sqm) VALUES (?, ?)",
+            ("MultiFB", 1.0),
         )
         fb_type_id = cursor.lastrowid
         assert fb_type_id is not None
@@ -503,15 +501,22 @@ class TestGetCo2TransportEmissions:
 
         # Insert fabric block type
         cursor.execute(
-            "INSERT INTO fabric_block_types (name, material, amount_kg, activity_id) VALUES (?, ?, ?, ?)",
-            ("TransportTestBlock", "cotton", 2.0, 8001),
+            "INSERT INTO fabric_block_types (name, sqm) VALUES (?, ?)",
+            ("TransportTestBlock", 2.0),
         )
         fb_type_id = cursor.lastrowid
 
+        cursor.execute(
+            "INSERT OR IGNORE INTO materials (name, kg_per_sqm, activity_id) VALUES (?, ?, ?)",
+            ("cotton", 1.0, 8001),
+        )
+        cursor.execute("SELECT id FROM materials WHERE name = ?", ("cotton",))
+        material_id = cursor.fetchone()[0]
+
         # Link fabric block to garment recipe
         cursor.execute(
-            "INSERT INTO garment_recipe_fabric_blocks (garment_type, fabric_block_id, amount) VALUES (?, ?, ?)",
-            (garment_id, fb_type_id, 1),
+            "INSERT INTO garment_recipe_fabric_blocks (garment_type, fabric_block_id, material_id, amount) VALUES (?, ?, ?, ?)",
+            (garment_id, fb_type_id, material_id, 1),
         )
 
         # Insert fabric block in inventory with St. Gallen location
@@ -560,11 +565,11 @@ class TestGetCo2TransportEmissions:
 
             return mock_response
 
-        with patch("ceis_backend.utils.get_wiser_token", return_value="mock_token"):
+        with patch("ceis_backend.wiser_bridge.get_wiser_token", return_value="mock_token"):
             with patch(
                 "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
             ):
-                result = get_co2_for_garment(test_data["garment_id"])
+                result = get_co2_for_garment(test_data["garment_id"], "mock_token")
 
         # Check transport emission is calculated
         # St. Gallen distance = 10 km, amount_kg = 2.0
@@ -634,15 +639,22 @@ class TestGetCo2TransportEmissions:
 
         # Insert fabric block type
         cursor.execute(
-            "INSERT INTO fabric_block_types (name, material, amount_kg, activity_id) VALUES (?, ?, ?, ?)",
-            ("NoLocationBlock", "cotton", 1.5, 9001),
+            "INSERT INTO fabric_block_types (name, sqm) VALUES (?, ?)",
+            ("NoLocationBlock", 1.5),
         )
         fb_type_id = cursor.lastrowid
 
+        cursor.execute(
+            "INSERT OR IGNORE INTO materials (name, kg_per_sqm, activity_id) VALUES (?, ?, ?)",
+            ("cotton", 1.0, 9001),
+        )
+        cursor.execute("SELECT id FROM materials WHERE name = ?", ("cotton",))
+        material_id = cursor.fetchone()[0]
+
         # Link fabric block to garment
         cursor.execute(
-            "INSERT INTO garment_recipe_fabric_blocks (garment_type, fabric_block_id, amount) VALUES (?, ?, ?)",
-            (garment_id, fb_type_id, 1),
+            "INSERT INTO garment_recipe_fabric_blocks (garment_type, fabric_block_id, material_id, amount) VALUES (?, ?, ?, ?)",
+            (garment_id, fb_type_id, material_id, 1),
         )
 
         # Insert fabric block WITHOUT location_id
@@ -663,12 +675,12 @@ class TestGetCo2TransportEmissions:
             }
             return mock_response
 
-        with patch("ceis_backend.utils.get_wiser_token", return_value="mock_token"):
+        with patch("ceis_backend.wiser_bridge.get_wiser_token", return_value="mock_token"):
             with patch(
                 "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
             ):
                 assert garment_id is not None
-                result = get_co2_for_garment(int(garment_id))
+                result = get_co2_for_garment(int(garment_id), "mock_token")
 
         fb_details = result.fabric_blocks.details[0]
         alternative = fb_details.get("alternative", {})
@@ -740,15 +752,22 @@ class TestGetCo2TransportEmissions:
 
         # Insert fabric block type
         cursor.execute(
-            "INSERT INTO fabric_block_types (name, material, amount_kg, activity_id) VALUES (?, ?, ?, ?)",
-            ("UnknownLocationBlock", "polyester", 1.0, 9002),
+            "INSERT INTO fabric_block_types (name, sqm) VALUES (?, ?)",
+            ("UnknownLocationBlock", 1.0),
         )
         fb_type_id = cursor.lastrowid
 
+        cursor.execute(
+            "INSERT OR IGNORE INTO materials (name, kg_per_sqm, activity_id) VALUES (?, ?, ?)",
+            ("polyester", 1.0, 9002),
+        )
+        cursor.execute("SELECT id FROM materials WHERE name = ?", ("polyester",))
+        material_id = cursor.fetchone()[0]
+
         # Link fabric block to garment
         cursor.execute(
-            "INSERT INTO garment_recipe_fabric_blocks (garment_type, fabric_block_id, amount) VALUES (?, ?, ?)",
-            (garment_id, fb_type_id, 1),
+            "INSERT INTO garment_recipe_fabric_blocks (garment_type, fabric_block_id, material_id, amount) VALUES (?, ?, ?, ?)",
+            (garment_id, fb_type_id, material_id, 1),
         )
 
         # Insert fabric block WITH unknown location
@@ -769,11 +788,11 @@ class TestGetCo2TransportEmissions:
             }
             return mock_response
 
-        with patch("ceis_backend.utils.get_wiser_token", return_value="mock_token"):
+        with patch("ceis_backend.wiser_bridge.get_wiser_token", return_value="mock_token"):
             with patch(
                 "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
             ):
-                result = get_co2_for_garment(garment_id)
+                result = get_co2_for_garment(garment_id, "mock_token")
 
         fb_details = result.fabric_blocks.details[0]
         alternative = fb_details.get("alternative", {})
@@ -861,10 +880,17 @@ class TestGetCo2FabricBlockProductionEmissions:
 
         # Insert fabric block type
         cursor.execute(
-            "INSERT INTO fabric_block_types (name, material, amount_kg, activity_id) VALUES (?, ?, ?, ?)",
-            ("TestBlock", "cotton", 1.0, 1001),
+            "INSERT INTO fabric_block_types (name, sqm) VALUES (?, ?)",
+            ("TestBlock", 1.0),
         )
         fb_type_id = cursor.lastrowid
+
+        cursor.execute(
+            "INSERT OR IGNORE INTO materials (name, kg_per_sqm, activity_id) VALUES (?, ?, ?)",
+            ("cotton", 1.0, 1001),
+        )
+        cursor.execute("SELECT id FROM materials WHERE name = ?", ("cotton",))
+        material_id = cursor.fetchone()[0]
 
         # Insert process type with unit and activity_id
         cursor.execute(
@@ -875,8 +901,8 @@ class TestGetCo2FabricBlockProductionEmissions:
 
         # Link fabric block to garment recipe
         cursor.execute(
-            "INSERT INTO garment_recipe_fabric_blocks (garment_type, fabric_block_id, amount) VALUES (?, ?, ?)",
-            (garment_id, fb_type_id, 1),
+            "INSERT INTO garment_recipe_fabric_blocks (garment_type, fabric_block_id, material_id, amount) VALUES (?, ?, ?, ?)",
+            (garment_id, fb_type_id, material_id, 1),
         )
 
         # Insert fabric block into inventory (actual instance of the type)
@@ -933,11 +959,11 @@ class TestGetCo2FabricBlockProductionEmissions:
 
             return mock_response
 
-        with patch("ceis_backend.utils.get_wiser_token", return_value="mock_token"):
+        with patch("ceis_backend.wiser_bridge.get_wiser_token", return_value="mock_token"):
             with patch(
                 "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
             ):
-                result = get_co2_for_garment(test_data["garment_id"])
+                result = get_co2_for_garment(test_data["garment_id"], "mock_token")
 
         # Verify fabric blocks emissions are calculated
         assert result.fabric_blocks.total_emission > 0
@@ -993,15 +1019,22 @@ class TestGetCo2FabricBlockProductionEmissions:
 
         # Insert fabric block type (no processes linked)
         cursor.execute(
-            "INSERT INTO fabric_block_types (name, material, amount_kg, activity_id) VALUES (?, ?, ?, ?)",
-            ("NoProcessBlock", "linen", 1.0, 3001),
+            "INSERT INTO fabric_block_types (name, sqm) VALUES (?, ?)",
+            ("NoProcessBlock", 1.0),
         )
         fb_type_id = cursor.lastrowid
 
+        cursor.execute(
+            "INSERT OR IGNORE INTO materials (name, kg_per_sqm, activity_id) VALUES (?, ?, ?)",
+            ("linen", 1.0, 3001),
+        )
+        cursor.execute("SELECT id FROM materials WHERE name = ?", ("linen",))
+        material_id = cursor.fetchone()[0]
+
         # Link fabric block to garment recipe
         cursor.execute(
-            "INSERT INTO garment_recipe_fabric_blocks (garment_type, fabric_block_id, amount) VALUES (?, ?, ?)",
-            (garment_id, fb_type_id, 1),
+            "INSERT INTO garment_recipe_fabric_blocks (garment_type, fabric_block_id, material_id, amount) VALUES (?, ?, ?, ?)",
+            (garment_id, fb_type_id, material_id, 1),
         )
 
         conn.commit()
@@ -1016,11 +1049,11 @@ class TestGetCo2FabricBlockProductionEmissions:
             }
             return mock_response
 
-        with patch("ceis_backend.utils.get_wiser_token", return_value="mock_token"):
+        with patch("ceis_backend.wiser_bridge.get_wiser_token", return_value="mock_token"):
             with patch(
                 "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
             ):
-                result = get_co2_for_garment(garment_id)
+                result = get_co2_for_garment(garment_id, "mock_token")
 
         # Verify production emissions is 0
         fb_details = result.fabric_blocks.details[0]
@@ -1070,10 +1103,17 @@ class TestGetCo2FabricBlockProductionEmissions:
 
         # Insert fabric block type
         cursor.execute(
-            "INSERT INTO fabric_block_types (name, material, amount_kg, activity_id) VALUES (?, ?, ?, ?)",
-            ("MultiProcBlock", "hemp", 1.0, 4001),
+            "INSERT INTO fabric_block_types (name, sqm) VALUES (?, ?)",
+            ("MultiProcBlock", 1.0),
         )
         fb_type_id = cursor.lastrowid
+
+        cursor.execute(
+            "INSERT OR IGNORE INTO materials (name, kg_per_sqm, activity_id) VALUES (?, ?, ?)",
+            ("hemp", 1.0, 4001),
+        )
+        cursor.execute("SELECT id FROM materials WHERE name = ?", ("hemp",))
+        material_id = cursor.fetchone()[0]
 
         # Insert first process type
         cursor.execute(
@@ -1091,8 +1131,8 @@ class TestGetCo2FabricBlockProductionEmissions:
 
         # Link fabric block to garment recipe
         cursor.execute(
-            "INSERT INTO garment_recipe_fabric_blocks (garment_type, fabric_block_id, amount) VALUES (?, ?, ?)",
-            (garment_id, fb_type_id, 1),
+            "INSERT INTO garment_recipe_fabric_blocks (garment_type, fabric_block_id, material_id, amount) VALUES (?, ?, ?, ?)",
+            (garment_id, fb_type_id, material_id, 1),
         )
 
         # Link fabric block to first process
@@ -1140,11 +1180,11 @@ class TestGetCo2FabricBlockProductionEmissions:
 
             return mock_response
 
-        with patch("ceis_backend.utils.get_wiser_token", return_value="mock_token"):
+        with patch("ceis_backend.wiser_bridge.get_wiser_token", return_value="mock_token"):
             with patch(
                 "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
             ):
-                result = get_co2_for_garment(garment_id)
+                result = get_co2_for_garment(garment_id, "mock_token")
 
         # Calculate expected production emissions:
         # process 1 (dyeing): 0.4 * 2.0 = 0.8

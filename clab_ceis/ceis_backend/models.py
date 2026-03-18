@@ -17,7 +17,6 @@ class FabricBlock(BaseModel):
     id: int
     name: str
     material: str
-    amount_kg: float
     activity_id: int
     processes: list[Process]
 
@@ -58,9 +57,7 @@ class GarmentTypeCreate(BaseModel):
 
 class FabricBlockTypeCreate(BaseModel):
     name: str
-    material: Optional[str] = None
-    amount_kg: Optional[float] = None
-    activity_id: int
+    sqm: float
 
 
 class ProcessTypeCreate(BaseModel):
@@ -69,8 +66,15 @@ class ProcessTypeCreate(BaseModel):
     activity_id: int
 
 
+class MaterialCreate(BaseModel):
+    name: str
+    kg_per_sqm: float
+    activity_id: int
+
+
 class GarmentRecipeFabricBlockCreate(BaseModel):
     type_id: int
+    material_id: int
     amount: int
 
 
@@ -80,7 +84,7 @@ class GarmentRecipeProcessCreate(BaseModel):
 
 
 class GarmentRecipeCreate(BaseModel):
-    garment_type_id: int
+    garment_type_name: str
     fabric_blocks: list[GarmentRecipeFabricBlockCreate]
     processes: Optional[list[GarmentRecipeProcessCreate]] = None
 
