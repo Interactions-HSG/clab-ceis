@@ -9,16 +9,18 @@ from ceis_backend.db_init import init_sqlite_db
 from ceis_backend.config import BACKEND_HOST, BACKEND_PORT
 from ceis_backend.utils import (
     get_co2_for_garment,
-    get_wiser_token,
     get_emission_per_unit,
     calculate_transport_emission,
     build_scenario_activities,
     calculate_replacement_fabric_blocks_emissions,
 )
+from ceis_backend.wiser_bridge import get_wiser_token
 from ceis_backend.queries import (
     db_create_garment_type,
     db_get_garment_types,
     db_get_locations,
+    db_get_materials,
+    db_upsert_material,
     db_delete_garment_recipe,
     db_create_fabric_block_type,
     db_create_process_type,
@@ -31,6 +33,7 @@ from ceis_backend.queries import (
     db_get_fabric_blocks,
     db_delete_fabric_block,
     get_full_garment_recipe,
+    get_fabric_block_weight_kg,
 )
 from ceis_backend.data.location_details import (
     distances_customer_sigmaringen,
@@ -42,6 +45,7 @@ from ceis_backend.models import (
     ActivitySearchRequest,
     GarmentRecipeCreate,
     GarmentTypeCreate,
+    MaterialCreate,
     ProcessTypeCreate,
 )
 
@@ -76,6 +80,16 @@ def get_locations():
     return db_get_locations()
 
 
+@app.get("/materials")
+def get_materials():
+    return db_get_materials()
+
+
+@app.post("/materials")
+def upsert_material(payload: MaterialCreate):
+    return db_upsert_material(payload.name, payload.kg_per_sqm, payload.activity_id)
+
+
 @app.delete("/garment-recipes/{garment_type_id}")
 def delete_garment_recipe(garment_type_id: int):
     return db_delete_garment_recipe(garment_type_id)
@@ -83,9 +97,7 @@ def delete_garment_recipe(garment_type_id: int):
 
 @app.post("/fabric-block-types")
 def create_fabric_block_type(payload: FabricBlockTypeCreate):
-    return db_create_fabric_block_type(
-        payload.name, payload.material, payload.amount_kg, payload.activity_id
-    )
+    return db_create_fabric_block_type(payload.name, payload.sqm)
 
 
 @app.post("/process-types")
@@ -163,7 +175,7 @@ def delete_process_type(type_id: int):
 @app.post("/garment-recipes")
 def create_garment_recipe(payload: GarmentRecipeCreate):
     return db_create_garment_recipe(
-        payload.garment_type_id,
+        payload.garment_type_name,
         payload.fabric_blocks,
         payload.processes or [],
     )
@@ -189,8 +201,7 @@ def delete_fabric_block(fabric_block_id: int):
     return db_delete_fabric_block(fabric_block_id)
 
 
-def _get_transport_emission_per_unit() -> float | None:
-    token = get_wiser_token()
+def _get_transport_emission_per_unit(token: str) -> float | None:
     if not token or isinstance(token, dict):
         return None
 
@@ -206,9 +217,19 @@ def get_co2_scenarios():
         raise HTTPException(status_code=404, detail="Garment recipe not found")
     amount_kg = 0.0
     for block in recipe.fabric_blocks:
-        amount_kg += block.amount_kg
+        block_weight_kg = get_fabric_block_weight_kg(block.name, block.material)
+        if block_weight_kg is None:
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "Failed to resolve fabric block weight for "
+                    f"'{block.name}' and material '{block.material}'"
+                ),
+            )
+        amount_kg += block_weight_kg
 
-    per_unit_emission = _get_transport_emission_per_unit()
+    wiser_token = get_wiser_token()
+    per_unit_emission = _get_transport_emission_per_unit(wiser_token)
 
     distance_bucharest = distances_customer_sigmaringen.get("Bucharest")
     distance_st_gallen = distances_customer_sigmaringen.get("St. Gallen")
@@ -219,13 +240,9 @@ def get_co2_scenarios():
             name.strip() for name in replacements.split(",") if name.strip()
         ]
 
-    token = get_wiser_token()
-    if isinstance(token, dict):
-        raise HTTPException(status_code=500, detail="Failed to fetch Wiser token")
-
     emission_cache: dict[int, float | None] = {}
     replacement_fabric_blocks_data = calculate_replacement_fabric_blocks_emissions(
-        replacement_names, token, emission_cache
+        replacement_names, wiser_token, emission_cache
     )
 
     # def build_scenario_activities(
@@ -273,7 +290,7 @@ def get_co2_scenarios():
     ]
 
     # Add "Buy New" scenario using garment type 1
-    buy_new_co2_data = get_co2_for_garment(1)
+    buy_new_co2_data = get_co2_for_garment(1, wiser_token)
     buy_new_activity_map: dict[str, float] = {}
 
     # Add transport to customer
@@ -334,7 +351,8 @@ def get_co2_scenarios():
 
 @app.get("/co2/{garment_type_id}")
 def get_co2_for_garment_endpoint(garment_type_id: int):
-    co2_data = get_co2_for_garment(garment_type_id)
+    wiser_token = get_wiser_token()
+    co2_data = get_co2_for_garment(garment_type_id, wiser_token)
     return co2_data
 
 

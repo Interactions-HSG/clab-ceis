@@ -50,6 +50,72 @@ def db_get_locations() -> list[dict]:
     return [{"id": loc[0], "name": loc[1]} for loc in locations]
 
 
+def db_get_materials() -> list[dict]:
+    """Get all materials from the database."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id, name, kg_per_sqm, activity_id FROM materials ORDER BY name"
+    )
+    materials = cursor.fetchall()
+    conn.close()
+    return [
+        {
+            "id": row[0],
+            "name": row[1],
+            "kg_per_sqm": row[2],
+            "activity_id": row[3],
+        }
+        for row in materials
+    ]
+
+
+def db_upsert_material(name: str, kg_per_sqm: float, activity_id: int) -> dict:
+    """Create or update a material by name."""
+    normalized_name = name.strip()
+    if not normalized_name:
+        raise HTTPException(status_code=400, detail="Material name is required")
+    if kg_per_sqm <= 0:
+        raise HTTPException(status_code=400, detail="kg_per_sqm must be greater than 0")
+    if activity_id <= 0:
+        raise HTTPException(
+            status_code=400, detail="activity_id must be greater than 0"
+        )
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT id FROM materials WHERE name = ?", (normalized_name,))
+        existing = cursor.fetchone()
+        action = "updated" if existing else "created"
+
+        cursor.execute(
+            """
+            INSERT INTO materials (name, kg_per_sqm, activity_id)
+            VALUES (?, ?, ?)
+            ON CONFLICT(name) DO UPDATE SET
+                kg_per_sqm = excluded.kg_per_sqm,
+                activity_id = excluded.activity_id
+            """,
+            (normalized_name, kg_per_sqm, activity_id),
+        )
+        cursor.execute(
+            "SELECT id, name, kg_per_sqm, activity_id FROM materials WHERE name = ?",
+            (normalized_name,),
+        )
+        row = cursor.fetchone()
+        conn.commit()
+        return {
+            "id": row[0],
+            "name": row[1],
+            "kg_per_sqm": row[2],
+            "activity_id": row[3],
+            "action": action,
+        }
+    finally:
+        conn.close()
+
+
 def db_delete_garment_recipe(garment_type_id: int) -> dict:
     """Delete a garment recipe by garment type ID."""
     conn = sqlite3.connect(DB_PATH)
@@ -81,19 +147,17 @@ def db_delete_garment_recipe(garment_type_id: int) -> dict:
         conn.close()
 
 
-def db_create_fabric_block_type(
-    name: str, material: str | None, amount_kg: float | None, activity_id: int
-) -> dict:
+def db_create_fabric_block_type(name: str, sqm: float) -> dict:
     """Create a new fabric block type in the database."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     try:
         cursor.execute(
             """
-            INSERT INTO fabric_block_types (name, material, amount_kg, activity_id)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO fabric_block_types (name, sqm)
+            VALUES (?, ?)
             """,
-            (name, material, amount_kg, activity_id),
+            (name, sqm),
         )
         conn.commit()
         return {"id": cursor.lastrowid, "name": name}
@@ -216,7 +280,7 @@ def db_delete_process_type(type_id: int) -> dict:
 
 
 def db_create_garment_recipe(
-    garment_type_id: int, fabric_blocks: list, processes: list
+    garment_type_name: str, fabric_blocks: list, processes: list
 ) -> dict:
     """Create or update a garment recipe in the database."""
     if not fabric_blocks:
@@ -230,11 +294,13 @@ def db_create_garment_recipe(
 
     try:
         cursor.execute(
-            "SELECT id FROM garment_types WHERE id = ?",
-            (garment_type_id,),
+            "SELECT id FROM garment_types WHERE name = ?",
+            (garment_type_name,),
         )
-        if cursor.fetchone() is None:
+        garment_type_row = cursor.fetchone()
+        if garment_type_row is None:
             raise HTTPException(status_code=400, detail="Invalid garment type")
+        garment_type_id = garment_type_row[0]
 
         fabric_block_ids = [fb.type_id for fb in fabric_blocks]
         cursor.execute(
@@ -243,6 +309,14 @@ def db_create_garment_recipe(
         )
         if cursor.fetchone()[0] != len(set(fabric_block_ids)):
             raise HTTPException(status_code=400, detail="Invalid fabric block type")
+
+        material_ids = [fb.material_id for fb in fabric_blocks]
+        cursor.execute(
+            f"SELECT COUNT(*) FROM materials WHERE id IN ({','.join('?' * len(material_ids))})",
+            material_ids,
+        )
+        if cursor.fetchone()[0] != len(set(material_ids)):
+            raise HTTPException(status_code=400, detail="Invalid material type")
 
         if processes:
             process_ids = [proc.process_id for proc in processes]
@@ -278,10 +352,13 @@ def db_create_garment_recipe(
         cursor.executemany(
             """
             INSERT INTO garment_recipe_fabric_blocks
-            (garment_type, fabric_block_id, amount)
-            VALUES (?, ?, ?)
+            (garment_type, fabric_block_id, material_id, amount)
+            VALUES (?, ?, ?, ?)
             """,
-            [(garment_type_id, fb.type_id, int(fb.amount)) for fb in fabric_blocks],
+            [
+                (garment_type_id, fb.type_id, fb.material_id, int(fb.amount))
+                for fb in fabric_blocks
+            ],
         )
 
         if processes:
@@ -298,6 +375,7 @@ def db_create_garment_recipe(
         return {
             "message": "Garment recipe saved",
             "garment_type_id": garment_type_id,
+            "garment_type_name": garment_type_name,
         }
     finally:
         conn.close()
@@ -412,14 +490,16 @@ def db_delete_fabric_block(fabric_block_id: int) -> dict:
         conn.close()
 
 
-def get_fabric_block_recipe(fabric_block_name: str) -> FabricBlock | None:
+def get_fabric_block_recipe(
+    fabric_block_name: str, material_id: int | None = None
+) -> FabricBlock | None:
     """Get a fabric block recipe with all its processes."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     # Get fabric block type details
     cursor.execute(
-        "SELECT id, material, activity_id, amount_kg FROM fabric_block_types WHERE name = ?",
+        "SELECT id FROM fabric_block_types WHERE name = ?",
         (fabric_block_name,),
     )
     result = cursor.fetchone()
@@ -427,7 +507,23 @@ def get_fabric_block_recipe(fabric_block_name: str) -> FabricBlock | None:
         conn.close()
         return None
 
-    fabric_block_type_id, material, activity_id, amount_kg = result
+    fabric_block_type_id = result[0]
+
+    selected_material_name = "unknown"
+    selected_activity_id = 0
+    if material_id is not None:
+        cursor.execute(
+            "SELECT name, activity_id FROM materials WHERE id = ?",
+            (material_id,),
+        )
+        material_row = cursor.fetchone()
+    else:
+        cursor.execute("SELECT name, activity_id FROM materials ORDER BY id LIMIT 1")
+        material_row = cursor.fetchone()
+
+    if material_row:
+        selected_material_name = material_row[0]
+        selected_activity_id = material_row[1]
 
     # Get processes for this fabric block type
     cursor.execute(
@@ -450,11 +546,36 @@ def get_fabric_block_recipe(fabric_block_name: str) -> FabricBlock | None:
     return FabricBlock(
         id=fabric_block_type_id,
         name=fabric_block_name,
-        material=material,
-        amount_kg=amount_kg,
-        activity_id=activity_id,
+        material=selected_material_name,
+        activity_id=selected_activity_id,
         processes=processes,
     )
+
+
+def get_fabric_block_weight_kg(
+    fabric_block_name: str, material_name: str
+) -> float | None:
+    """Get computed block weight in kg for a fabric block and material pair."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT fbt.sqm, m.kg_per_sqm
+            FROM fabric_block_types fbt
+            JOIN materials m ON m.name = ?
+            WHERE fbt.name = ?
+            LIMIT 1
+            """,
+            (material_name, fabric_block_name),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+        sqm, kg_per_sqm = row
+        return sqm * kg_per_sqm
+    finally:
+        conn.close()
 
 
 def get_full_garment_recipe(garment_type_id: int) -> GarmentRecipe | None:
@@ -468,7 +589,7 @@ def get_full_garment_recipe(garment_type_id: int) -> GarmentRecipe | None:
 
     cursor.execute(
         """
-        SELECT ft.name, grfb.amount FROM garment_recipe_fabric_blocks grfb
+        SELECT ft.name, grfb.material_id, grfb.amount FROM garment_recipe_fabric_blocks grfb
         JOIN fabric_block_types ft ON grfb.fabric_block_id = ft.id
         WHERE grfb.garment_type = ?
     """,
@@ -479,9 +600,9 @@ def get_full_garment_recipe(garment_type_id: int) -> GarmentRecipe | None:
 
     fabric_blocks: list[FabricBlock] = []
     for fb in fabric_blocks_data:
-        fb_name, fb_amount = fb
+        fb_name, fb_material_id, fb_amount = fb
         # Get full fabric block details
-        fabric_block = get_fabric_block_recipe(fb_name)
+        fabric_block = get_fabric_block_recipe(fb_name, fb_material_id)
         if fabric_block:
             # Add the fabric block multiple times based on amount
             fabric_blocks.extend([fabric_block] * fb_amount)
@@ -571,17 +692,18 @@ def get_used_fabric_block(
 
 def get_fabric_block_type_for_emission(
     fabric_block_name: str,
-) -> tuple[int, int, float] | None:
+) -> tuple[int, int, float, float, str] | None:
     """Get fabric block type details for emission calculation.
 
-    Returns tuple of (fabric_block_type_id, activity_id, amount_kg) or None if not found.
+    Returns tuple of (fabric_block_type_id, activity_id, sqm, kg_per_sqm, material_name)
+    or None if not found.
     """
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     try:
         cursor.execute(
             """
-            SELECT id, activity_id, amount_kg
+            SELECT id, sqm
             FROM fabric_block_types
             WHERE name = ?
             LIMIT 1
@@ -589,7 +711,9 @@ def get_fabric_block_type_for_emission(
             (fabric_block_name,),
         )
         row = cursor.fetchone()
-        return row if row else None
+        if not row:
+            return None
+
     finally:
         conn.close()
 

@@ -7,7 +7,7 @@ from ceis_backend.models import (
     SecondLifeFabricBlock,
     Process,
 )
-from ceis_backend.wiser_bridge import get_emission_per_unit, get_wiser_token
+from ceis_backend.wiser_bridge import get_emission_per_unit
 from ceis_backend.data.location_details import (
     distances_to_manufacturer,
     activity_id_transport,
@@ -17,6 +17,7 @@ from ceis_backend.queries import (
     get_used_fabric_block,
     get_fabric_block_type_for_emission,
     get_fabric_block_processes_for_emission,
+    get_fabric_block_weight_kg,
 )
 
 
@@ -148,12 +149,24 @@ def process_fabric_block_emissions(
     Returns:
         Dictionary with fabric block emission details.
     """
+    block_weight_kg = get_fabric_block_weight_kg(
+        fabric_block_name, fabric_block_data.material
+    )
+    if block_weight_kg is None:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Failed to resolve fabric block weight for "
+                f"'{fabric_block_name}' and material '{fabric_block_data.material}'"
+            ),
+        )
+
     # Material emission
     material_emission_per_unit = get_emission_per_unit(
         wiser_token, fabric_block_data.activity_id
     )
     material_emission = (
-        material_emission_per_unit * fabric_block_data.amount_kg
+        material_emission_per_unit * block_weight_kg
         if material_emission_per_unit is not None
         else 0
     )
@@ -173,13 +186,13 @@ def process_fabric_block_emissions(
     if used_fabric_block:
         already_used_ids.append(used_fabric_block.id)
         used_fabric_block_alternative = calculate_used_fabric_block_alternative(
-            wiser_token, used_fabric_block, fabric_block_data.amount_kg
+            wiser_token, used_fabric_block, block_weight_kg
         )
 
     return {
         "fabric_block": fabric_block_name,
         "material": fabric_block_data.material,
-        "amount": fabric_block_data.amount_kg,
+        "amount_kg": block_weight_kg,
         "activity_id": fabric_block_data.activity_id,
         "emission": total_emission,
         "material_emission": material_emission,
@@ -189,7 +202,7 @@ def process_fabric_block_emissions(
     }
 
 
-def get_co2_for_garment(garment_type_id: int) -> GarmentCo2Response:
+def get_co2_for_garment(garment_type_id: int, wiser_token: str) -> GarmentCo2Response:
     """
     Calculate CO2 emissions for a garment, including fabric blocks and assembly processes.
 
@@ -202,7 +215,6 @@ def get_co2_for_garment(garment_type_id: int) -> GarmentCo2Response:
     Raises:
         HTTPException: If the garment recipe is not found.
     """
-    wiser_token = get_wiser_token()
 
     recipe = get_full_garment_recipe(garment_type_id)
     if recipe is None:
@@ -263,7 +275,14 @@ def calculate_replacement_fabric_blocks_emissions(
         if not fabric_block_data:
             continue
 
-        fabric_block_type_id, activity_id, weight_per_block = fabric_block_data
+        (
+            fabric_block_type_id,
+            activity_id,
+            sqm,
+            kg_per_sqm,
+            material_name,
+        ) = fabric_block_data
+        weight_per_block = sqm * kg_per_sqm
 
         # Get emission for material
         if activity_id in emission_cache:
@@ -322,6 +341,9 @@ def calculate_replacement_fabric_blocks_emissions(
         replacement_fabric_blocks["details"].append(
             {
                 "fabric_block": fabric_block_name,
+                "material": material_name,
+                "sqm": sqm,
+                "kg_per_sqm": kg_per_sqm,
                 "material_emission": material_emission,
                 "processes": process_emissions_list,
             }
