@@ -13,9 +13,9 @@ from ceis_backend.data.location_details import (
     activity_id_transport,
 )
 from ceis_backend.queries import (
+    get_fabric_block_recipe,
     get_full_garment_recipe,
     get_used_fabric_block,
-    get_fabric_block_type_for_emission,
     get_fabric_block_processes_for_emission,
     get_fabric_block_weight_kg,
 )
@@ -266,44 +266,34 @@ def calculate_replacement_fabric_blocks_emissions(
     """Calculate emissions for replacement fabric blocks for repair scenarios."""
     replacement_fabric_blocks = {"details": [], "total_emission": 0}
 
-    if not replacement_names:
-        return replacement_fabric_blocks
-
     for fabric_block_name in replacement_names:
         # Query fabric block type details
-        fabric_block_data = get_fabric_block_type_for_emission(fabric_block_name)
+        fabric_block_data = get_fabric_block_recipe(fabric_block_name)
         if not fabric_block_data:
             continue
 
-        (
-            fabric_block_type_id,
-            activity_id,
-            sqm,
-            kg_per_sqm,
-            material_name,
-        ) = fabric_block_data
-        weight_per_block = sqm * kg_per_sqm
-
         # Get emission for material
-        if activity_id in emission_cache:
-            material_emission_per_unit = emission_cache[activity_id]
+        if fabric_block_data.activity_id in emission_cache:
+            material_emission_per_unit = emission_cache[fabric_block_data.activity_id]
         else:
-            material_emission_per_unit = get_emission_per_unit(token, activity_id)
+            material_emission_per_unit = get_emission_per_unit(
+                token, fabric_block_data.activity_id
+            )
             if material_emission_per_unit is None:
                 raise HTTPException(
                     status_code=500,
-                    detail=f"Failed to fetch emission for activity {activity_id}",
+                    detail=f"Failed to fetch emission for activity {fabric_block_data.activity_id}",
                 )
-            emission_cache[activity_id] = material_emission_per_unit
+            emission_cache[fabric_block_data.activity_id] = material_emission_per_unit
 
         material_emission = (
-            material_emission_per_unit * weight_per_block
+            material_emission_per_unit * fabric_block_data.weight_kg
             if material_emission_per_unit is not None
             else 0
         )
 
         # Get processes for this fabric block
-        processes_data = get_fabric_block_processes_for_emission(fabric_block_type_id)
+        processes_data = get_fabric_block_processes_for_emission(fabric_block_data.id)
 
         process_emissions_list = []
         for process_name, process_amount, process_activity_id in processes_data:
@@ -341,9 +331,9 @@ def calculate_replacement_fabric_blocks_emissions(
         replacement_fabric_blocks["details"].append(
             {
                 "fabric_block": fabric_block_name,
-                "material": material_name,
-                "sqm": sqm,
-                "kg_per_sqm": kg_per_sqm,
+                "material": fabric_block_data.material,
+                "amount_kg": fabric_block_data.weight_kg,
+                "activity_id": fabric_block_data.activity_id,
                 "material_emission": material_emission,
                 "processes": process_emissions_list,
             }

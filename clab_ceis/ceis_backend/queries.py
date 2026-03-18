@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from ceis_backend.config import DB_PATH
 from ceis_backend.models import (
     FabricBlock,
+    FabricBlockType,
     SecondLifeFabricBlock,
     GarmentRecipe,
     Process,
@@ -499,7 +500,7 @@ def get_fabric_block_recipe(
 
     # Get fabric block type details
     cursor.execute(
-        "SELECT id FROM fabric_block_types WHERE name = ?",
+        "SELECT id, sqm FROM fabric_block_types WHERE name = ?",
         (fabric_block_name,),
     )
     result = cursor.fetchone()
@@ -508,22 +509,27 @@ def get_fabric_block_recipe(
         return None
 
     fabric_block_type_id = result[0]
+    fabric_block_sqm = result[1]
 
     selected_material_name = "unknown"
     selected_activity_id = 0
+    selected_kg_per_sqm = 0
     if material_id is not None:
         cursor.execute(
-            "SELECT name, activity_id FROM materials WHERE id = ?",
+            "SELECT name, kg_per_sqm, activity_id FROM materials WHERE id = ?",
             (material_id,),
         )
         material_row = cursor.fetchone()
     else:
-        cursor.execute("SELECT name, activity_id FROM materials ORDER BY id LIMIT 1")
+        cursor.execute(
+            "SELECT name, kg_per_sqm, activity_id FROM materials ORDER BY id LIMIT 1"
+        )
         material_row = cursor.fetchone()
 
     if material_row:
         selected_material_name = material_row[0]
-        selected_activity_id = material_row[1]
+        selected_kg_per_sqm = material_row[1]
+        selected_activity_id = material_row[2]
 
     # Get processes for this fabric block type
     cursor.execute(
@@ -547,6 +553,7 @@ def get_fabric_block_recipe(
         id=fabric_block_type_id,
         name=fabric_block_name,
         material=selected_material_name,
+        weight_kg=selected_kg_per_sqm * fabric_block_sqm,
         activity_id=selected_activity_id,
         processes=processes,
     )
@@ -692,11 +699,10 @@ def get_used_fabric_block(
 
 def get_fabric_block_type_for_emission(
     fabric_block_name: str,
-) -> tuple[int, int, float, float, str] | None:
+) -> FabricBlockType | None:
     """Get fabric block type details for emission calculation.
 
-    Returns tuple of (fabric_block_type_id, activity_id, sqm, kg_per_sqm, material_name)
-    or None if not found.
+    Returns FabricBlockType or None if not found.
     """
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -713,7 +719,8 @@ def get_fabric_block_type_for_emission(
         row = cursor.fetchone()
         if not row:
             return None
-
+        fb_type_id, fb_sqm = row
+        return FabricBlockType(id=fb_type_id, name=fabric_block_name, sqm=fb_sqm)
     finally:
         conn.close()
 

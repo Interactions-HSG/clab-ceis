@@ -17,8 +17,15 @@ class FabricBlock(BaseModel):
     id: int
     name: str
     material: str
+    weight_kg: float
     activity_id: int
     processes: list[Process]
+
+
+class FabricBlockType(BaseModel):
+    id: int
+    name: str
+    sqm: float
 
 
 class SecondLifeFabricBlock(BaseModel):

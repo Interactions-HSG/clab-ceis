@@ -211,7 +211,7 @@ def _get_transport_emission_per_unit(token: str) -> float | None:
 @app.get("/scenarios")
 def get_co2_scenarios():
     # Hardcoded values for crop top repair scenario
-    replacements = "40x14"
+    replacements = ["40x14"]
     recipe = get_full_garment_recipe(1)
     if not recipe:
         raise HTTPException(status_code=404, detail="Garment recipe not found")
@@ -234,15 +234,9 @@ def get_co2_scenarios():
     distance_bucharest = distances_customer_sigmaringen.get("Bucharest")
     distance_st_gallen = distances_customer_sigmaringen.get("St. Gallen")
 
-    replacement_names: list[str] = []
-    if replacements:
-        replacement_names = [
-            name.strip() for name in replacements.split(",") if name.strip()
-        ]
-
     emission_cache: dict[int, float | None] = {}
     replacement_fabric_blocks_data = calculate_replacement_fabric_blocks_emissions(
-        replacement_names, wiser_token, emission_cache
+        replacements, wiser_token, emission_cache
     )
 
     # def build_scenario_activities(
