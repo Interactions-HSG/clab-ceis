@@ -81,7 +81,7 @@ def db_get_materials_for_garment(garment_type_id: int) -> list[dict]:
         FROM garment_recipe_materials grm
         JOIN materials m ON m.id = grm.material_id
         WHERE grm.garment_type = ?
-        ORDER BY m.name
+        ORDER BY grm.id
         """,
         (garment_type_id,),
     )

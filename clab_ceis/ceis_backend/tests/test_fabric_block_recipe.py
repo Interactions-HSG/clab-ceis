@@ -595,7 +595,9 @@ class TestGetCo2TransportEmissions:
 
             return mock_response
 
-        with patch("ceis_backend.wiser_bridge.get_wiser_token", return_value="mock_token"):
+        with patch(
+            "ceis_backend.wiser_bridge.get_wiser_token", return_value="mock_token"
+        ):
             with patch(
                 "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
             ):
@@ -712,7 +714,9 @@ class TestGetCo2TransportEmissions:
             }
             return mock_response
 
-        with patch("ceis_backend.wiser_bridge.get_wiser_token", return_value="mock_token"):
+        with patch(
+            "ceis_backend.wiser_bridge.get_wiser_token", return_value="mock_token"
+        ):
             with patch(
                 "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
             ):
@@ -830,7 +834,9 @@ class TestGetCo2TransportEmissions:
             }
             return mock_response
 
-        with patch("ceis_backend.wiser_bridge.get_wiser_token", return_value="mock_token"):
+        with patch(
+            "ceis_backend.wiser_bridge.get_wiser_token", return_value="mock_token"
+        ):
             with patch(
                 "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
             ):
@@ -1007,7 +1013,9 @@ class TestGetCo2FabricBlockProductionEmissions:
 
             return mock_response
 
-        with patch("ceis_backend.wiser_bridge.get_wiser_token", return_value="mock_token"):
+        with patch(
+            "ceis_backend.wiser_bridge.get_wiser_token", return_value="mock_token"
+        ):
             with patch(
                 "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
             ):
@@ -1104,7 +1112,9 @@ class TestGetCo2FabricBlockProductionEmissions:
             }
             return mock_response
 
-        with patch("ceis_backend.wiser_bridge.get_wiser_token", return_value="mock_token"):
+        with patch(
+            "ceis_backend.wiser_bridge.get_wiser_token", return_value="mock_token"
+        ):
             with patch(
                 "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
             ):
@@ -1240,7 +1250,9 @@ class TestGetCo2FabricBlockProductionEmissions:
 
             return mock_response
 
-        with patch("ceis_backend.wiser_bridge.get_wiser_token", return_value="mock_token"):
+        with patch(
+            "ceis_backend.wiser_bridge.get_wiser_token", return_value="mock_token"
+        ):
             with patch(
                 "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
             ):

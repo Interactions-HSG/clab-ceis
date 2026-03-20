@@ -103,7 +103,7 @@ def register_co2_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
             # Build HTML for this garment type
             sections.extend(
                 [
-                    html.H3(garment_name),
+                    html.H3(f"{garment_name} (material={materials[0]['name']})"),
                     html.P(
                         [
                             f"Total CO2 Emissions for {garment_name}: ",

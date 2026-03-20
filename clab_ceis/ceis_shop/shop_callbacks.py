@@ -65,7 +65,7 @@ def get_callbacks(app):
 
         fig.update_layout(
             barmode="stack",
-            title="CO2 Comparison: Different Repairing Options vs Buying a New Crop Top",
+            title="CO2 Comparison: Different Repairing Options (replacement of the fabric block 64x40) vs Buying new 'Basic Trousers'",
             xaxis_title="Scenario",
             yaxis_title="CO2 (kg CO2eq)",
             # legend_title_text="Emissions",
