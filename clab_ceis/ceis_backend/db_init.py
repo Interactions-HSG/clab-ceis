@@ -76,34 +76,6 @@ def create_tables(cursor):
     """
     )
 
-    cursor.execute("PRAGMA table_info(garment_recipe_fabric_blocks)")
-    garment_recipe_fabric_blocks_columns = [row[1] for row in cursor.fetchall()]
-    if "material_id" in garment_recipe_fabric_blocks_columns:
-        cursor.executescript(
-            """
-            INSERT OR IGNORE INTO garment_recipe_materials (garment_type, material_id)
-            SELECT garment_type, material_id
-            FROM garment_recipe_fabric_blocks
-            WHERE material_id IS NOT NULL;
-
-            CREATE TABLE garment_recipe_fabric_blocks_new (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                garment_type INTEGER NOT NULL,
-                fabric_block_id INTEGER NOT NULL,
-                amount INTEGER,
-                FOREIGN KEY (garment_type) REFERENCES garment_types(id) ON DELETE CASCADE,
-                FOREIGN KEY (fabric_block_id) REFERENCES fabric_block_types(id) ON DELETE CASCADE
-            );
-
-            INSERT INTO garment_recipe_fabric_blocks_new (id, garment_type, fabric_block_id, amount)
-            SELECT id, garment_type, fabric_block_id, amount
-            FROM garment_recipe_fabric_blocks;
-
-            DROP TABLE garment_recipe_fabric_blocks;
-            ALTER TABLE garment_recipe_fabric_blocks_new RENAME TO garment_recipe_fabric_blocks;
-            """
-        )
-
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS garment_recipe_processes (
@@ -257,13 +229,35 @@ def seed_data(cursor):
         ('silk', 0.25, 20936);
 
         INSERT OR IGNORE INTO garment_types (name) VALUES
-        ('Crop Top'),
-        ('Shirt');
+        ('Basic Trousers'),
+        ('Full Trousers'),
+        ('Basic Jumpsuit short sleeves'),
+        ('Basic Jumpsuit long sleeves'),
+        ('Elegant cowl neck top'),
+        ('Elegant cowl neck dress'),
+        ('Wrap Skirt'),
+        ('Daily dress with pocket'),
+        ('Cocktail fitted dress'),
+        ('Long tabard'),
+        ('Cocoon jacket'),
+        ('Orka jacket'),
+        ('Nordlys Dress'),
+        ('Mangata Dress'),
+        ('Måne top'),
+        ('Sommar Skirt'),
+        ('Basic Unisex Shirt with pocket'),
+        ('Basic Crop Top');
 
         INSERT OR IGNORE INTO fabric_block_types (name, sqm) VALUES
         ('80x64', 0.512),
         ('40x14', 0.056),
-        ('64x40', 0.256);
+        ('64x40', 0.256),
+        ('100x64', 0.64),
+        ('100x80', 0.8),
+        ('140x14', 0.196),
+        ('140x28', 0.392),
+        ('160x100', 1.6),
+        ('4x48', 0.0192);
 
         INSERT OR IGNORE INTO process_types (name, unit, activity_id) VALUES
         ('sewing', 'kWh', 6566),
@@ -274,29 +268,157 @@ def seed_data(cursor):
         ('transport', 'tkm', 17901);
 
         INSERT OR IGNORE INTO garment_recipe_fabric_blocks (garment_type, fabric_block_id, amount) VALUES
-        ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM fabric_block_types WHERE name='80x64'), 1),
-        ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM fabric_block_types WHERE name='40x14'), 2),
-        ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM fabric_block_types WHERE name='80x64'), 1),
-        ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM fabric_block_types WHERE name='40x14'), 1),
-        ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM fabric_block_types WHERE name='64x40'), 4);
+        -- Basic Trousers
+        ((SELECT id FROM garment_types WHERE name='Basic Trousers'), (SELECT id FROM fabric_block_types WHERE name='100x64'), 2),
+        ((SELECT id FROM garment_types WHERE name='Basic Trousers'), (SELECT id FROM fabric_block_types WHERE name='64x40'), 2),
+        -- Full Trousers
+        ((SELECT id FROM garment_types WHERE name='Full Trousers'), (SELECT id FROM fabric_block_types WHERE name='100x64'), 2),
+        ((SELECT id FROM garment_types WHERE name='Full Trousers'), (SELECT id FROM fabric_block_types WHERE name='64x40'), 4),
+        -- Basic Jumpsuit short sleeves
+        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit short sleeves'), (SELECT id FROM fabric_block_types WHERE name='80x64'), 1),
+        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit short sleeves'), (SELECT id FROM fabric_block_types WHERE name='100x64'), 2),
+        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit short sleeves'), (SELECT id FROM fabric_block_types WHERE name='140x14'), 1),
+        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit short sleeves'), (SELECT id FROM fabric_block_types WHERE name='40x14'), 4),
+        -- Basic Jumpsuit long sleeves
+        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit long sleeves'), (SELECT id FROM fabric_block_types WHERE name='80x64'), 1),
+        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit long sleeves'), (SELECT id FROM fabric_block_types WHERE name='100x64'), 2),
+        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit long sleeves'), (SELECT id FROM fabric_block_types WHERE name='140x14'), 1),
+        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit long sleeves'), (SELECT id FROM fabric_block_types WHERE name='40x14'), 4),
+        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit long sleeves'), (SELECT id FROM fabric_block_types WHERE name='64x40'), 2),
+        -- Elegant cowl neck top
+        ((SELECT id FROM garment_types WHERE name='Elegant cowl neck top'), (SELECT id FROM fabric_block_types WHERE name='64x40'), 2),
+        ((SELECT id FROM garment_types WHERE name='Elegant cowl neck top'), (SELECT id FROM fabric_block_types WHERE name='4x48'), 2),
+        -- Elegant cowl neck dress
+        ((SELECT id FROM garment_types WHERE name='Elegant cowl neck dress'), (SELECT id FROM fabric_block_types WHERE name='64x40'), 4),
+        ((SELECT id FROM garment_types WHERE name='Elegant cowl neck dress'), (SELECT id FROM fabric_block_types WHERE name='4x48'), 2),
+        -- Wrap Skirt
+        ((SELECT id FROM garment_types WHERE name='Wrap Skirt'), (SELECT id FROM fabric_block_types WHERE name='100x80'), 1),
+        ((SELECT id FROM garment_types WHERE name='Wrap Skirt'), (SELECT id FROM fabric_block_types WHERE name='40x14'), 2),
+        ((SELECT id FROM garment_types WHERE name='Wrap Skirt'), (SELECT id FROM fabric_block_types WHERE name='140x14'), 1),
+        -- Daily dress with pocket
+        ((SELECT id FROM garment_types WHERE name='Daily dress with pocket'), (SELECT id FROM fabric_block_types WHERE name='140x28'), 4),
+        ((SELECT id FROM garment_types WHERE name='Daily dress with pocket'), (SELECT id FROM fabric_block_types WHERE name='140x14'), 2),
+        ((SELECT id FROM garment_types WHERE name='Daily dress with pocket'), (SELECT id FROM fabric_block_types WHERE name='40x14'), 2),
+        -- Cocktail fitted dress
+        ((SELECT id FROM garment_types WHERE name='Cocktail fitted dress'), (SELECT id FROM fabric_block_types WHERE name='100x80'), 2),
+        ((SELECT id FROM garment_types WHERE name='Cocktail fitted dress'), (SELECT id FROM fabric_block_types WHERE name='140x28'), 4),
+        -- Long tabard
+        ((SELECT id FROM garment_types WHERE name='Long tabard'), (SELECT id FROM fabric_block_types WHERE name='140x28'), 4),
+        ((SELECT id FROM garment_types WHERE name='Long tabard'), (SELECT id FROM fabric_block_types WHERE name='40x14'), 1),
+        -- Cocoon jacket
+        ((SELECT id FROM garment_types WHERE name='Cocoon jacket'), (SELECT id FROM fabric_block_types WHERE name='100x80'), 3),
+        ((SELECT id FROM garment_types WHERE name='Cocoon jacket'), (SELECT id FROM fabric_block_types WHERE name='40x14'), 6),
+        -- Orka jacket
+        ((SELECT id FROM garment_types WHERE name='Orka jacket'), (SELECT id FROM fabric_block_types WHERE name='100x80'), 1),
+        -- Nordlys Dress
+        ((SELECT id FROM garment_types WHERE name='Nordlys Dress'), (SELECT id FROM fabric_block_types WHERE name='160x100'), 1),
+        ((SELECT id FROM garment_types WHERE name='Nordlys Dress'), (SELECT id FROM fabric_block_types WHERE name='100x80'), 1),
+        -- Mangata Dress
+        ((SELECT id FROM garment_types WHERE name='Mangata Dress'), (SELECT id FROM fabric_block_types WHERE name='160x100'), 1),
+        ((SELECT id FROM garment_types WHERE name='Mangata Dress'), (SELECT id FROM fabric_block_types WHERE name='100x80'), 1),
+        ((SELECT id FROM garment_types WHERE name='Mangata Dress'), (SELECT id FROM fabric_block_types WHERE name='4x48'), 1),
+        -- Måne top
+        ((SELECT id FROM garment_types WHERE name='Måne top'), (SELECT id FROM fabric_block_types WHERE name='100x80'), 1),
+        ((SELECT id FROM garment_types WHERE name='Måne top'), (SELECT id FROM fabric_block_types WHERE name='4x48'), 2),
+        -- Sommar Skirt
+        ((SELECT id FROM garment_types WHERE name='Sommar Skirt'), (SELECT id FROM fabric_block_types WHERE name='160x100'), 1),
+        -- Basic Unisex Shirt with pocket
+        ((SELECT id FROM garment_types WHERE name='Basic Unisex Shirt with pocket'), (SELECT id FROM fabric_block_types WHERE name='80x64'), 1),
+        ((SELECT id FROM garment_types WHERE name='Basic Unisex Shirt with pocket'), (SELECT id FROM fabric_block_types WHERE name='64x40'), 4),
+        ((SELECT id FROM garment_types WHERE name='Basic Unisex Shirt with pocket'), (SELECT id FROM fabric_block_types WHERE name='40x14'), 3),
+        -- Basic Crop Top
+        ((SELECT id FROM garment_types WHERE name='Basic Crop Top'), (SELECT id FROM fabric_block_types WHERE name='80x64'), 1),
+        ((SELECT id FROM garment_types WHERE name='Basic Crop Top'), (SELECT id FROM fabric_block_types WHERE name='40x14'), 3);
 
         INSERT OR IGNORE INTO garment_recipe_materials (garment_type, material_id) VALUES
-        ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM materials WHERE name='hemp')),
-        ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM materials WHERE name='hemp'));
-
+        -- Basic Trousers (Hemp, Cotton)
+        ((SELECT id FROM garment_types WHERE name='Basic Trousers'), (SELECT id FROM materials WHERE name='hemp')),
+        ((SELECT id FROM garment_types WHERE name='Basic Trousers'), (SELECT id FROM materials WHERE name='cotton')),
+        -- Full Trousers (Hemp, Cotton)
+        ((SELECT id FROM garment_types WHERE name='Full Trousers'), (SELECT id FROM materials WHERE name='hemp')),
+        ((SELECT id FROM garment_types WHERE name='Full Trousers'), (SELECT id FROM materials WHERE name='cotton')),
+        -- Basic Jumpsuit short sleeves (Hemp, Cotton)
+        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit short sleeves'), (SELECT id FROM materials WHERE name='hemp')),
+        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit short sleeves'), (SELECT id FROM materials WHERE name='cotton')),
+        -- Basic Jumpsuit long sleeves (Hemp, Cotton)
+        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit long sleeves'), (SELECT id FROM materials WHERE name='hemp')),
+        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit long sleeves'), (SELECT id FROM materials WHERE name='cotton')),
+        -- Elegant cowl neck top (Hemp, Silk)
+        ((SELECT id FROM garment_types WHERE name='Elegant cowl neck top'), (SELECT id FROM materials WHERE name='hemp')),
+        ((SELECT id FROM garment_types WHERE name='Elegant cowl neck top'), (SELECT id FROM materials WHERE name='silk')),
+        -- Elegant cowl neck dress (Hemp, Silk)
+        ((SELECT id FROM garment_types WHERE name='Elegant cowl neck dress'), (SELECT id FROM materials WHERE name='hemp')),
+        ((SELECT id FROM garment_types WHERE name='Elegant cowl neck dress'), (SELECT id FROM materials WHERE name='silk')),
+        -- Wrap Skirt (Hemp)
+        ((SELECT id FROM garment_types WHERE name='Wrap Skirt'), (SELECT id FROM materials WHERE name='hemp')),
+        -- Daily dress with pocket (Hemp, Cotton)
+        ((SELECT id FROM garment_types WHERE name='Daily dress with pocket'), (SELECT id FROM materials WHERE name='hemp')),
+        ((SELECT id FROM garment_types WHERE name='Daily dress with pocket'), (SELECT id FROM materials WHERE name='cotton')),
+        -- Cocktail fitted dress (Silk)
+        ((SELECT id FROM garment_types WHERE name='Cocktail fitted dress'), (SELECT id FROM materials WHERE name='silk')),
+        -- Long tabard (Hemp)
+        ((SELECT id FROM garment_types WHERE name='Long tabard'), (SELECT id FROM materials WHERE name='hemp')),
+        -- Cocoon jacket (Hemp)
+        ((SELECT id FROM garment_types WHERE name='Cocoon jacket'), (SELECT id FROM materials WHERE name='hemp')),
+        -- Orka jacket (Cotton)
+        ((SELECT id FROM garment_types WHERE name='Orka jacket'), (SELECT id FROM materials WHERE name='cotton')),
+        -- Nordlys Dress (Cotton)
+        ((SELECT id FROM garment_types WHERE name='Nordlys Dress'), (SELECT id FROM materials WHERE name='cotton')),
+        -- Mangata Dress (Cotton)
+        ((SELECT id FROM garment_types WHERE name='Mangata Dress'), (SELECT id FROM materials WHERE name='cotton'));
+       
         INSERT OR IGNORE INTO garment_recipe_processes (garment_type, process_id, amount) VALUES
-        ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
-        ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
-        ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM process_types WHERE name='steaming'), 0.22);
+        ((SELECT id FROM garment_types WHERE name='Basic Trousers'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
+        ((SELECT id FROM garment_types WHERE name='Basic Trousers'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
+        ((SELECT id FROM garment_types WHERE name='Full Trousers'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
+        ((SELECT id FROM garment_types WHERE name='Full Trousers'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
+        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit short sleeves'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
+        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit short sleeves'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
+        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit long sleeves'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
+        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit long sleeves'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
+        ((SELECT id FROM garment_types WHERE name='Elegant cowl neck top'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
+        ((SELECT id FROM garment_types WHERE name='Elegant cowl neck top'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
+        ((SELECT id FROM garment_types WHERE name='Elegant cowl neck dress'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
+        ((SELECT id FROM garment_types WHERE name='Elegant cowl neck dress'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
+        ((SELECT id FROM garment_types WHERE name='Wrap Skirt'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
+        ((SELECT id FROM garment_types WHERE name='Wrap Skirt'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
+        ((SELECT id FROM garment_types WHERE name='Daily dress with pocket'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
+        ((SELECT id FROM garment_types WHERE name='Daily dress with pocket'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
+        ((SELECT id FROM garment_types WHERE name='Cocktail fitted dress'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
+        ((SELECT id FROM garment_types WHERE name='Cocktail fitted dress'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
+        ((SELECT id FROM garment_types WHERE name='Long tabard'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
+        ((SELECT id FROM garment_types WHERE name='Long tabard'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
+        ((SELECT id FROM garment_types WHERE name='Cocoon jacket'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
+        ((SELECT id FROM garment_types WHERE name='Cocoon jacket'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
+        ((SELECT id FROM garment_types WHERE name='Orka jacket'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
+        ((SELECT id FROM garment_types WHERE name='Orka jacket'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
+        ((SELECT id FROM garment_types WHERE name='Nordlys Dress'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
+        ((SELECT id FROM garment_types WHERE name='Nordlys Dress'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
+        ((SELECT id FROM garment_types WHERE name='Mangata Dress'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
+        ((SELECT id FROM garment_types WHERE name='Mangata Dress'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
+        ((SELECT id FROM garment_types WHERE name='Måne top'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
+        ((SELECT id FROM garment_types WHERE name='Måne top'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
+        ((SELECT id FROM garment_types WHERE name='Sommar Skirt'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
+        ((SELECT id FROM garment_types WHERE name='Sommar Skirt'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
+        ((SELECT id FROM garment_types WHERE name='Basic Unisex Shirt with pocket'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
+        ((SELECT id FROM garment_types WHERE name='Basic Unisex Shirt with pocket'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
+        ((SELECT id FROM garment_types WHERE name='Basic Crop Top'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
+        ((SELECT id FROM garment_types WHERE name='Basic Crop Top'), (SELECT id FROM process_types WHERE name='steaming'), 0.22);
 
         INSERT OR IGNORE INTO fabric_block_recipe_processes (fabric_block_type, process_id, amount) VALUES
         -- transport to Cristina is calculated: Distance from Istanbul to Roermond to Bucharest: 4570 km / 1000 (because transport emission is per tkm) * weight of the fabric block (kg). This calculation might need to be automated.
-        ((SELECT id FROM fabric_block_types WHERE name='80x64'), (SELECT id FROM process_types WHERE name='transport'), 0.49),
+        -- ((SELECT id FROM fabric_block_types WHERE name='80x64'), (SELECT id FROM process_types WHERE name='transport'), 0.49),
         ((SELECT id FROM fabric_block_types WHERE name='80x64'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
-        ((SELECT id FROM fabric_block_types WHERE name='40x14'), (SELECT id FROM process_types WHERE name='transport'), 0.054),
+        -- ((SELECT id FROM fabric_block_types WHERE name='40x14'), (SELECT id FROM process_types WHERE name='transport'), 0.054),
         ((SELECT id FROM fabric_block_types WHERE name='40x14'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
-        ((SELECT id FROM fabric_block_types WHERE name='64x40'), (SELECT id FROM process_types WHERE name='transport'), 0.246),
-        ((SELECT id FROM fabric_block_types WHERE name='64x40'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01);
+        -- ((SELECT id FROM fabric_block_types WHERE name='64x40'), (SELECT id FROM process_types WHERE name='transport'), 0.246),
+        ((SELECT id FROM fabric_block_types WHERE name='64x40'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
+        ((SELECT id FROM fabric_block_types WHERE name='100x64'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
+        ((SELECT id FROM fabric_block_types WHERE name='100x80'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
+        ((SELECT id FROM fabric_block_types WHERE name='140x14'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
+        ((SELECT id FROM fabric_block_types WHERE name='140x28'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
+        ((SELECT id FROM fabric_block_types WHERE name='160x100'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
+        ((SELECT id FROM fabric_block_types WHERE name='4x48'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01);
     """
     )
     cursor.execute("UPDATE seed_meta SET seeded = 1 WHERE id = 1;")

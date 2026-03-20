@@ -217,7 +217,7 @@ def _get_transport_emission_per_unit(token: str) -> float | None:
 @app.get("/scenarios")
 def get_co2_scenarios():
     # Hardcoded values for crop top repair scenario
-    replacements = ["40x14"]
+    replacements = ["64x40"]
     # use hemp as the material for now
     materials = get_materials()
     hemp_material = next((m for m in materials if m["name"].lower() == "hemp"), None)
@@ -252,18 +252,18 @@ def get_co2_scenarios():
         replacements, wiser_token, emission_cache, selected_material_id
     )
 
-    # def build_scenario_activities(
-    #     transport_distance: float | None,
-    #     amount_kg: float,
-    #     per_unit_emission: float | None,
-    #     replacement_fabric_blocks_data: dict,
-    # ) -> list[dict]:
+    # Calculate total weight of replacement fabric blocks
+    replacement_blocks_weight_kg = sum(
+        detail.get("amount_kg", 0)
+        for detail in replacement_fabric_blocks_data.get("details", [])
+    )
+
     scenarios = [
         {
             "label": "Self repair (materials shipped)",
             "activities": build_scenario_activities(
                 distance_bucharest,
-                amount_kg,
+                replacement_blocks_weight_kg,
                 per_unit_emission,
                 replacement_fabric_blocks_data,
             ),
