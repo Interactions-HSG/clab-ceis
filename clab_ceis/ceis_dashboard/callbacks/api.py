@@ -40,9 +40,36 @@ def fetch_garment_types():
         return []
 
 
-def get_co2(garment_type_id: int) -> GarmentCo2Response | None:
+def fetch_materials() -> list[dict]:
     try:
-        resp = requests.get(f"{config.BACKEND_API_URL}/co2/{garment_type_id}")
+        resp = requests.get(f"{config.BACKEND_API_URL}/materials")
+        if resp.status_code != 200:
+            return []
+        return resp.json()
+    except Exception:
+        return []
+
+
+def fetch_materials_for_garment(garment_type_id: int) -> list[dict]:
+    try:
+        resp = requests.get(
+            f"{config.BACKEND_API_URL}/garment-types/{garment_type_id}/materials"
+        )
+        if resp.status_code != 200:
+            return []
+        return resp.json()
+    except Exception:
+        return []
+
+
+def get_co2(
+    garment_type_id: int, material_id: int
+) -> GarmentCo2Response | None:
+    try:
+        resp = requests.get(
+            f"{config.BACKEND_API_URL}/co2/{garment_type_id}",
+            params={"material_id": material_id},
+        )
         if resp.status_code != 200:
             return None
 

@@ -17,7 +17,6 @@ from ceis_backend.queries import (
     get_full_garment_recipe,
     get_used_fabric_block,
     get_fabric_block_processes_for_emission,
-    get_fabric_block_weight_kg,
 )
 
 
@@ -149,9 +148,7 @@ def process_fabric_block_emissions(
     Returns:
         Dictionary with fabric block emission details.
     """
-    block_weight_kg = get_fabric_block_weight_kg(
-        fabric_block_name, fabric_block_data.material
-    )
+    block_weight_kg = fabric_block_data.weight_kg
     if block_weight_kg is None:
         raise HTTPException(
             status_code=500,
@@ -202,7 +199,9 @@ def process_fabric_block_emissions(
     }
 
 
-def get_co2_for_garment(garment_type_id: int, wiser_token: str) -> GarmentCo2Response:
+def get_co2_for_garment(
+    garment_type_id: int, wiser_token: str, material_id: int
+) -> GarmentCo2Response:
     """
     Calculate CO2 emissions for a garment, including fabric blocks and assembly processes.
 
@@ -216,7 +215,7 @@ def get_co2_for_garment(garment_type_id: int, wiser_token: str) -> GarmentCo2Res
         HTTPException: If the garment recipe is not found.
     """
 
-    recipe = get_full_garment_recipe(garment_type_id)
+    recipe = get_full_garment_recipe(garment_type_id, material_id)
     if recipe is None:
         raise HTTPException(
             status_code=404,
@@ -261,14 +260,17 @@ def get_co2_for_garment(garment_type_id: int, wiser_token: str) -> GarmentCo2Res
 
 
 def calculate_replacement_fabric_blocks_emissions(
-    replacement_names: list[str], token: str, emission_cache: dict[int, float | None]
+    replacement_names: list[str],
+    token: str,
+    emission_cache: dict[int, float | None],
+    material_id: int,
 ) -> dict:
     """Calculate emissions for replacement fabric blocks for repair scenarios."""
     replacement_fabric_blocks = {"details": [], "total_emission": 0}
 
     for fabric_block_name in replacement_names:
         # Query fabric block type details
-        fabric_block_data = get_fabric_block_recipe(fabric_block_name)
+        fabric_block_data = get_fabric_block_recipe(fabric_block_name, material_id)
         if not fabric_block_data:
             continue
 
