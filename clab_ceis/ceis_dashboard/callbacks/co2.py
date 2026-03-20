@@ -2,7 +2,11 @@ from __future__ import annotations
 from dash import Dash, Input, Output, html
 
 import ceis_data
-from ceis_dashboard.callbacks.api import get_co2, fetch_garment_types
+from ceis_dashboard.callbacks.api import (
+    get_co2,
+    fetch_garment_types,
+    fetch_materials_for_garment,
+)
 
 
 def register_co2_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
@@ -20,9 +24,23 @@ def register_co2_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
         for garment_type in garment_types:
             garment_name = garment_type["name"]
             garment_id = garment_type["id"]
+            materials = fetch_materials_for_garment(garment_id)
+
+            if not materials:
+                sections.extend(
+                    [
+                        html.H3(garment_name),
+                        html.P(
+                            f"No materials configured for the recipe of {garment_name}."
+                        ),
+                    ]
+                )
+                continue
+
+            material_id = materials[0]["id"]
 
             # Get CO2 data for this garment type
-            co2_data = get_co2(garment_id)
+            co2_data = get_co2(garment_id, material_id)
 
             if not co2_data:
                 sections.extend(

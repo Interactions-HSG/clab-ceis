@@ -20,6 +20,7 @@ from ceis_backend.queries import (
     db_get_garment_types,
     db_get_locations,
     db_get_materials,
+    db_get_materials_for_garment,
     db_upsert_material,
     db_delete_garment_recipe,
     db_create_fabric_block_type,
@@ -33,7 +34,6 @@ from ceis_backend.queries import (
     db_get_fabric_blocks,
     db_delete_fabric_block,
     get_full_garment_recipe,
-    get_fabric_block_weight_kg,
 )
 from ceis_backend.data.location_details import (
     distances_customer_sigmaringen,
@@ -83,6 +83,11 @@ def get_locations():
 @app.get("/materials")
 def get_materials():
     return db_get_materials()
+
+
+@app.get("/garment-types/{garment_type_id}/materials")
+def get_materials_for_garment(garment_type_id: int):
+    return db_get_materials_for_garment(garment_type_id)
 
 
 @app.post("/materials")
@@ -177,6 +182,7 @@ def create_garment_recipe(payload: GarmentRecipeCreate):
     return db_create_garment_recipe(
         payload.garment_type_name,
         payload.fabric_blocks,
+        payload.materials or [],
         payload.processes or [],
     )
 
@@ -212,12 +218,19 @@ def _get_transport_emission_per_unit(token: str) -> float | None:
 def get_co2_scenarios():
     # Hardcoded values for crop top repair scenario
     replacements = ["40x14"]
-    recipe = get_full_garment_recipe(1)
+    # use hemp as the material for now
+    materials = get_materials()
+    hemp_material = next((m for m in materials if m["name"].lower() == "hemp"), None)
+    if not hemp_material:
+        raise HTTPException(status_code=500, detail="Hemp material not found")
+    selected_material_id = hemp_material["id"]
+
+    recipe = get_full_garment_recipe(1, selected_material_id)
     if not recipe:
         raise HTTPException(status_code=404, detail="Garment recipe not found")
     amount_kg = 0.0
     for block in recipe.fabric_blocks:
-        block_weight_kg = get_fabric_block_weight_kg(block.name, block.material)
+        block_weight_kg = block.weight_kg
         if block_weight_kg is None:
             raise HTTPException(
                 status_code=500,
@@ -236,7 +249,7 @@ def get_co2_scenarios():
 
     emission_cache: dict[int, float | None] = {}
     replacement_fabric_blocks_data = calculate_replacement_fabric_blocks_emissions(
-        replacements, wiser_token, emission_cache
+        replacements, wiser_token, emission_cache, selected_material_id
     )
 
     # def build_scenario_activities(
@@ -284,7 +297,7 @@ def get_co2_scenarios():
     ]
 
     # Add "Buy New" scenario using garment type 1
-    buy_new_co2_data = get_co2_for_garment(1, wiser_token)
+    buy_new_co2_data = get_co2_for_garment(1, wiser_token, selected_material_id)
     buy_new_activity_map: dict[str, float] = {}
 
     # Add transport to customer
@@ -344,9 +357,9 @@ def get_co2_scenarios():
 
 
 @app.get("/co2/{garment_type_id}")
-def get_co2_for_garment_endpoint(garment_type_id: int):
+def get_co2_for_garment_endpoint(garment_type_id: int, material_id: int):
     wiser_token = get_wiser_token()
-    co2_data = get_co2_for_garment(garment_type_id, wiser_token)
+    co2_data = get_co2_for_garment(garment_type_id, wiser_token, material_id)
     return co2_data
 
 

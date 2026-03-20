@@ -443,6 +443,7 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
             return "Please enter a garment type name."
 
         fabric_blocks = []
+        material_ids = set()
         for fb_id, material_id, amount in zip(
             fabric_block_ids, fabric_material_ids, fabric_block_amounts
         ):
@@ -450,6 +451,7 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
                 continue
             if material_id is None:
                 return "Please select a material for each fabric block."
+            material_ids.add(material_id)
             try:
                 fb_amount = int(amount) if amount is not None else 1
             except (TypeError, ValueError):
@@ -459,7 +461,6 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
             fabric_blocks.append(
                 {
                     "type_id": fb_id,
-                    "material_id": material_id,
                     "amount": fb_amount,
                 }
             )
@@ -508,6 +509,10 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
             payload = {
                 "garment_type_name": garment_type_name,
                 "fabric_blocks": fabric_blocks,
+                "materials": [
+                    {"material_id": material_id}
+                    for material_id in sorted(material_ids)
+                ],
                 "processes": processes,
             }
 

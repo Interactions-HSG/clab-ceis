@@ -81,8 +81,11 @@ class MaterialCreate(BaseModel):
 
 class GarmentRecipeFabricBlockCreate(BaseModel):
     type_id: int
-    material_id: int
     amount: int
+
+
+class GarmentRecipeMaterialCreate(BaseModel):
+    material_id: int
 
 
 class GarmentRecipeProcessCreate(BaseModel):
@@ -93,6 +96,7 @@ class GarmentRecipeProcessCreate(BaseModel):
 class GarmentRecipeCreate(BaseModel):
     garment_type_name: str
     fabric_blocks: list[GarmentRecipeFabricBlockCreate]
+    materials: Optional[list[GarmentRecipeMaterialCreate]] = None
     processes: Optional[list[GarmentRecipeProcessCreate]] = None
 
 

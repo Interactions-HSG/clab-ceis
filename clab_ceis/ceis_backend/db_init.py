@@ -56,14 +56,53 @@ def create_tables(cursor):
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             garment_type INTEGER NOT NULL,
             fabric_block_id INTEGER NOT NULL,
-            material_id INTEGER,
             amount INTEGER,
             FOREIGN KEY (garment_type) REFERENCES garment_types(id) ON DELETE CASCADE,
-            FOREIGN KEY (fabric_block_id) REFERENCES fabric_block_types(id) ON DELETE CASCADE,
-            FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE SET NULL
+            FOREIGN KEY (fabric_block_id) REFERENCES fabric_block_types(id) ON DELETE CASCADE
         )
     """
     )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS garment_recipe_materials (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            garment_type INTEGER NOT NULL,
+            material_id INTEGER NOT NULL,
+            FOREIGN KEY (garment_type) REFERENCES garment_types(id) ON DELETE CASCADE,
+            FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE,
+            UNIQUE(garment_type, material_id)
+        )
+    """
+    )
+
+    cursor.execute("PRAGMA table_info(garment_recipe_fabric_blocks)")
+    garment_recipe_fabric_blocks_columns = [row[1] for row in cursor.fetchall()]
+    if "material_id" in garment_recipe_fabric_blocks_columns:
+        cursor.executescript(
+            """
+            INSERT OR IGNORE INTO garment_recipe_materials (garment_type, material_id)
+            SELECT garment_type, material_id
+            FROM garment_recipe_fabric_blocks
+            WHERE material_id IS NOT NULL;
+
+            CREATE TABLE garment_recipe_fabric_blocks_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                garment_type INTEGER NOT NULL,
+                fabric_block_id INTEGER NOT NULL,
+                amount INTEGER,
+                FOREIGN KEY (garment_type) REFERENCES garment_types(id) ON DELETE CASCADE,
+                FOREIGN KEY (fabric_block_id) REFERENCES fabric_block_types(id) ON DELETE CASCADE
+            );
+
+            INSERT INTO garment_recipe_fabric_blocks_new (id, garment_type, fabric_block_id, amount)
+            SELECT id, garment_type, fabric_block_id, amount
+            FROM garment_recipe_fabric_blocks;
+
+            DROP TABLE garment_recipe_fabric_blocks;
+            ALTER TABLE garment_recipe_fabric_blocks_new RENAME TO garment_recipe_fabric_blocks;
+            """
+        )
 
     cursor.execute(
         """
@@ -213,7 +252,9 @@ def seed_data(cursor):
         ('Ravensburg');
 
         INSERT OR IGNORE INTO materials (name, kg_per_sqm, activity_id) VALUES
-        ('hemp', 0.21, 276186);
+        ('hemp', 0.21, 276186),
+        ('cotton', 0.16, 6756),
+        ('silk', 0.25, 20936);
 
         INSERT OR IGNORE INTO garment_types (name) VALUES
         ('Crop Top'),
@@ -232,12 +273,16 @@ def seed_data(cursor):
         -- Transport of fabric to Cristina. Assumes lorry, >32 metric ton, diesel, EURO 5
         ('transport', 'tkm', 17901);
 
-        INSERT OR IGNORE INTO garment_recipe_fabric_blocks (garment_type, fabric_block_id, material_id, amount) VALUES
-        ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM fabric_block_types WHERE name='80x64'), (SELECT id FROM materials WHERE name='hemp'), 1),
-        ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM fabric_block_types WHERE name='40x14'), (SELECT id FROM materials WHERE name='hemp'), 2),
-        ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM fabric_block_types WHERE name='80x64'), (SELECT id FROM materials WHERE name='hemp'), 1),
-        ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM fabric_block_types WHERE name='40x14'), (SELECT id FROM materials WHERE name='hemp'), 1),
-        ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM fabric_block_types WHERE name='64x40'), (SELECT id FROM materials WHERE name='hemp'), 4);
+        INSERT OR IGNORE INTO garment_recipe_fabric_blocks (garment_type, fabric_block_id, amount) VALUES
+        ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM fabric_block_types WHERE name='80x64'), 1),
+        ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM fabric_block_types WHERE name='40x14'), 2),
+        ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM fabric_block_types WHERE name='80x64'), 1),
+        ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM fabric_block_types WHERE name='40x14'), 1),
+        ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM fabric_block_types WHERE name='64x40'), 4);
+
+        INSERT OR IGNORE INTO garment_recipe_materials (garment_type, material_id) VALUES
+        ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM materials WHERE name='hemp')),
+        ((SELECT id FROM garment_types WHERE name='Shirt'), (SELECT id FROM materials WHERE name='hemp'));
 
         INSERT OR IGNORE INTO garment_recipe_processes (garment_type, process_id, amount) VALUES
         ((SELECT id FROM garment_types WHERE name='Crop Top'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
