@@ -3,6 +3,7 @@ from pathlib import Path
 from dash import Dash, dcc, html
 from dash.dependencies import Input, Output
 
+from ceis_shop.layouts.garment import garment_page
 from ceis_shop.layouts.home import home_page
 from ceis_shop.layouts.skirt import skirt_page
 from ceis_shop.layouts.top import top_page
@@ -32,6 +33,12 @@ get_callbacks(app)
 # Page routing callback
 @app.callback(Output("page-content", "children"), [Input("url", "pathname")])
 def display_page(pathname):
+    if pathname and pathname.startswith("/garment/"):
+        try:
+            garment_type_id = int(pathname.split("/garment/")[1])
+            return garment_page(garment_type_id)
+        except (ValueError, IndexError):
+            return html.Div("Invalid garment page.")
     if pathname == "/skirt":
         return skirt_page()
     elif pathname == "/top":
