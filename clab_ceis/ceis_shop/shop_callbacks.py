@@ -7,6 +7,10 @@ from dash import dcc, html
 from dash.dependencies import Input, Output
 
 from ceis_shop import config
+from ceis_shop.layouts.garment import (
+    render_co2_content,
+    render_waiting_for_material_co2_content,
+)
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "ceis_dashboard"))
 
@@ -75,3 +79,42 @@ def get_callbacks(app):
         return html.Div(
             dcc.Graph(figure=fig),
         )
+
+    @app.callback(
+        Output("garment-co2-content", "children"),
+        Input("garment-material-dropdown", "value"),
+        Input("garment-type-id-store", "data"),
+        Input("garment-materials-store", "data"),
+    )
+    def update_garment_recipe_and_co2(material_id, garment_type_id, materials):
+        if not garment_type_id or not materials:
+            return html.Div("Material and garment information is unavailable.")
+
+        if not material_id:
+            return render_waiting_for_material_co2_content()
+
+        selected_material = next(
+            (material for material in materials if material.get("id") == material_id),
+            None,
+        )
+        selected_material_name = (
+            selected_material.get("name") if selected_material else "Unknown"
+        )
+
+        try:
+            response = requests.get(
+                f"{config.BACKEND_API_URL}/co2/{garment_type_id}?material_id={material_id}",
+                timeout=30,
+            )
+            response.raise_for_status()
+            co2_payload = response.json()
+        except Exception as exc:
+            return html.Div(
+                [
+                    html.H3("CO2 Emissions"),
+                    html.P("Unable to calculate CO2 for selected material."),
+                    html.P(str(exc)),
+                ]
+            )
+
+        return render_co2_content(selected_material_name, co2_payload)

@@ -225,8 +225,9 @@ def seed_data(cursor):
 
         INSERT OR IGNORE INTO materials (name, kg_per_sqm, activity_id) VALUES
         ('hemp', 0.21, 276186),
-        ('cotton', 0.16, 6756),
-        ('silk', 0.25, 20936);
+        ('cotton', 0.14, 6756),
+        ('silk', 0.082, 20936),
+        ('mikado silk', 0.13, 20936);
 
         INSERT OR IGNORE INTO garment_types (name) VALUES
         ('Basic Trousers'),
@@ -251,6 +252,7 @@ def seed_data(cursor):
         INSERT OR IGNORE INTO fabric_block_types (name, sqm) VALUES
         ('80x64', 0.512),
         ('40x14', 0.056),
+        ('20x15', 0.03),
         ('64x40', 0.256),
         ('100x64', 0.64),
         ('100x80', 0.8),
@@ -271,9 +273,11 @@ def seed_data(cursor):
         -- Basic Trousers
         ((SELECT id FROM garment_types WHERE name='Basic Trousers'), (SELECT id FROM fabric_block_types WHERE name='100x64'), 2),
         ((SELECT id FROM garment_types WHERE name='Basic Trousers'), (SELECT id FROM fabric_block_types WHERE name='64x40'), 2),
+        ((SELECT id FROM garment_types WHERE name='Basic Trousers'), (SELECT id FROM fabric_block_types WHERE name='20x15'), 4),
         -- Full Trousers
         ((SELECT id FROM garment_types WHERE name='Full Trousers'), (SELECT id FROM fabric_block_types WHERE name='100x64'), 2),
         ((SELECT id FROM garment_types WHERE name='Full Trousers'), (SELECT id FROM fabric_block_types WHERE name='64x40'), 4),
+        ((SELECT id FROM garment_types WHERE name='Full Trousers'), (SELECT id FROM fabric_block_types WHERE name='20x15'), 4),
         -- Basic Jumpsuit short sleeves
         ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit short sleeves'), (SELECT id FROM fabric_block_types WHERE name='80x64'), 1),
         ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit short sleeves'), (SELECT id FROM fabric_block_types WHERE name='100x64'), 2),
@@ -343,11 +347,9 @@ def seed_data(cursor):
         -- Basic Jumpsuit long sleeves (Hemp, Cotton)
         ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit long sleeves'), (SELECT id FROM materials WHERE name='hemp')),
         ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit long sleeves'), (SELECT id FROM materials WHERE name='cotton')),
-        -- Elegant cowl neck top (Hemp, Silk)
-        ((SELECT id FROM garment_types WHERE name='Elegant cowl neck top'), (SELECT id FROM materials WHERE name='hemp')),
+        -- Elegant cowl neck top (Silk)
         ((SELECT id FROM garment_types WHERE name='Elegant cowl neck top'), (SELECT id FROM materials WHERE name='silk')),
-        -- Elegant cowl neck dress (Hemp, Silk)
-        ((SELECT id FROM garment_types WHERE name='Elegant cowl neck dress'), (SELECT id FROM materials WHERE name='hemp')),
+        -- Elegant cowl neck dress (Silk)
         ((SELECT id FROM garment_types WHERE name='Elegant cowl neck dress'), (SELECT id FROM materials WHERE name='silk')),
         -- Wrap Skirt (Hemp)
         ((SELECT id FROM garment_types WHERE name='Wrap Skirt'), (SELECT id FROM materials WHERE name='hemp')),
@@ -411,6 +413,7 @@ def seed_data(cursor):
         ((SELECT id FROM fabric_block_types WHERE name='80x64'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
         -- ((SELECT id FROM fabric_block_types WHERE name='40x14'), (SELECT id FROM process_types WHERE name='transport'), 0.054),
         ((SELECT id FROM fabric_block_types WHERE name='40x14'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
+        ((SELECT id FROM fabric_block_types WHERE name='20x15'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
         -- ((SELECT id FROM fabric_block_types WHERE name='64x40'), (SELECT id FROM process_types WHERE name='transport'), 0.246),
         ((SELECT id FROM fabric_block_types WHERE name='64x40'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
         ((SELECT id FROM fabric_block_types WHERE name='100x64'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),

@@ -1,7 +1,39 @@
+import requests
 from dash import html, dcc
+
+from ceis_shop import config
+
+
+def _fetch_garment_types() -> list[dict]:
+    response = requests.get(f"{config.BACKEND_API_URL}/garment-types", timeout=30)
+    response.raise_for_status()
+    garments = response.json()
+    return sorted(garments, key=lambda g: g.get("name", ""))
 
 
 def home_page():
+    try:
+        garment_types = _fetch_garment_types()
+        product_links = [
+            dcc.Link(
+                href=f"/garment/{garment['id']}",
+                children=html.Div(
+                    className="product",
+                    children=[
+                        html.Div(garment["name"], className="product-label"),
+                    ],
+                ),
+            )
+            for garment in garment_types
+        ]
+    except Exception:
+        product_links = [
+            html.Div(
+                "Unable to load garments from backend.",
+                className="product-label",
+            )
+        ]
+
     return html.Div(
         className="wrapper",
         children=[
@@ -17,35 +49,8 @@ def home_page():
                     html.H2("Select the Type of Clothing You Want to Order"),
                     html.Div(
                         className="order-form",
-                        children=[
-                            dcc.Link(
-                                href="/skirt",
-                                children=html.Div(
-                                    className="product",
-                                    children=[
-                                        html.Img(
-                                            src="/assets/skirt.jpg",
-                                            alt="Skirt",
-                                            className="product-image",
-                                        ),
-                                    ],
-                                ),
-                            ),
-                            dcc.Link(
-                                href="/top",
-                                children=html.Div(
-                                    className="product",
-                                    children=[
-                                        html.Img(
-                                            src="/assets/top.jpg",
-                                            alt="Top",
-                                            className="product-image",
-                                        ),
-                                    ],
-                                ),
-                            ),
-                        ],
-                        style={"display": "flex", "gap": "20px"},
+                        children=product_links,
+                        style={"display": "flex", "gap": "20px", "flex-wrap": "wrap"},
                     ),
                 ],
             ),
