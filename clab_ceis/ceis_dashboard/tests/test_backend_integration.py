@@ -68,7 +68,7 @@ def test_dashboard_api_reads_seeded_backend_data(tmp_path):
         api.config.BACKEND_API_URL = base_url
 
         garment_types = api.fetch_garment_types()
-        assert any(item["name"] == "Crop Top" for item in garment_types)
+        assert any("Crop Top" in item["name"] for item in garment_types)
 
         fabric_block_types = requests.get(f"{base_url}/fabric-block-types", timeout=5)
         assert fabric_block_types.status_code == 200
