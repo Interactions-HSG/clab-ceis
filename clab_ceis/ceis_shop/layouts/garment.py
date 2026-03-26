@@ -51,6 +51,15 @@ def render_recipe_content(co2_payload: dict) -> html.Div:
     )
 
 
+def render_waiting_for_material_recipe_content() -> html.Div:
+    return html.Div(
+        [
+            html.H3("Recipe"),
+            html.P("Select a material to view recipe details."),
+        ]
+    )
+
+
 def render_co2_content(selected_material_name: str, co2_payload: dict) -> html.Div:
 
     fabric_blocks_total = co2_payload.get("fabric_blocks", {}).get("total_emission", 0)
@@ -112,12 +121,7 @@ def garment_page(garment_type_id: int):
             {"label": material["name"], "value": material["id"]}
             for material in materials
         ]
-        # Recipe does not depend on selected material, so render it once from any valid material.
-        recipe_seed_material = materials[0]
-        recipe_payload = _fetch_json(
-            f"/co2/{garment_type_id}?material_id={recipe_seed_material['id']}"
-        )
-        recipe_content = render_recipe_content(recipe_payload)
+        recipe_content = render_waiting_for_material_recipe_content()
         initial_co2_content = render_waiting_for_material_co2_content()
 
         return html.Div(
