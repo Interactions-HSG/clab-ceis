@@ -1,7 +1,7 @@
 from dash import dcc, html
 
 
-def end_of_life_page():
+def scenarios_page():
     return html.Div(
         className="wrapper",
         children=[
