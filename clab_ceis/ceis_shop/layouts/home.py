@@ -57,15 +57,10 @@ def home_page():
             html.Div(
                 className="card",
                 children=[
-                    html.H2("End of Life Options"),
-                    html.P(
-                        "Manufacturer: Bucharest, Repair Center: St. Gallen, Consumer: Sigmaringen."
-                    ),
-                    dcc.Loading(
-                        id="customer-repair-loading",
-                        type="circle",
-                        children=html.Div(id="customer-repair-content"),
-                        color="green",
+                    dcc.Link(
+                        "View End of Life Options",
+                        href="/scenarios",
+                        className="back-link",
                     ),
                 ],
             ),
