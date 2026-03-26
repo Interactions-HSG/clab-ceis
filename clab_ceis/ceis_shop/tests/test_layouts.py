@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import Mock, patch
 
-from ceis_shop.layouts.end_of_life import end_of_life_page
+from ceis_shop.layouts.scenarios import scenarios_page
 from ceis_shop.layouts.garment import garment_page
 from ceis_shop.layouts.home import home_page
 
@@ -26,8 +26,8 @@ def test_home_page_contains_expected_links():
     assert "/scenarios" in text
 
 
-def test_end_of_life_page_contains_scenarios_section():
-    layout = end_of_life_page()
+def test_scenarios_page_contains_scenarios_section():
+    layout = scenarios_page()
     text = str(layout)
 
     assert "End of Life Options" in text
