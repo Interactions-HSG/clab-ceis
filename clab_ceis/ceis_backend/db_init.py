@@ -367,7 +367,9 @@ def seed_data(cursor):
         -- Nordlys Dress (Cotton)
         ((SELECT id FROM garment_types WHERE name='Nordlys Dress'), (SELECT id FROM materials WHERE name='cotton')),
         -- Mangata Dress (Cotton)
-        ((SELECT id FROM garment_types WHERE name='Mangata Dress'), (SELECT id FROM materials WHERE name='cotton'));
+        ((SELECT id FROM garment_types WHERE name='Mangata Dress'), (SELECT id FROM materials WHERE name='cotton')),
+        -- Basic Crop Top (Hemp)
+        ((SELECT id FROM garment_types WHERE name='Basic Crop Top'), (SELECT id FROM materials WHERE name='hemp'));
        
         INSERT OR IGNORE INTO garment_recipe_processes (garment_type, process_id, amount) VALUES
         ((SELECT id FROM garment_types WHERE name='Basic Trousers'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),

@@ -1,8 +1,9 @@
 import sqlite3
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 
+import ceis_backend.db_init as db_init
 from ceis_backend.db_init import init_sqlite_db, create_tables
 from ceis_backend.utils import get_co2_for_garment
 from ceis_backend.queries import get_fabric_block_recipe
@@ -38,6 +39,14 @@ def clean_db(tmp_path, monkeypatch):
     conn.close()
 
     yield str(db_path)
+
+
+def _build_mock_wiser_client(
+    emissions_by_activity: dict[int, float | None],
+) -> MagicMock:
+    wiser_client = MagicMock()
+    wiser_client.get_emission_per_unit.side_effect = emissions_by_activity.get
+    return wiser_client
 
 
 class TestFabricBlockRecipeProcessesTableCreation:
@@ -86,6 +95,43 @@ class TestFabricBlockRecipeProcessesTableCreation:
         conn.close()
 
         assert count > 0
+
+    def test_backfill_adds_basic_crop_top_hemp_to_seeded_db(self, clean_db):
+        """Verify startup backfills the Basic Crop Top hemp association."""
+        conn = sqlite3.connect("ceis_backend.db")
+        cursor = conn.cursor()
+        cursor.executescript(
+            """
+            INSERT INTO materials (name, kg_per_sqm, activity_id)
+            VALUES ('hemp', 0.21, 276186);
+
+            INSERT INTO garment_types (name)
+            VALUES ('Basic Crop Top');
+
+            UPDATE seed_meta SET seeded = 1 WHERE id = 1;
+            """
+        )
+        conn.commit()
+        conn.close()
+
+        db_init.init_sqlite_db()
+
+        conn = sqlite3.connect("ceis_backend.db")
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT COUNT(*)
+            FROM garment_recipe_materials grm
+            JOIN garment_types gt ON gt.id = grm.garment_type
+            JOIN materials m ON m.id = grm.material_id
+            WHERE gt.name = ? AND m.name = ?
+            """,
+            ("Basic Crop Top", "hemp"),
+        )
+        count = cursor.fetchone()[0]
+        conn.close()
+
+        assert count == 1
 
 
 class TestGetRecipeForFabricBlock:
@@ -626,39 +672,10 @@ class TestGetCo2TransportEmissions:
         """Verify transport_emission is calculated based on location distance and API response."""
         test_data = setup_transport_test_db
 
-        def mock_get_response(*args, **kwargs):
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.raise_for_status = MagicMock()
-
-            url = args[0] if args else kwargs.get("url", "")
-
-            if "8001" in url:  # Material activity
-                mock_response.json.return_value = {
-                    "lcia_results": [
-                        {"method": {"name": "IPCC 2021"}, "emissions": 5.0}
-                    ]
-                }
-            elif "7309" in url:  # Transport activity (activity_id_transport)
-                mock_response.json.return_value = {
-                    "lcia_results": [
-                        {"method": {"name": "IPCC 2021"}, "emissions": 0.1}
-                    ]
-                }
-            else:
-                mock_response.json.return_value = {"lcia_results": []}
-
-            return mock_response
-
-        with patch(
-            "ceis_backend.wiser_bridge.get_wiser_token", return_value="mock_token"
-        ):
-            with patch(
-                "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
-            ):
-                result = get_co2_for_garment(
-                    test_data["garment_id"], "mock_token", test_data["material_id"]
-                )
+        wiser_client = _build_mock_wiser_client({8001: 5.0, 7309: 0.1})
+        result = get_co2_for_garment(
+            test_data["garment_id"], wiser_client, test_data["material_id"]
+        )
 
         # Check transport emission is calculated
         # St. Gallen distance = 10 km, amount_kg = 2.0
@@ -760,23 +777,9 @@ class TestGetCo2TransportEmissions:
         conn.commit()
         conn.close()
 
-        def mock_get_response(*args, **kwargs):
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.raise_for_status = MagicMock()
-            mock_response.json.return_value = {
-                "lcia_results": [{"method": {"name": "IPCC 2021"}, "emissions": 5.0}]
-            }
-            return mock_response
-
-        with patch(
-            "ceis_backend.wiser_bridge.get_wiser_token", return_value="mock_token"
-        ):
-            with patch(
-                "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
-            ):
-                assert garment_id is not None
-                result = get_co2_for_garment(int(garment_id), "mock_token", material_id)
+        wiser_client = _build_mock_wiser_client({9001: 5.0})
+        assert garment_id is not None
+        result = get_co2_for_garment(int(garment_id), wiser_client, material_id)
 
         fb_details = result.fabric_blocks.details[0]
         alternative = fb_details.get("alternative", {})
@@ -880,22 +883,8 @@ class TestGetCo2TransportEmissions:
         conn.commit()
         conn.close()
 
-        def mock_get_response(*args, **kwargs):
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.raise_for_status = MagicMock()
-            mock_response.json.return_value = {
-                "lcia_results": [{"method": {"name": "IPCC 2021"}, "emissions": 5.0}]
-            }
-            return mock_response
-
-        with patch(
-            "ceis_backend.wiser_bridge.get_wiser_token", return_value="mock_token"
-        ):
-            with patch(
-                "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
-            ):
-                result = get_co2_for_garment(garment_id, "mock_token", material_id)
+        wiser_client = _build_mock_wiser_client({9002: 5.0})
+        result = get_co2_for_garment(garment_id, wiser_client, material_id)
 
         fb_details = result.fabric_blocks.details[0]
         alternative = fb_details.get("alternative", {})
@@ -1044,39 +1033,10 @@ class TestGetCo2FabricBlockProductionEmissions:
         test_data = setup_co2_test_db
 
         # Mock external API responses
-        def mock_get_response(*args, **kwargs):
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.raise_for_status = MagicMock()
-
-            url = args[0] if args else kwargs.get("url", "")
-
-            if "1001" in url:  # Material activity
-                mock_response.json.return_value = {
-                    "lcia_results": [
-                        {"method": {"name": "IPCC 2021"}, "emissions": 5.0}
-                    ]
-                }
-            elif "2001" in url:  # Resource activity
-                mock_response.json.return_value = {
-                    "lcia_results": [
-                        {"method": {"name": "IPCC 2021"}, "emissions": 0.5}
-                    ]
-                }
-            else:
-                mock_response.json.return_value = {"lcia_results": []}
-
-            return mock_response
-
-        with patch(
-            "ceis_backend.wiser_bridge.get_wiser_token", return_value="mock_token"
-        ):
-            with patch(
-                "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
-            ):
-                result = get_co2_for_garment(
-                    test_data["garment_id"], "mock_token", test_data["material_id"]
-                )
+        wiser_client = _build_mock_wiser_client({1001: 5.0, 2001: 0.5})
+        result = get_co2_for_garment(
+            test_data["garment_id"], wiser_client, test_data["material_id"]
+        )
 
         # Verify fabric blocks emissions are calculated
         assert result.fabric_blocks.total_emission > 0
@@ -1158,22 +1118,8 @@ class TestGetCo2FabricBlockProductionEmissions:
         conn.commit()
         conn.close()
 
-        def mock_get_response(*args, **kwargs):
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.raise_for_status = MagicMock()
-            mock_response.json.return_value = {
-                "lcia_results": [{"method": {"name": "IPCC 2021"}, "emissions": 10.0}]
-            }
-            return mock_response
-
-        with patch(
-            "ceis_backend.wiser_bridge.get_wiser_token", return_value="mock_token"
-        ):
-            with patch(
-                "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
-            ):
-                result = get_co2_for_garment(garment_id, "mock_token", material_id)
+        wiser_client = _build_mock_wiser_client({3001: 10.0})
+        result = get_co2_for_garment(garment_id, wiser_client, material_id)
 
         # Verify production emissions is 0
         fb_details = result.fabric_blocks.details[0]
@@ -1275,43 +1221,8 @@ class TestGetCo2FabricBlockProductionEmissions:
         conn.commit()
         conn.close()
 
-        def mock_get_response(*args, **kwargs):
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.raise_for_status = MagicMock()
-
-            url = args[0] if args else kwargs.get("url", "")
-
-            if "4001" in url:  # Material
-                mock_response.json.return_value = {
-                    "lcia_results": [
-                        {"method": {"name": "IPCC 2021"}, "emissions": 1.0}
-                    ]
-                }
-            elif "5001" in url:  # Dyeing process
-                mock_response.json.return_value = {
-                    "lcia_results": [
-                        {"method": {"name": "IPCC 2021"}, "emissions": 0.4}
-                    ]
-                }
-            elif "5002" in url:  # Finishing process
-                mock_response.json.return_value = {
-                    "lcia_results": [
-                        {"method": {"name": "IPCC 2021"}, "emissions": 0.1}
-                    ]
-                }
-            else:
-                mock_response.json.return_value = {"lcia_results": []}
-
-            return mock_response
-
-        with patch(
-            "ceis_backend.wiser_bridge.get_wiser_token", return_value="mock_token"
-        ):
-            with patch(
-                "ceis_backend.wiser_bridge.requests.get", side_effect=mock_get_response
-            ):
-                result = get_co2_for_garment(garment_id, "mock_token", material_id)
+        wiser_client = _build_mock_wiser_client({4001: 1.0, 5001: 0.4, 5002: 0.1})
+        result = get_co2_for_garment(garment_id, wiser_client, material_id)
 
         # Calculate expected production emissions:
         # process 1 (dyeing): 0.4 * 2.0 = 0.8

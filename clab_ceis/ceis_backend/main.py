@@ -1,20 +1,18 @@
-import requests
 from contextlib import asynccontextmanager
 from typing import Optional
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 
 from ceis_backend.db_init import init_sqlite_db
 from ceis_backend.config import BACKEND_HOST, BACKEND_PORT
 from ceis_backend.utils import (
     get_co2_for_garment,
-    get_emission_per_unit,
     calculate_transport_emission,
     build_scenario_activities,
     calculate_replacement_fabric_blocks_emissions,
 )
-from ceis_backend.wiser_bridge import get_wiser_token
+from ceis_backend.wiser_bridge import WiserClient, WiserClientError
 from ceis_backend.queries import (
     db_create_garment_type,
     db_get_garment_types,
@@ -54,10 +52,19 @@ from ceis_backend.models import (
 async def lifespan(app: FastAPI):
     """Handle startup and shutdown events."""
     init_sqlite_db()
+    app.state.wiser_client = WiserClient()
     yield
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+def get_wiser_client(request: Request) -> WiserClient:
+    return request.app.state.wiser_client
+
+
+def _raise_wiser_http_exception(error: WiserClientError) -> None:
+    raise HTTPException(status_code=502, detail=str(error)) from error
 
 
 @app.get("/")
@@ -113,38 +120,21 @@ def create_process_type(payload: ProcessTypeCreate):
 
 
 @app.post("/activity-search")
-def activity_search(payload: ActivitySearchRequest):
+def activity_search(
+    payload: ActivitySearchRequest,
+    wiser_client: WiserClient = Depends(get_wiser_client),
+):
     if not payload.query:
         raise HTTPException(status_code=400, detail="Query is required")
 
-    token = get_wiser_token()
-    if isinstance(token, dict):
-        raise HTTPException(status_code=500, detail="Failed to fetch Wiser token")
+    search_results: list[dict] = []
+    try:
+        search_results = wiser_client.search_activities(payload.query)
+    except WiserClientError as error:
+        _raise_wiser_http_exception(error)
 
-    url = "https://api.wiser.ehealth.hevs.ch/ecoinvent/3.12-cutoff/activity/search/"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-    }
-    response = requests.post(url, headers=headers, json={"query": payload.query})
-    if response.status_code != 200:
-        print("Activity search failed")
-        print("Request url:", url)
-        print("Query:", payload.query)
-        print("Status:", response.status_code)
-        print("Response headers:", dict(response.headers))
-        try:
-            print("Response body:", response.json())
-        except Exception:
-            print("Response body (text):", response.text)
-        raise HTTPException(
-            status_code=response.status_code,
-            detail="Activity search failed",
-        )
-
-    data = response.json()
     results = []
-    for item in data.get("search_results", []):
+    for item in search_results:
         location = item.get("location", {}) or {}
         results.append(
             {
@@ -208,16 +198,15 @@ def delete_fabric_block(fabric_block_id: int):
     return db_delete_fabric_block(fabric_block_id)
 
 
-def _get_transport_emission_per_unit(token: str) -> float | None:
-    if not token or isinstance(token, dict):
-        return None
-
-    return get_emission_per_unit(token, activity_id_transport)
+def _get_transport_emission_per_unit(wiser_client: WiserClient) -> float | None:
+    return wiser_client.get_emission_per_unit(activity_id_transport)
 
 
 @app.get("/scenarios")
-def get_co2_scenarios():
-    # Hardcoded values for crop top repair scenario
+def get_co2_scenarios(
+    wiser_client: WiserClient = Depends(get_wiser_client),
+):
+    garment_type_id = 18  # Basic Crop Top
     replacements = ["64x40"]
     # use hemp as the material for now
     materials = get_materials()
@@ -226,7 +215,7 @@ def get_co2_scenarios():
         raise HTTPException(status_code=500, detail="Hemp material not found")
     selected_material_id = hemp_material["id"]
 
-    recipe = get_full_garment_recipe(1, selected_material_id)
+    recipe = get_full_garment_recipe(garment_type_id, selected_material_id)
     if not recipe:
         raise HTTPException(status_code=404, detail="Garment recipe not found")
     amount_kg = 0.0
@@ -242,126 +231,135 @@ def get_co2_scenarios():
             )
         amount_kg += block_weight_kg
 
-    wiser_token = get_wiser_token()
-    per_unit_emission = _get_transport_emission_per_unit(wiser_token)
+    try:
+        per_unit_emission = _get_transport_emission_per_unit(wiser_client)
 
-    distance_bucharest = distances_customer_sigmaringen.get("Bucharest")
-    distance_st_gallen = distances_customer_sigmaringen.get("St. Gallen")
+        distance_bucharest = distances_customer_sigmaringen.get("Bucharest")
+        distance_st_gallen = distances_customer_sigmaringen.get("St. Gallen")
 
-    emission_cache: dict[int, float | None] = {}
-    replacement_fabric_blocks_data = calculate_replacement_fabric_blocks_emissions(
-        replacements, wiser_token, emission_cache, selected_material_id
-    )
-
-    # Calculate total weight of replacement fabric blocks
-    replacement_blocks_weight_kg = sum(
-        detail.get("amount_kg", 0)
-        for detail in replacement_fabric_blocks_data.get("details", [])
-    )
-
-    scenarios = [
-        {
-            "label": "Self repair (materials shipped)",
-            "activities": build_scenario_activities(
-                distance_bucharest,
-                replacement_blocks_weight_kg,
-                per_unit_emission,
-                replacement_fabric_blocks_data,
-            ),
-        },
-        {
-            "label": "Repair at shop",
-            "activities": build_scenario_activities(
-                (
-                    float(distance_st_gallen * 2)
-                    if distance_st_gallen is not None
-                    else None
-                ),
-                amount_kg,
-                per_unit_emission,
-                replacement_fabric_blocks_data,
-            ),
-        },
-        {
-            "label": "Send to manufacturer",
-            "activities": build_scenario_activities(
-                (
-                    float(distance_bucharest * 2)
-                    if distance_bucharest is not None
-                    else None
-                ),
-                amount_kg,
-                per_unit_emission,
-                replacement_fabric_blocks_data,
-            ),
-        },
-    ]
-
-    # Add "Buy New" scenario using garment type 1
-    buy_new_co2_data = get_co2_for_garment(1, wiser_token, selected_material_id)
-    buy_new_activity_map: dict[str, float] = {}
-
-    # Add transport to customer
-    if distance_bucharest is not None:
-        transport_to_customer_emission = calculate_transport_emission(
-            distance_bucharest, amount_kg, per_unit_emission
+        emission_cache: dict[int, float | None] = {}
+        replacement_fabric_blocks_data = calculate_replacement_fabric_blocks_emissions(
+            replacements, wiser_client, emission_cache, selected_material_id
         )
-        if transport_to_customer_emission is not None:
-            buy_new_activity_map["Transport To Customer"] = (
-                transport_to_customer_emission
-            )
 
-    # Aggregate fabric block activities by process name
-    for detail in buy_new_co2_data.fabric_blocks.details:
-        # Add material emission under the fabric block name
-        material_emission = detail.get("material_emission", 0)
-        if material_emission > 0:
-            buy_new_activity_map["Garment Material"] = (
-                buy_new_activity_map.get("Garment Material", 0) + material_emission
-            )
+        # Calculate total weight of replacement fabric blocks
+        replacement_blocks_weight_kg = sum(
+            detail.get("amount_kg", 0)
+            for detail in replacement_fabric_blocks_data.get("details", [])
+        )
 
-        # Aggregate production processes by process name
-        for process in detail.get("production_processes", []):
-            process_name = f"Garment {process.get('process', 'Unknown Process')}"
-            process_emission = process.get("emission", 0)
+        scenarios = [
+            {
+                "label": "Self repair (materials shipped)",
+                "activities": build_scenario_activities(
+                    distance_bucharest,
+                    replacement_blocks_weight_kg,
+                    per_unit_emission,
+                    replacement_fabric_blocks_data,
+                ),
+            },
+            {
+                "label": "Repair at shop",
+                "activities": build_scenario_activities(
+                    (
+                        float(distance_st_gallen * 2)
+                        if distance_st_gallen is not None
+                        else None
+                    ),
+                    amount_kg,
+                    per_unit_emission,
+                    replacement_fabric_blocks_data,
+                ),
+            },
+            {
+                "label": "Send to manufacturer",
+                "activities": build_scenario_activities(
+                    (
+                        float(distance_bucharest * 2)
+                        if distance_bucharest is not None
+                        else None
+                    ),
+                    amount_kg,
+                    per_unit_emission,
+                    replacement_fabric_blocks_data,
+                ),
+            },
+        ]
+
+        # Add "Buy New" scenario for the same garment.
+        buy_new_co2_data = get_co2_for_garment(
+            garment_type_id, wiser_client, selected_material_id
+        )
+        buy_new_activity_map: dict[str, float] = {}
+
+        # Add transport to customer
+        if distance_bucharest is not None:
+            transport_to_customer_emission = calculate_transport_emission(
+                distance_bucharest, amount_kg, per_unit_emission
+            )
+            if transport_to_customer_emission is not None:
+                buy_new_activity_map["Transport To Customer"] = (
+                    transport_to_customer_emission
+                )
+
+        # Aggregate fabric block activities by process name
+        for detail in buy_new_co2_data.fabric_blocks.details:
+            # Add material emission under the fabric block name
+            material_emission = detail.get("material_emission", 0)
+            if material_emission > 0:
+                buy_new_activity_map["Garment Material"] = (
+                    buy_new_activity_map.get("Garment Material", 0) + material_emission
+                )
+
+            # Aggregate production processes by process name
+            for process in detail.get("production_processes", []):
+                process_name = f"Garment {process.get('process', 'Unknown Process')}"
+                process_emission = process.get("emission", 0)
+                buy_new_activity_map[process_name] = (
+                    buy_new_activity_map.get(process_name, 0) + process_emission
+                )
+
+        # Aggregate assembly process activities by process name
+        for detail in buy_new_co2_data.processes.details:
+            process_name = f"Garment {detail.get('process', 'Unknown Process')}"
+            process_emission = detail.get("emission", 0)
             buy_new_activity_map[process_name] = (
                 buy_new_activity_map.get(process_name, 0) + process_emission
             )
 
-    # Aggregate assembly process activities by process name
-    for detail in buy_new_co2_data.processes.details:
-        process_name = f"Garment {detail.get('process', 'Unknown Process')}"
-        process_emission = detail.get("emission", 0)
-        buy_new_activity_map[process_name] = (
-            buy_new_activity_map.get(process_name, 0) + process_emission
+        buy_new_activities = [
+            {
+                "name": name,
+                "costs": {
+                    "economic": 0,
+                    "co2_kg": emission,
+                },
+            }
+            for name, emission in sorted(buy_new_activity_map.items())
+        ]
+
+        scenarios.append(
+            {
+                "label": "Buy New",
+                "activities": buy_new_activities,
+            }
         )
 
-    buy_new_activities = [
-        {
-            "name": name,
-            "costs": {
-                "economic": 0,
-                "co2_kg": emission,
-            },
-        }
-        for name, emission in sorted(buy_new_activity_map.items())
-    ]
-
-    scenarios.append(
-        {
-            "label": "Buy New",
-            "activities": buy_new_activities,
-        }
-    )
-
-    return scenarios
+        return scenarios
+    except WiserClientError as error:
+        _raise_wiser_http_exception(error)
 
 
 @app.get("/co2/{garment_type_id}")
-def get_co2_for_garment_endpoint(garment_type_id: int, material_id: int):
-    wiser_token = get_wiser_token()
-    co2_data = get_co2_for_garment(garment_type_id, wiser_token, material_id)
-    return co2_data
+def get_co2_for_garment_endpoint(
+    garment_type_id: int,
+    material_id: int,
+    wiser_client: WiserClient = Depends(get_wiser_client),
+):
+    try:
+        return get_co2_for_garment(garment_type_id, wiser_client, material_id)
+    except WiserClientError as error:
+        _raise_wiser_http_exception(error)
 
 
 def main():
