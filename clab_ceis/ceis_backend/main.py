@@ -116,7 +116,6 @@ def activity_search(payload: ActivitySearchRequest):
         raise HTTPException(status_code=400, detail="Query is required")
 
     token = get_wiser_token()
-    print("token:", token)
     if isinstance(token, dict):
         raise HTTPException(status_code=500, detail="Failed to fetch Wiser token")
 

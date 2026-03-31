@@ -5,6 +5,7 @@ from dash.dependencies import Input, Output
 from pages.recipe import get_recipe_layout
 from pages.flow import get_dashboard_layout
 from pages.home import get_index_layout
+from pages.co2 import get_co2_layout
 import ceis_data
 import ceis_callbacks
 import config
@@ -71,6 +72,12 @@ class CeisMonitor:
                 return self._dashboard_layout
             elif pathname == "/add-recipe":
                 return self._add_recipe_layout
+            elif pathname and pathname.startswith("/co2/"):
+                try:
+                    garment_type_id = int(pathname.split("/co2/")[1])
+                    return get_co2_layout(garment_type_id)
+                except (ValueError, IndexError):
+                    return html.Div("Invalid CO2 garment page.")
             # default / or unknown paths -> index
             return self._index_layout
 
