@@ -62,9 +62,15 @@ class GarmentTypeCreate(BaseModel):
     name: str
 
 
+class FabricBlockTypeProcessCreate(BaseModel):
+    process_id: int
+    amount: float
+
+
 class FabricBlockTypeCreate(BaseModel):
     name: str
     sqm: float
+    processes: Optional[list[FabricBlockTypeProcessCreate]] = None
 
 
 class ProcessTypeCreate(BaseModel):

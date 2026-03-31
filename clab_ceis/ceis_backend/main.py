@@ -102,7 +102,9 @@ def delete_garment_recipe(garment_type_id: int):
 
 @app.post("/fabric-block-types")
 def create_fabric_block_type(payload: FabricBlockTypeCreate):
-    return db_create_fabric_block_type(payload.name, payload.sqm)
+    return db_create_fabric_block_type(
+        payload.name, payload.sqm, payload.processes or []
+    )
 
 
 @app.post("/process-types")

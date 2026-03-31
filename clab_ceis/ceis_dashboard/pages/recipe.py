@@ -116,6 +116,31 @@ def get_recipe_layout():
                                 step=0.1,
                                 placeholder="e.g., 1.2",
                             ),
+                            html.H3("Processes (optional)"),
+                            html.Div(
+                                id="fabric-block-type-processes-container",
+                                children=[],
+                            ),
+                            html.Div(
+                                [
+                                    html.Button(
+                                        "Add Process Step",
+                                        id="add-fabric-block-type-process",
+                                        n_clicks=0,
+                                    ),
+                                    html.Button(
+                                        "Remove Last Process Step",
+                                        id="remove-fabric-block-type-process",
+                                        n_clicks=0,
+                                    ),
+                                ],
+                                style={
+                                    "marginTop": "8px",
+                                    "marginBottom": "12px",
+                                    "display": "flex",
+                                    "gap": "8px",
+                                },
+                            ),
                             html.Button(
                                 "Add Fabric Block Type",
                                 id="add-fabric-block-type",
