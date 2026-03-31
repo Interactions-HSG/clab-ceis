@@ -180,11 +180,30 @@ def db_delete_garment_recipe(garment_type_id: int) -> dict:
         conn.close()
 
 
-def db_create_fabric_block_type(name: str, sqm: float) -> dict:
+def db_create_fabric_block_type(name: str, sqm: float, processes: list) -> dict:
     """Create a new fabric block type in the database."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     try:
+        if sqm <= 0:
+            raise HTTPException(status_code=400, detail="sqm must be greater than 0")
+
+        if processes:
+            process_ids = [proc.process_id for proc in processes]
+            cursor.execute(
+                f"SELECT COUNT(*) FROM process_types WHERE id IN ({','.join('?' * len(process_ids))})",
+                process_ids,
+            )
+            if cursor.fetchone()[0] != len(set(process_ids)):
+                raise HTTPException(status_code=400, detail="Invalid process type")
+
+        for proc in processes:
+            if proc.amount <= 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Process amount must be greater than 0",
+                )
+
         cursor.execute(
             """
             INSERT INTO fabric_block_types (name, sqm)
@@ -192,8 +211,23 @@ def db_create_fabric_block_type(name: str, sqm: float) -> dict:
             """,
             (name, sqm),
         )
+        fabric_block_type_id = cursor.lastrowid
+
+        if processes:
+            cursor.executemany(
+                """
+                INSERT INTO fabric_block_recipe_processes
+                (fabric_block_type, process_id, amount)
+                VALUES (?, ?, ?)
+                """,
+                [
+                    (fabric_block_type_id, proc.process_id, proc.amount)
+                    for proc in processes
+                ],
+            )
+
         conn.commit()
-        return {"id": cursor.lastrowid, "name": name}
+        return {"id": fabric_block_type_id, "name": name}
     except sqlite3.IntegrityError:
         raise HTTPException(status_code=409, detail="Fabric block type already exists")
     finally:

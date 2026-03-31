@@ -262,6 +262,61 @@ class TestDeleteFabricBlockType:
         conn.close()
 
 
+class TestCreateFabricBlockTypeWithProcesses:
+    def test_creates_recipe_process_links(self, clean_db):
+        conn = sqlite3.connect("ceis_backend.db")
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO process_types (name, unit, activity_id) VALUES (?, ?, ?)",
+            ("test_process", "kWh", 4321),
+        )
+        process_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+
+        client = TestClient(app)
+        response = client.post(
+            "/fabric-block-types",
+            json={
+                "name": "LinkedFB",
+                "sqm": 1.5,
+                "processes": [{"process_id": process_id, "amount": 2.5}],
+            },
+        )
+
+        assert response.status_code == 200
+        created_id = response.json()["id"]
+
+        conn = sqlite3.connect("ceis_backend.db")
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT process_id, amount
+            FROM fabric_block_recipe_processes
+            WHERE fabric_block_type = ?
+            """,
+            (created_id,),
+        )
+        rows = cursor.fetchall()
+        conn.close()
+
+        assert rows == [(process_id, 2.5)]
+
+    def test_rejects_invalid_process_type(self, clean_db):
+        client = TestClient(app)
+        response = client.post(
+            "/fabric-block-types",
+            json={
+                "name": "BadFB",
+                "sqm": 1.0,
+                "processes": [{"process_id": 999999, "amount": 1.0}],
+            },
+        )
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Invalid process type"
+
+
 class TestGetLocationsEndpoint:
     """Test case: GET /locations endpoint returns correct list of locations."""
 

@@ -63,21 +63,116 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
         return garment_options, fabric_options, process_options
 
     @app.callback(
+        Output("fabric-block-type-processes-container", "children"),
+        [
+            Input("add-fabric-block-type-process", "n_clicks"),
+            Input("remove-fabric-block-type-process", "n_clicks"),
+        ],
+        [State("fabric-block-type-processes-container", "children")],
+    )
+    def update_fabric_block_type_process_fields(add_clicks, remove_clicks, children):
+        ctx = callback_context
+        triggered = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else None
+
+        if children is None:
+            children = []
+
+        if triggered == "add-fabric-block-type-process":
+            options = []
+            try:
+                resp = requests.get(f"{config.BACKEND_API_URL}/process-types")
+                if resp.status_code == 200:
+                    data = resp.json()
+                    options = [
+                        {"label": proc["name"], "value": proc["id"]} for proc in data
+                    ]
+            except Exception:
+                pass
+
+            new_id = len(children)
+            children.append(
+                html.Div(
+                    [
+                        html.Div(
+                            [
+                                dcc.Dropdown(
+                                    id={
+                                        "type": "fabric-block-type-process",
+                                        "index": new_id,
+                                    },
+                                    options=options,
+                                    placeholder="Select process",
+                                    clearable=False,
+                                    style={"width": "240px"},
+                                ),
+                            ],
+                            style={"flex": "1"},
+                        ),
+                        html.Div(
+                            [
+                                dcc.Input(
+                                    id={
+                                        "type": "fabric-block-type-process-amount",
+                                        "index": new_id,
+                                    },
+                                    placeholder="Amount",
+                                    type="number",
+                                    min=0,
+                                    step=0.5,
+                                    value=1,
+                                    style={"width": "120px"},
+                                ),
+                            ],
+                            style={"marginLeft": "12px"},
+                        ),
+                    ],
+                    style={
+                        "display": "flex",
+                        "alignItems": "center",
+                        "gap": "8px",
+                        "marginBottom": "8px",
+                    },
+                )
+            )
+
+        elif triggered == "remove-fabric-block-type-process" and len(children) > 0:
+            children = children[:-1]
+
+        return children
+
+    @app.callback(
         Output("fabric-block-type-status", "children"),
         Input("add-fabric-block-type", "n_clicks"),
         State("fabric-block-type-name", "value"),
         State("fabric-block-type-sqm", "value"),
+        State({"type": "fabric-block-type-process", "index": ALL}, "value"),
+        State({"type": "fabric-block-type-process-amount", "index": ALL}, "value"),
         prevent_initial_call=True,
     )
-    def add_fabric_block_type(n_clicks, name, sqm):
+    def add_fabric_block_type(n_clicks, name, sqm, process_ids, process_amounts):
         if not name:
             return "Please enter a fabric block type name."
         if sqm is None or sqm <= 0:
             return "Please enter a valid sqm value greater than 0."
 
+        processes = []
+        for proc_id, amount in zip(process_ids, process_amounts):
+            if proc_id is None:
+                continue
+            if amount is None:
+                return "Please provide an amount for each selected process step."
+            try:
+                proc_amount = float(amount)
+            except (TypeError, ValueError):
+                return "Process step amount must be a valid number."
+            if proc_amount <= 0:
+                return "Process step amount must be greater than 0."
+            processes.append({"process_id": proc_id, "amount": proc_amount})
+
         payload = {
             "name": name,
             "sqm": sqm,
+            "processes": processes,
         }
 
         try:
