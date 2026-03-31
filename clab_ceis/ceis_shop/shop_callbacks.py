@@ -23,7 +23,7 @@ def get_callbacks(app):
         Input("url", "pathname"),
     )
     def load_customer_repair_content(pathname):
-        if pathname != "/end-of-life":
+        if pathname != "/scenarios":
             return html.Div()
 
         try:
@@ -74,7 +74,7 @@ def get_callbacks(app):
 
         fig.update_layout(
             barmode="stack",
-            title="CO2 Comparison: Different Repairing Options (replacement of the fabric block 64x40) vs Buying new 'Basic Trousers'",
+            title="CO2 Comparison: Different Repairing Options (replacement of the fabric block 64x40) vs Buying new 'Basic Crop Top'",
             xaxis_title="Scenario",
             yaxis_title="CO2 (kg CO2eq)",
             # legend_title_text="Emissions",

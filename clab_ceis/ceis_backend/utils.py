@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from fastapi import HTTPException
 
 from ceis_backend.models import (
@@ -7,7 +9,7 @@ from ceis_backend.models import (
     SecondLifeFabricBlock,
     Process,
 )
-from ceis_backend.wiser_bridge import get_emission_per_unit
+from ceis_backend.wiser_bridge import WiserClient
 from ceis_backend.data.location_details import (
     distances_to_manufacturer,
     activity_id_transport,
@@ -40,13 +42,13 @@ def calculate_transport_emission(
 
 
 def calculate_process_emissions(
-    wiser_token: str, processes: list[Process]
+    wiser_client: WiserClient, processes: list[Process]
 ) -> tuple[float, list[dict]]:
     """
     Calculate total emissions and details for a list of processes.
 
     Args:
-        wiser_token: Token for WISER API.
+        wiser_client: Client for the WISER API.
         processes: List of Process objects to calculate emissions for.
 
     Returns:
@@ -56,7 +58,7 @@ def calculate_process_emissions(
     process_details = []
 
     for process in processes:
-        emission_per_unit = get_emission_per_unit(wiser_token, process.activity_id)
+        emission_per_unit = wiser_client.get_emission_per_unit(process.activity_id)
         emissions = (
             emission_per_unit * process.amount if emission_per_unit is not None else 0
         )
@@ -74,7 +76,7 @@ def calculate_process_emissions(
 
 
 def calculate_used_fabric_block_alternative(
-    wiser_token: str,
+    wiser_client: WiserClient,
     used_fabric_block: SecondLifeFabricBlock,
     fabric_block_amount_kg: float,
 ) -> dict:
@@ -82,7 +84,7 @@ def calculate_used_fabric_block_alternative(
     Calculate emissions and details for a used/secondhand fabric block.
 
     Args:
-        wiser_token: Token for WISER API.
+        wiser_client: Client for the WISER API.
         used_fabric_block: The SecondLifeFabricBlock to analyze.
         fabric_block_amount_kg: Weight of the fabric block in kg.
 
@@ -103,8 +105,8 @@ def calculate_used_fabric_block_alternative(
         and used_fabric_block.location_name in distances_to_manufacturer
     ):
         distance = distances_to_manufacturer[used_fabric_block.location_name]
-        transport_emission_per_unit = get_emission_per_unit(
-            wiser_token, activity_id_transport
+        transport_emission_per_unit = wiser_client.get_emission_per_unit(
+            activity_id_transport
         )
         transport_emission = calculate_transport_emission(
             distance, fabric_block_amount_kg, transport_emission_per_unit
@@ -114,7 +116,7 @@ def calculate_used_fabric_block_alternative(
 
     # Calculate preparation emissions
     prep_emissions, prep_details = calculate_process_emissions(
-        wiser_token, used_fabric_block.processes
+        wiser_client, used_fabric_block.processes
     )
     alternative["preparation_details"] = [
         {
@@ -131,7 +133,7 @@ def calculate_used_fabric_block_alternative(
 
 
 def process_fabric_block_emissions(
-    wiser_token: str,
+    wiser_client: WiserClient,
     fabric_block_name: str,
     fabric_block_data: FabricBlock,
     already_used_ids: list[int],
@@ -140,7 +142,7 @@ def process_fabric_block_emissions(
     Calculate total emissions for a fabric block including material, production, and alternatives.
 
     Args:
-        wiser_token: Token for WISER API.
+        wiser_client: Client for the WISER API.
         fabric_block_name: Name of the fabric block.
         fabric_block_data: FabricBlock object with material and process info.
         already_used_ids: List of already-used fabric block IDs.
@@ -159,8 +161,8 @@ def process_fabric_block_emissions(
         )
 
     # Material emission
-    material_emission_per_unit = get_emission_per_unit(
-        wiser_token, fabric_block_data.activity_id
+    material_emission_per_unit = wiser_client.get_emission_per_unit(
+        fabric_block_data.activity_id
     )
     material_emission = (
         material_emission_per_unit * block_weight_kg
@@ -170,7 +172,7 @@ def process_fabric_block_emissions(
 
     # Production process emissions
     production_emission, production_details = calculate_process_emissions(
-        wiser_token, fabric_block_data.processes
+        wiser_client, fabric_block_data.processes
     )
 
     # Total fabric block emission
@@ -183,7 +185,7 @@ def process_fabric_block_emissions(
     if used_fabric_block:
         already_used_ids.append(used_fabric_block.id)
         used_fabric_block_alternative = calculate_used_fabric_block_alternative(
-            wiser_token, used_fabric_block, block_weight_kg
+            wiser_client, used_fabric_block, block_weight_kg
         )
 
     return {
@@ -200,7 +202,7 @@ def process_fabric_block_emissions(
 
 
 def get_co2_for_garment(
-    garment_type_id: int, wiser_token: str, material_id: int
+    garment_type_id: int, wiser_client: WiserClient, material_id: int
 ) -> GarmentCo2Response:
     """
     Calculate CO2 emissions for a garment, including fabric blocks and assembly processes.
@@ -231,7 +233,7 @@ def get_co2_for_garment(
     already_used_fabric_block_ids = []
     for fabric_block_data in recipe.fabric_blocks:
         fabric_block_detail = process_fabric_block_emissions(
-            wiser_token,
+            wiser_client,
             fabric_block_data.name,
             fabric_block_data,
             already_used_fabric_block_ids,
@@ -241,7 +243,7 @@ def get_co2_for_garment(
 
     # Process garment assembly process emissions
     for process in recipe.processes:
-        emission_per_unit = get_emission_per_unit(wiser_token, process.activity_id)
+        emission_per_unit = wiser_client.get_emission_per_unit(process.activity_id)
         process_emission = (
             emission_per_unit * process.amount if emission_per_unit is not None else 0
         )
@@ -261,7 +263,7 @@ def get_co2_for_garment(
 
 def calculate_replacement_fabric_blocks_emissions(
     replacement_names: list[str],
-    token: str,
+    wiser_client: WiserClient,
     emission_cache: dict[int, float | None],
     material_id: int,
 ) -> dict:
@@ -278,8 +280,8 @@ def calculate_replacement_fabric_blocks_emissions(
         if fabric_block_data.activity_id in emission_cache:
             material_emission_per_unit = emission_cache[fabric_block_data.activity_id]
         else:
-            material_emission_per_unit = get_emission_per_unit(
-                token, fabric_block_data.activity_id
+            material_emission_per_unit = wiser_client.get_emission_per_unit(
+                fabric_block_data.activity_id
             )
             if material_emission_per_unit is None:
                 raise HTTPException(
@@ -303,8 +305,8 @@ def calculate_replacement_fabric_blocks_emissions(
             if process_activity_id in emission_cache:
                 resource_emission_per_unit = emission_cache[process_activity_id]
             else:
-                resource_emission_per_unit = get_emission_per_unit(
-                    token, process_activity_id
+                resource_emission_per_unit = wiser_client.get_emission_per_unit(
+                    process_activity_id
                 )
                 if resource_emission_per_unit is None:
                     raise HTTPException(
