@@ -1,5 +1,7 @@
 from dash import html, dcc, dash_table
 
+from ceis_dashboard.callbacks.api import fetch_garment_types
+
 
 def get_index_layout():
     inventory_form = html.Div(
@@ -121,15 +123,22 @@ def get_index_layout():
         className="fabric-add-form",
     )
 
+    garment_types = fetch_garment_types()
+    co2_links = [
+        html.Li(
+            dcc.Link(
+                f"{garment['name']} CO2 Assessment",
+                href=f"/co2/{garment['id']}",
+            )
+        )
+        for garment in garment_types
+    ]
+
     co2_form = html.Div(
         [
             html.H2("CO2 Assessment"),
-            dcc.Loading(
-                id="co2-loading",
-                type="circle",  # "default", "circle", "dot"
-                children=html.Div(id="co2-form-content"),
-                color="green",  # optional spinner color
-            ),
+            html.P("Open a garment page to view its CO2 details."),
+            html.Ul(co2_links or [html.Li("No garment types available.")]),
         ]
     )
 
