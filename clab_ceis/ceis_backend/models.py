@@ -1,5 +1,12 @@
 from typing import Any, Optional
 from pydantic import BaseModel
+from enum import Enum
+
+
+class Material(str, Enum):
+    COTTON = "cotton"
+    SILK = "silk"
+    HEMP = "hemp"
 
 
 class Process(BaseModel):
@@ -16,7 +23,7 @@ class InventoryProcessInfo(BaseModel):
 class FabricBlock(BaseModel):
     id: int
     name: str
-    material: str
+    material: Material
     weight_kg: float
     activity_id: int
     processes: list[Process]
