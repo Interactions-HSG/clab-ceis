@@ -56,6 +56,7 @@ class WiserClient:
         return search_results
 
     def get_emission_per_unit(self, activity_id: int) -> float | None:
+        print(f"Fetching Wiser emission per unit for activity {activity_id}")
         body = self._request_json(
             "GET",
             f"/activity/{activity_id}/",

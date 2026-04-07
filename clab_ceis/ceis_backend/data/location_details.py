@@ -1,11 +1,21 @@
-distances_to_manufacturer = {
+DISTANCES_TO_MANUFACTURER = {
     "St. Gallen": 10,
     "Sigmaringen": 112,
     "Dornbirn": 38,
     "Ravensburg": 92,
 }
-distances_customer_sigmaringen = {
+DISTANCES_CUSTOMER_SIGMARINGEN = {
     "Bucharest": 1710,
     "St. Gallen": 111,
 }
-activity_id_transport = 7309
+ACTIVITY_ID_TRANSPORT = 7309
+ACTIVITY_ID_LONG_DISTANCE_TRANSPORT = 17901
+
+HEMP_DISTANCE_TO_MANUFACTURER_KM = 4570  # placeholder value
+COTTON_DISTANCE_TO_MANUFACTURER_KM = 4570  # placeholder value
+SILK_DISTANCE_TO_MANUFACTURER_KM = 4570  # placeholder value
+
+SUPPLY_CHAIN_SOURCE_COMPANY = "Okutex"
+SUPPLY_CHAIN_DESTINATION_COMPANY = "Takli Textil"
+SUPPLY_CHAIN_TRANSPORT_PROCESS_NAME = "transport inside supply chain"
+MATERIAL_TRANSPORT_PROCESS_NAME = "material transport to manufacturer"

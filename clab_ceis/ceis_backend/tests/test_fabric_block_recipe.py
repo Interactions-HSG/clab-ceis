@@ -95,6 +95,7 @@ class TestFabricBlockRecipeProcessesTableCreation:
 
         assert count > 0
 
+
 class TestInventoryProcessTables:
     def test_inventory_process_tables_exist_after_init(self, test_db):
         conn = sqlite3.connect("ceis_backend.db")
@@ -842,9 +843,9 @@ class TestGetCo2TransportEmissions:
 
         cursor.execute(
             "INSERT OR IGNORE INTO materials (name, kg_per_sqm, activity_id) VALUES (?, ?, ?)",
-            ("polyester", 1.0, 9002),
+            ("cotton", 1.0, 9002),
         )
-        cursor.execute("SELECT id FROM materials WHERE name = ?", ("polyester",))
+        cursor.execute("SELECT id FROM materials WHERE name = ?", ("cotton",))
         material_id = cursor.fetchone()[0]
 
         cursor.execute(
@@ -875,6 +876,87 @@ class TestGetCo2TransportEmissions:
 
         # Transport emission should be 0 for unknown location
         assert alternative.get("transport_emission", 0) == 0
+
+    def test_adds_supply_chain_transport_process_okutex_to_takli(self, clean_db):
+        """Verify garment process includes transport inside supply chain for Okutex -> Takli Textil."""
+        conn = sqlite3.connect("ceis_backend.db")
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "INSERT INTO garment_types (name) VALUES (?)",
+            ("SupplyChainTransportGarment",),
+        )
+        garment_id = cursor.lastrowid
+        assert garment_id is not None
+
+        cursor.execute(
+            "INSERT INTO fabric_block_types (name, sqm) VALUES (?, ?)",
+            ("SupplyChainTransportBlock", 2.0),
+        )
+        fabric_block_type_id = cursor.lastrowid
+        assert fabric_block_type_id is not None
+
+        cursor.execute(
+            "INSERT OR IGNORE INTO materials (name, kg_per_sqm, activity_id) VALUES (?, ?, ?)",
+            ("cotton", 1.0, 9101),
+        )
+        cursor.execute("SELECT id FROM materials WHERE name = ?", ("cotton",))
+        material_id = cursor.fetchone()[0]
+
+        cursor.execute(
+            "INSERT INTO garment_recipe_materials (garment_type, material_id) VALUES (?, ?)",
+            (garment_id, material_id),
+        )
+        cursor.execute(
+            "INSERT INTO garment_recipe_fabric_blocks (garment_type, fabric_block_id, amount) VALUES (?, ?, ?)",
+            (garment_id, fabric_block_type_id, 1),
+        )
+
+        cursor.execute(
+            """
+            INSERT INTO manufacturer_distances (
+                source_company,
+                source_role_group,
+                source_location,
+                destination_company,
+                destination_role_group,
+                destination_location,
+                distance_km
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "Okutex",
+                "fabric",
+                "St. Gallen",
+                "Takli Textil",
+                "garment",
+                "Burladingen",
+                120.0,
+            ),
+        )
+
+        conn.commit()
+        conn.close()
+
+        wiser_client = _build_mock_wiser_client({9101: 5.0, 7309: 0.2})
+        result = get_co2_for_garment(garment_id, wiser_client, material_id)
+
+        process_details = result.processes.details
+        supply_chain_process = next(
+            (
+                process
+                for process in process_details
+                if process.get("process") == "garment transport inside supply chain"
+            ),
+            None,
+        )
+
+        assert supply_chain_process is not None
+        assert supply_chain_process["amount"] == 120.0
+        # amount_kg = 2.0 sqm * 1.0 kg_per_sqm = 2.0 kg
+        # emission = 0.2 / 1000 * 120.0 * 2.0 = 0.048
+        assert supply_chain_process["emission"] == pytest.approx(0.048)
 
 
 class TestGetCo2FabricBlockProductionEmissions:
@@ -1083,9 +1165,9 @@ class TestGetCo2FabricBlockProductionEmissions:
 
         cursor.execute(
             "INSERT OR IGNORE INTO materials (name, kg_per_sqm, activity_id) VALUES (?, ?, ?)",
-            ("linen", 1.0, 3001),
+            ("hemp", 1.0, 3001),
         )
-        cursor.execute("SELECT id FROM materials WHERE name = ?", ("linen",))
+        cursor.execute("SELECT id FROM materials WHERE name = ?", ("hemp",))
         material_id = cursor.fetchone()[0]
 
         cursor.execute(

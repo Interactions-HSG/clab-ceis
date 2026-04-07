@@ -8,18 +8,47 @@ from ceis_backend.models import (
     FabricBlock,
     SecondLifeFabricBlock,
     Process,
+    Material,
 )
 from ceis_backend.wiser_bridge import WiserClient
 from ceis_backend.data.location_details import (
-    distances_to_manufacturer,
-    activity_id_transport,
+    DISTANCES_TO_MANUFACTURER,
+    ACTIVITY_ID_TRANSPORT,
+    ACTIVITY_ID_LONG_DISTANCE_TRANSPORT,
+    HEMP_DISTANCE_TO_MANUFACTURER_KM,
+    COTTON_DISTANCE_TO_MANUFACTURER_KM,
+    MATERIAL_TRANSPORT_PROCESS_NAME,
+    SILK_DISTANCE_TO_MANUFACTURER_KM,
+    SUPPLY_CHAIN_DESTINATION_COMPANY,
+    SUPPLY_CHAIN_SOURCE_COMPANY,
+    SUPPLY_CHAIN_TRANSPORT_PROCESS_NAME,
 )
 from ceis_backend.queries import (
     get_fabric_block_recipe,
     get_full_garment_recipe,
     get_used_fabric_block,
     get_fabric_block_processes_for_emission,
+    get_manufacturer_distance_km,
 )
+
+
+def _get_transport_emission_per_unit(wiser_client: WiserClient) -> float | None:
+    return wiser_client.get_emission_per_unit(ACTIVITY_ID_TRANSPORT)
+
+
+def _get_long_distance_transport_emission_per_unit(
+    wiser_client: WiserClient,
+) -> float | None:
+    return wiser_client.get_emission_per_unit(ACTIVITY_ID_LONG_DISTANCE_TRANSPORT)
+
+
+def _get_material_distance_to_manufacturer_km(material: Material) -> float:
+    material_distance_km = {
+        Material.HEMP: HEMP_DISTANCE_TO_MANUFACTURER_KM,
+        Material.COTTON: COTTON_DISTANCE_TO_MANUFACTURER_KM,
+        Material.SILK: SILK_DISTANCE_TO_MANUFACTURER_KM,
+    }
+    return material_distance_km[material]
 
 
 def calculate_transport_emission(
@@ -102,12 +131,10 @@ def calculate_used_fabric_block_alternative(
     transport_emission = 0
     if (
         used_fabric_block.location_name
-        and used_fabric_block.location_name in distances_to_manufacturer
+        and used_fabric_block.location_name in DISTANCES_TO_MANUFACTURER
     ):
-        distance = distances_to_manufacturer[used_fabric_block.location_name]
-        transport_emission_per_unit = wiser_client.get_emission_per_unit(
-            activity_id_transport
-        )
+        distance = DISTANCES_TO_MANUFACTURER[used_fabric_block.location_name]
+        transport_emission_per_unit = _get_transport_emission_per_unit(wiser_client)
         transport_emission = calculate_transport_emission(
             distance, fabric_block_amount_kg, transport_emission_per_unit
         )
@@ -174,6 +201,12 @@ def process_fabric_block_emissions(
     production_emission, production_details = calculate_process_emissions(
         wiser_client, fabric_block_data.processes
     )
+
+    extra_emissions_for_block = get_extra_emissions_for_fabric_block(
+        wiser_client, fabric_block_data
+    )
+    production_details.append(extra_emissions_for_block)
+    production_emission += extra_emissions_for_block.get("emission", 0)
 
     # Total fabric block emission
     total_emission = material_emission + production_emission
@@ -251,12 +284,35 @@ def get_co2_for_garment(
         emission_details.processes.details.append(
             {
                 "process": process.name,
-                "duration": process.amount,
+                "amount": process.amount,
                 "activity_id": process.activity_id,
                 "emission": process_emission,
             }
         )
         emission_details.processes.total_emission += process_emission
+
+    supply_chain_distance_km = get_manufacturer_distance_km(
+        SUPPLY_CHAIN_SOURCE_COMPANY, SUPPLY_CHAIN_DESTINATION_COMPANY
+    )
+    if supply_chain_distance_km is not None:
+        total_garment_weight_kg = sum(block.weight_kg for block in recipe.fabric_blocks)
+        transport_emission_per_unit = _get_transport_emission_per_unit(wiser_client)
+        supply_chain_transport_emission = calculate_transport_emission(
+            supply_chain_distance_km,
+            total_garment_weight_kg,
+            transport_emission_per_unit,
+        )
+        emission_details.processes.details.append(
+            {
+                "process": SUPPLY_CHAIN_TRANSPORT_PROCESS_NAME,
+                "amount": supply_chain_distance_km,
+                "activity_id": ACTIVITY_ID_TRANSPORT,
+                "emission": supply_chain_transport_emission or 0,
+            }
+        )
+        emission_details.processes.total_emission += (
+            supply_chain_transport_emission or 0
+        )
 
     return emission_details
 
@@ -405,3 +461,35 @@ def build_scenario_activities(
     ]
 
     return activities
+
+
+def get_extra_emissions_for_fabric_block(
+    wiser_client: WiserClient, fabric_block: FabricBlock
+) -> dict:
+    """
+    Get extra emissions for one fabric block, such as transport of the
+    material to the manufacturer.
+
+    Args:
+        fabric_block: The fabric block for which extra emissions are calculated.
+
+    Returns:
+        A dictionary with extra emissions details.
+    """
+    long_distance_transport_emissions_per_unit = (
+        _get_long_distance_transport_emission_per_unit(wiser_client)
+    )
+
+    distance_km = _get_material_distance_to_manufacturer_km(fabric_block.material)
+    total_transport_emission = calculate_transport_emission(
+        distance_km,
+        fabric_block.weight_kg,
+        long_distance_transport_emissions_per_unit,
+    )
+
+    return {
+        "process": MATERIAL_TRANSPORT_PROCESS_NAME,
+        "amount": distance_km,
+        "activity_id": ACTIVITY_ID_LONG_DISTANCE_TRANSPORT,
+        "emission": total_transport_emission or 0,
+    }

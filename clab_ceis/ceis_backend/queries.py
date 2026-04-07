@@ -725,6 +725,30 @@ def get_full_garment_recipe(
     return recipe
 
 
+def get_manufacturer_distance_km(
+    source_company: str, destination_company: str
+) -> float | None:
+    """Return the stored transport distance between two manufacturers."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT distance_km
+            FROM manufacturer_distances
+            WHERE source_company = ? AND destination_company = ?
+            LIMIT 1
+            """,
+            (source_company, destination_company),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+        return float(row[0])
+    finally:
+        conn.close()
+
+
 def get_used_fabric_block(
     fabric_block_name: str, already_used_ids: list[int]
 ) -> SecondLifeFabricBlock | None:
