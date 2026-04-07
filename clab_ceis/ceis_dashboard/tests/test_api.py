@@ -24,7 +24,7 @@ def test_fetch_garment_types_returns_payload(monkeypatch):
     assert result == [{"id": 1, "name": "Crop Top"}]
 
 
-def test_fetch_fabric_blocks_formats_preparations(monkeypatch):
+def test_fetch_fabric_blocks_formats_processes(monkeypatch):
     def fake_get(url):
         assert url.endswith("/fabric-blocks")
         return _Response(
@@ -33,7 +33,7 @@ def test_fetch_fabric_blocks_formats_preparations(monkeypatch):
                 {
                     "id": 5,
                     "type": "80x64",
-                    "preparations": [{"type": "sewing", "amount": 0.42}],
+                    "processes": [{"type": "sewing", "amount": 0.42}],
                 }
             ],
         )
@@ -43,4 +43,4 @@ def test_fetch_fabric_blocks_formats_preparations(monkeypatch):
     result = api.fetch_fabric_blocks()
 
     assert len(result) == 1
-    assert result[0]["preparations"] == "sewing(0.42)"
+    assert result[0]["processes"] == "sewing(0.42)"

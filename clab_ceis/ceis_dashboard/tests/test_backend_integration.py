@@ -93,7 +93,7 @@ def test_dashboard_api_reads_seeded_backend_data(tmp_path):
             json={
                 "type_id": first_fb_type_id,
                 "location_id": st_gallen_location_id,
-                "processes": [{"type_id": sewing_process_id, "amount": 0.5}],
+                "processes": [{"process_id": sewing_process_id, "amount": 0.5}],
             },
             timeout=5,
         )
@@ -102,7 +102,7 @@ def test_dashboard_api_reads_seeded_backend_data(tmp_path):
         blocks = api.fetch_fabric_blocks()
         assert len(blocks) == 1
         assert blocks[0]["type"] == first_fb_type_name
-        assert "sewing(0.5)" in blocks[0]["preparations"]
+        assert "sewing(0.5)" in blocks[0]["processes"]
     finally:
         proc.terminate()
         proc.wait(timeout=10)

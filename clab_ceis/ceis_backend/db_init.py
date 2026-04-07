@@ -6,7 +6,6 @@ from ceis_backend.manufacturer_distance_sync import (
     sync_manufacturer_distances_if_changed,
 )
 
-
 def create_tables(cursor):
     cursor.execute(
         """
@@ -140,13 +139,26 @@ def create_tables(cursor):
 
     cursor.execute(
         """
-        CREATE TABLE IF NOT EXISTS preparations_used_fabric_blocks (
+        CREATE TABLE IF NOT EXISTS processes_fabric_blocks_inventory (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            type_id INTEGER NOT NULL,
+            process_id INTEGER NOT NULL,
             amount REAL,
             fabric_block_id INTEGER,
-            FOREIGN KEY (type_id) REFERENCES process_types (id) ON DELETE CASCADE,
+            FOREIGN KEY (process_id) REFERENCES process_types (id) ON DELETE CASCADE,
             FOREIGN KEY (fabric_block_id) REFERENCES fabric_blocks_inventory (id) ON DELETE CASCADE
+        )
+    """
+    )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS processes_garments_inventory (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            process_id INTEGER NOT NULL,
+            amount REAL,
+            garment_id INTEGER NOT NULL,
+            FOREIGN KEY (process_id) REFERENCES process_types (id) ON DELETE CASCADE,
+            FOREIGN KEY (garment_id) REFERENCES garments_inventory (id) ON DELETE CASCADE
         )
     """
     )
@@ -207,6 +219,7 @@ def create_tables(cursor):
         INSERT OR IGNORE INTO seed_meta (id, seeded) VALUES (1, 0);
     """
     )
+
 
 
 def seed_data(cursor):
@@ -372,8 +385,8 @@ def seed_data(cursor):
         ((SELECT id FROM garment_types WHERE name='Basic Crop Top'), (SELECT id FROM materials WHERE name='hemp'));
        
         INSERT OR IGNORE INTO garment_recipe_processes (garment_type, process_id, amount) VALUES
-        ((SELECT id FROM garment_types WHERE name='Basic Trousers'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
-        ((SELECT id FROM garment_types WHERE name='Basic Trousers'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
+        ((SELECT id FROM garment_types WHERE name='Basic Trousers'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),  -- Assuming 1 hour of sewing with a machine of 42 W
+        ((SELECT id FROM garment_types WHERE name='Basic Trousers'), (SELECT id FROM process_types WHERE name='steaming'), 0.22), -- Assuming 10 minutes of steaming with a machine of 2200 W
         ((SELECT id FROM garment_types WHERE name='Full Trousers'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
         ((SELECT id FROM garment_types WHERE name='Full Trousers'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
         ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit short sleeves'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),

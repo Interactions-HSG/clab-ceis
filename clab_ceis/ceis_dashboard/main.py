@@ -51,7 +51,7 @@ class CeisMonitor:
             if df is None or df.empty:
                 return []
             # Ensure columns used in the fabric table exist in df
-            required_cols = ["id", "type", "co2eq", "garment_id", "preparations"]
+            required_cols = ["id", "type", "co2eq", "garment_id", "processes"]
             for c in required_cols:
                 if c not in df.columns:
                     df[c] = None

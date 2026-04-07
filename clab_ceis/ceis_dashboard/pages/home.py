@@ -32,8 +32,8 @@ def get_index_layout():
                     {"name": "garment_id", "id": "garment_id"},
                     {"name": "location", "id": "location"},
                     {
-                        "name": "preparations necessary",
-                        "id": "preparations",
+                        "name": "processes",
+                        "id": "processes",
                     },
                 ],
                 data=[],  # populated via callback
@@ -75,14 +75,14 @@ def get_index_layout():
                 ],
                 style={"marginBottom": "12px", "maxWidth": "400px"},
             ),
-            html.H3("Preparations"),
-            html.Div(id="preparations-container", children=[]),
+            html.H3("Processes"),
+            html.Div(id="processes-container", children=[]),
             html.Div(
                 [
-                    html.Button("Add Preparation", id="add-prep-button", n_clicks=0),
+                    html.Button("Add Process", id="add-process-button", n_clicks=0),
                     html.Button(
-                        "Remove Last Preparation",
-                        id="remove-prep-button",
+                        "Remove Last Process",
+                        id="remove-process-button",
                         n_clicks=0,
                     ),
                 ],

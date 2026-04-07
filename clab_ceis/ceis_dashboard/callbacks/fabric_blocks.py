@@ -6,7 +6,7 @@ from dash.dependencies import ALL
 import config
 import ceis_data
 from ceis_dashboard.callbacks.api import fetch_fabric_blocks
-from ceis_backend.models import SecondLifeFabricBlockInfo, PreparationInfo
+from ceis_backend.models import FabricBlockInventoryCreate, InventoryProcessInfo
 
 
 def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
@@ -65,24 +65,24 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
             for block in blocks
         ]
 
-    # Callback to add/remove preparation input fields
+    # Callback to add/remove process input fields
     @app.callback(
-        Output("preparations-container", "children"),
+        Output("processes-container", "children"),
         [
-            Input("add-prep-button", "n_clicks"),
-            Input("remove-prep-button", "n_clicks"),
+            Input("add-process-button", "n_clicks"),
+            Input("remove-process-button", "n_clicks"),
         ],
-        [State("preparations-container", "children")],
+        [State("processes-container", "children")],
     )
-    def update_preparation_fields(add_clicks, remove_clicks, children):
+    def update_process_fields(add_clicks, remove_clicks, children):
         ctx = callback_context
         triggered = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else None
 
         if children is None:
             children = []
 
-        # Add a new preparation field
-        if triggered == "add-prep-button":
+        # Add a new process field
+        if triggered == "add-process-button":
 
             options = []
             try:
@@ -109,9 +109,9 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
                         html.Div(
                             [
                                 dcc.Dropdown(
-                                    id={"type": "prep-name", "index": new_id},
+                                    id={"type": "process-name", "index": new_id},
                                     options=options,
-                                    placeholder="Select preparation",
+                                    placeholder="Select process",
                                     clearable=False,
                                     style={"width": "200px"},
                                 ),
@@ -121,7 +121,7 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
                         html.Div(
                             [
                                 dcc.Input(
-                                    id={"type": "prep-count", "index": new_id},
+                                    id={"type": "process-amount", "index": new_id},
                                     placeholder="Count",
                                     type="number",
                                     min=0,
@@ -141,8 +141,8 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
                 )
             )
 
-        # Remove the last preparation field
-        elif triggered == "remove-prep-button" and len(children) > 0:
+        # Remove the last process field
+        elif triggered == "remove-process-button" and len(children) > 0:
             children = children[:-1]
 
         return children
@@ -159,8 +159,8 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
         [
             State("fabric-type", "value"),
             State("fabric-location", "value"),
-            State({"type": "prep-name", "index": ALL}, "value"),
-            State({"type": "prep-count", "index": ALL}, "value"),
+            State({"type": "process-name", "index": ALL}, "value"),
+            State({"type": "process-amount", "index": ALL}, "value"),
             State("delete-fabric-block-id", "value"),
             State("fabric-blocks-table", "data"),
         ],
@@ -171,8 +171,8 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
         delete_clicks,
         type_val,
         location_val,
-        prep_names,
-        prep_counts,
+        process_names,
+        process_amounts,
         delete_id,
         current_data,
     ):
@@ -189,12 +189,12 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
             if not type_val:
                 return no_update, "Please select a fabric type.", ""
 
-            preparations: list[PreparationInfo] = []
-            for name, count in zip(prep_names, prep_counts):
-                preparations.append(PreparationInfo(type_id=name, amount=count))
+            processes: list[InventoryProcessInfo] = []
+            for name, amount in zip(process_names, process_amounts):
+                processes.append(InventoryProcessInfo(process_id=name, amount=amount))
 
-            payload = SecondLifeFabricBlockInfo(
-                type_id=type_val, processes=preparations, location_id=location_val
+            payload = FabricBlockInventoryCreate(
+                type_id=type_val, processes=processes, location_id=location_val
             )
             print("Payload:", payload)
             try:
@@ -206,7 +206,7 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
                 if resp.status_code in (200, 201):
                     status_msg = (
                         "Successfully added fabric block with "
-                        f"{len(preparations)} preparation(s)."
+                        f"{len(processes)} process(es)."
                     )
 
                     # Now fetch fresh data

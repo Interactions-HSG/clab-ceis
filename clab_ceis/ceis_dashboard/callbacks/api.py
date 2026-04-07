@@ -15,14 +15,14 @@ def fetch_fabric_blocks():
         backend_data = resp.json()
 
         for block in backend_data:
-            preps = block.get("preparations", [])
+            processes = block.get("processes", [])
 
-            if isinstance(preps, list):
-                block["preparations"] = ", ".join(
-                    f"{p.get('type','')}({p.get('amount')})" for p in preps
+            if isinstance(processes, list):
+                block["processes"] = ", ".join(
+                    f"{p.get('type','')}({p.get('amount')})" for p in processes
                 )
             else:
-                block["preparations"] = str(preps)
+                block["processes"] = str(processes)
 
         return backend_data
 

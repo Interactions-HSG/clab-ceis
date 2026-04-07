@@ -24,9 +24,9 @@ def _build_material_co2_section(garment_name: str, material_name: str, co2_data)
         (fb["alternative"]["emission"] if fb["alternative"] else fb["emission"])
         for fb in co2_data.fabric_blocks.details
     )
-    co2_from_preparations = sum(
+    co2_from_inventory_processes = sum(
         (
-            sum(prep["emission"] for prep in fb["alternative"]["preparation_details"])
+            sum(process["emission"] for process in fb["alternative"]["process_details"])
             if fb["alternative"]
             else 0
         )
@@ -155,9 +155,9 @@ def _build_material_co2_section(garment_name: str, material_name: str, co2_data)
                     html.B(
                         f"{round(replaced_fabric_blocks_co2, 2) if replaced_fabric_blocks_co2 else 'N/A'}"
                     ),
-                    " kg CO2eq can be avoided, but the emissions from the preparation which amount to ",
+                    " kg CO2eq can be avoided, but the emissions from the added processes which amount to ",
                     html.B(
-                        f"{round(co2_from_preparations, 2) if co2_from_preparations else 'N/A'}"
+                        f"{round(co2_from_inventory_processes, 2) if co2_from_inventory_processes else 'N/A'}"
                     ),
                     " kg CO2eq and transport emissions of ",
                     html.B(
