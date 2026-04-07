@@ -38,7 +38,7 @@ from ceis_backend.data.location_details import (
     activity_id_transport,
 )
 from ceis_backend.models import (
-    SecondLifeFabricBlockInfo,
+    FabricBlockInventoryCreate,
     FabricBlockTypeCreate,
     ActivitySearchRequest,
     GarmentRecipeCreate,
@@ -159,7 +159,7 @@ def delete_fabric_block_type(type_id: int):
 
 
 @app.get("/process-types")
-def get_preparation_types():
+def get_process_types():
     return db_get_process_types()
 
 
@@ -179,7 +179,7 @@ def create_garment_recipe(payload: GarmentRecipeCreate):
 
 
 @app.post("/fabric-blocks")
-async def create_fabric_block(fabric_block: SecondLifeFabricBlockInfo):
+async def create_fabric_block(fabric_block: FabricBlockInventoryCreate):
     print("Received fabric block:", fabric_block)
     return db_create_fabric_block(
         fabric_block.type_id,

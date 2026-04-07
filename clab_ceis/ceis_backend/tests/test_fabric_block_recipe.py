@@ -3,7 +3,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-import ceis_backend.db_init as db_init
 from ceis_backend.db_init import init_sqlite_db, create_tables
 from ceis_backend.utils import get_co2_for_garment
 from ceis_backend.queries import get_fabric_block_recipe
@@ -96,42 +95,27 @@ class TestFabricBlockRecipeProcessesTableCreation:
 
         assert count > 0
 
-    def test_backfill_adds_basic_crop_top_hemp_to_seeded_db(self, clean_db):
-        """Verify startup backfills the Basic Crop Top hemp association."""
+class TestInventoryProcessTables:
+    def test_inventory_process_tables_exist_after_init(self, test_db):
         conn = sqlite3.connect("ceis_backend.db")
         cursor = conn.cursor()
-        cursor.executescript(
-            """
-            INSERT INTO materials (name, kg_per_sqm, activity_id)
-            VALUES ('hemp', 0.21, 276186);
 
-            INSERT INTO garment_types (name)
-            VALUES ('Basic Crop Top');
-
-            UPDATE seed_meta SET seeded = 1 WHERE id = 1;
-            """
-        )
-        conn.commit()
-        conn.close()
-
-        db_init.init_sqlite_db()
-
-        conn = sqlite3.connect("ceis_backend.db")
-        cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT COUNT(*)
-            FROM garment_recipe_materials grm
-            JOIN garment_types gt ON gt.id = grm.garment_type
-            JOIN materials m ON m.id = grm.material_id
-            WHERE gt.name = ? AND m.name = ?
-            """,
-            ("Basic Crop Top", "hemp"),
+            SELECT name
+            FROM sqlite_master
+            WHERE type='table'
+              AND name IN ('processes_fabric_blocks_inventory', 'processes_garments_inventory')
+            ORDER BY name
+            """
         )
-        count = cursor.fetchone()[0]
+        result = [row[0] for row in cursor.fetchall()]
         conn.close()
 
-        assert count == 1
+        assert result == [
+            "processes_fabric_blocks_inventory",
+            "processes_garments_inventory",
+        ]
 
 
 class TestGetRecipeForFabricBlock:
@@ -587,9 +571,9 @@ class TestGetCo2TransportEmissions:
         )
         cursor.execute(
             """
-            CREATE TABLE IF NOT EXISTS preparations_used_fabric_blocks (
+            CREATE TABLE IF NOT EXISTS processes_fabric_blocks_inventory (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                type_id INTEGER NOT NULL,
+                process_id INTEGER NOT NULL,
                 amount INTEGER,
                 fabric_block_id INTEGER
             )
@@ -714,9 +698,9 @@ class TestGetCo2TransportEmissions:
         )
         cursor.execute(
             """
-            CREATE TABLE IF NOT EXISTS preparations_used_fabric_blocks (
+            CREATE TABLE IF NOT EXISTS processes_fabric_blocks_inventory (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                type_id INTEGER NOT NULL,
+                process_id INTEGER NOT NULL,
                 amount INTEGER,
                 fabric_block_id INTEGER
             )
@@ -813,9 +797,9 @@ class TestGetCo2TransportEmissions:
         )
         cursor.execute(
             """
-            CREATE TABLE IF NOT EXISTS preparations_used_fabric_blocks (
+            CREATE TABLE IF NOT EXISTS processes_fabric_blocks_inventory (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                type_id INTEGER NOT NULL,
+                process_id INTEGER NOT NULL,
                 amount INTEGER,
                 fabric_block_id INTEGER
             )
@@ -957,9 +941,9 @@ class TestGetCo2FabricBlockProductionEmissions:
 
         cursor.execute(
             """
-            CREATE TABLE IF NOT EXISTS preparations_used_fabric_blocks (
+            CREATE TABLE IF NOT EXISTS processes_fabric_blocks_inventory (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                type_id INTEGER NOT NULL,
+                process_id INTEGER NOT NULL,
                 amount INTEGER,
                 fabric_block_id INTEGER
             )
@@ -1074,9 +1058,9 @@ class TestGetCo2FabricBlockProductionEmissions:
         )
         cursor.execute(
             """
-            CREATE TABLE IF NOT EXISTS preparations_used_fabric_blocks (
+            CREATE TABLE IF NOT EXISTS processes_fabric_blocks_inventory (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                type_id INTEGER NOT NULL,
+                process_id INTEGER NOT NULL,
                 amount INTEGER,
                 fabric_block_id INTEGER
             )
@@ -1151,9 +1135,9 @@ class TestGetCo2FabricBlockProductionEmissions:
         )
         cursor.execute(
             """
-            CREATE TABLE IF NOT EXISTS preparations_used_fabric_blocks (
+            CREATE TABLE IF NOT EXISTS processes_fabric_blocks_inventory (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                type_id INTEGER NOT NULL,
+                process_id INTEGER NOT NULL,
                 amount INTEGER,
                 fabric_block_id INTEGER
             )
