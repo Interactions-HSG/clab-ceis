@@ -8,8 +8,8 @@ class Process(BaseModel):
     activity_id: int
 
 
-class PreparationInfo(BaseModel):
-    type_id: int
+class InventoryProcessInfo(BaseModel):
+    process_id: int
     amount: float
 
 
@@ -37,9 +37,9 @@ class SecondLifeFabricBlock(BaseModel):
     location_name: Optional[str] = None
 
 
-class SecondLifeFabricBlockInfo(BaseModel):
+class FabricBlockInventoryCreate(BaseModel):
     type_id: int
-    processes: list[PreparationInfo]
+    processes: list[InventoryProcessInfo]
     location_id: Optional[int] = None
 
 

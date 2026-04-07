@@ -333,7 +333,11 @@ def db_delete_process_type(type_id: int) -> dict:
             (type_id,),
         )
         cursor.execute(
-            "DELETE FROM preparations_used_fabric_blocks WHERE type_id = ?",
+            "DELETE FROM processes_fabric_blocks_inventory WHERE process_id = ?",
+            (type_id,),
+        )
+        cursor.execute(
+            "DELETE FROM processes_garments_inventory WHERE process_id = ?",
             (type_id,),
         )
         cursor.execute(
@@ -492,10 +496,10 @@ def db_create_fabric_block(
     if processes:
         cursor.executemany(
             """
-            INSERT INTO preparations_used_fabric_blocks (type_id, amount, fabric_block_id)
+            INSERT INTO processes_fabric_blocks_inventory (process_id, amount, fabric_block_id)
             VALUES (?, ?, ?)
             """,
-            [(prep.type_id, prep.amount, fabric_block_id) for prep in processes],
+            [(process.process_id, process.amount, fabric_block_id) for process in processes],
         )
 
     conn.commit()
@@ -529,15 +533,15 @@ def db_get_fabric_blocks(type_filter: str | None = None) -> list[dict]:
         fb_type_name = fb_type_name[0] if fb_type_name else None
         cursor.execute(
             """
-            SELECT pt.name, pufb.amount
-            FROM preparations_used_fabric_blocks pufb
-            JOIN process_types pt ON pufb.type_id = pt.id
-            WHERE pufb.fabric_block_id = ?
+            SELECT pt.name, pfbi.amount
+            FROM processes_fabric_blocks_inventory pfbi
+            JOIN process_types pt ON pfbi.process_id = pt.id
+            WHERE pfbi.fabric_block_id = ?
             """,
             (fb_id,),
         )
-        preparations_data = cursor.fetchall()
-        preparations = [{"type": p[0], "amount": p[1]} for p in preparations_data]
+        inventory_processes_data = cursor.fetchall()
+        processes = [{"type": p[0], "amount": p[1]} for p in inventory_processes_data]
         fabric_blocks.append(
             {
                 "id": fb_id,
@@ -545,7 +549,7 @@ def db_get_fabric_blocks(type_filter: str | None = None) -> list[dict]:
                 "co2eq": fb_co2eq,
                 "garment_id": garment_id,
                 "location": location_name,
-                "preparations": preparations,
+                "processes": processes,
             }
         )
     conn.close()
@@ -565,7 +569,7 @@ def db_delete_fabric_block(fabric_block_id: int) -> dict:
             raise HTTPException(status_code=404, detail="Fabric block not found")
 
         cursor.execute(
-            "DELETE FROM preparations_used_fabric_blocks WHERE fabric_block_id = ?",
+            "DELETE FROM processes_fabric_blocks_inventory WHERE fabric_block_id = ?",
             (fabric_block_id,),
         )
         cursor.execute(
@@ -755,26 +759,26 @@ def get_used_fabric_block(
     fb_id, fb_type_id, fb_co2eq, fb_location_id, fb_location_name = result
     cursor.execute(
         """
-        SELECT pt.name, pufb.amount, pt.activity_id
-        FROM preparations_used_fabric_blocks pufb
-        JOIN process_types pt ON pufb.type_id = pt.id
-        WHERE pufb.fabric_block_id = ?
+        SELECT pt.name, pfbi.amount, pt.activity_id
+        FROM processes_fabric_blocks_inventory pfbi
+        JOIN process_types pt ON pfbi.process_id = pt.id
+        WHERE pfbi.fabric_block_id = ?
         """,
         (fb_id,),
     )
-    preparations_data = cursor.fetchall()
-    preparations: list[Process] = []
-    for prep in preparations_data:
-        prep_name, prep_amount, activity_id = prep
-        preparations.append(
-            Process(name=prep_name, amount=prep_amount, activity_id=activity_id)
+    inventory_processes_data = cursor.fetchall()
+    processes: list[Process] = []
+    for process in inventory_processes_data:
+        process_name, process_amount, activity_id = process
+        processes.append(
+            Process(name=process_name, amount=process_amount, activity_id=activity_id)
         )
     conn.close()
     return SecondLifeFabricBlock(
         id=fb_id,
         type_id=fb_type_id,
         co2eq=fb_co2eq,
-        processes=preparations,
+        processes=processes,
         location_id=fb_location_id,
         location_name=fb_location_name,
     )

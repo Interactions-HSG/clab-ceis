@@ -94,7 +94,7 @@ def calculate_used_fabric_block_alternative(
     alternative = {
         "id": used_fabric_block.id,
         "location": used_fabric_block.location_name,
-        "preparation_details": [],
+        "process_details": [],
         "transport_emission": 0,
     }
 
@@ -114,13 +114,13 @@ def calculate_used_fabric_block_alternative(
 
     alternative["transport_emission"] = transport_emission or 0
 
-    # Calculate preparation emissions
+    # Calculate inventory-specific process emissions
     prep_emissions, prep_details = calculate_process_emissions(
         wiser_client, used_fabric_block.processes
     )
-    alternative["preparation_details"] = [
+    alternative["process_details"] = [
         {
-            "preparation": detail["process"],
+            "process": detail["process"],
             "amount": detail["amount"],
             "emission": detail["emission"],
             "activity_id": detail["activity_id"],
