@@ -34,8 +34,8 @@ from ceis_backend.queries import (
     get_full_garment_recipe,
 )
 from ceis_backend.data.location_details import (
-    distances_customer_sigmaringen,
-    activity_id_transport,
+    DISTANCES_CUSTOMER_SIGMARINGEN,
+    ACTIVITY_ID_TRANSPORT,
 )
 from ceis_backend.models import (
     FabricBlockInventoryCreate,
@@ -198,10 +198,6 @@ def delete_fabric_block(fabric_block_id: int):
     return db_delete_fabric_block(fabric_block_id)
 
 
-def _get_transport_emission_per_unit(wiser_client: WiserClient) -> float | None:
-    return wiser_client.get_emission_per_unit(activity_id_transport)
-
-
 @app.get("/scenarios")
 def get_co2_scenarios(
     wiser_client: WiserClient = Depends(get_wiser_client),
@@ -232,10 +228,10 @@ def get_co2_scenarios(
         amount_kg += block_weight_kg
 
     try:
-        per_unit_emission = _get_transport_emission_per_unit(wiser_client)
+        per_unit_emission = wiser_client.get_emission_per_unit(ACTIVITY_ID_TRANSPORT)
 
-        distance_bucharest = distances_customer_sigmaringen.get("Bucharest")
-        distance_st_gallen = distances_customer_sigmaringen.get("St. Gallen")
+        distance_bucharest = DISTANCES_CUSTOMER_SIGMARINGEN.get("Bucharest")
+        distance_st_gallen = DISTANCES_CUSTOMER_SIGMARINGEN.get("St. Gallen")
 
         emission_cache: dict[int, float | None] = {}
         replacement_fabric_blocks_data = calculate_replacement_fabric_blocks_emissions(
