@@ -5,7 +5,7 @@ import pytest
 
 from ceis_backend.db_init import init_sqlite_db, create_tables
 from ceis_backend.utils import get_co2_for_garment
-from ceis_backend.queries import get_fabric_block_recipe
+from ceis_backend.queries import get_fabric_block_recipe, get_used_fabric_block
 from ceis_backend.models import Process
 from ceis_backend.main import delete_fabric_block_type
 from fastapi.testclient import TestClient
@@ -141,6 +141,54 @@ class TestGetRecipeForFabricBlock:
         # Verify 80x64 has the 'dyeing' process from seeded data
         process_names = [p.name for p in fabric_block.processes]
         assert "dyeing" in process_names
+
+
+class TestUsedFabricBlockSelection:
+    def test_prioritizes_same_material_for_alternative(self, clean_db):
+        conn = sqlite3.connect("ceis_backend.db")
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "INSERT INTO fabric_block_types (name, sqm) VALUES (?, ?)",
+            ("PriorityBlock", 1.0),
+        )
+        fabric_block_type_id = cursor.lastrowid
+
+        cursor.execute(
+            "INSERT INTO materials (name, kg_per_sqm, activity_id) VALUES (?, ?, ?)",
+            ("cotton", 1.0, 1001),
+        )
+        cotton_material_id = cursor.lastrowid
+        cursor.execute(
+            "INSERT INTO materials (name, kg_per_sqm, activity_id) VALUES (?, ?, ?)",
+            ("hemp", 1.0, 1002),
+        )
+        hemp_material_id = cursor.lastrowid
+
+        # Insert non-matching material first to prove ordering prioritizes preferred material.
+        cursor.execute(
+            """
+            INSERT INTO fabric_blocks_inventory (type_id, co2eq, garment_id, location_id, material_id, quality)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (fabric_block_type_id, None, None, None, cotton_material_id, 90),
+        )
+        cursor.execute(
+            """
+            INSERT INTO fabric_blocks_inventory (type_id, co2eq, garment_id, location_id, material_id, quality)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (fabric_block_type_id, None, None, None, hemp_material_id, 85),
+        )
+        conn.commit()
+        conn.close()
+
+        selected = get_used_fabric_block(
+            "PriorityBlock", already_used_ids=[], preferred_material="hemp"
+        )
+
+        assert selected is not None
+        assert selected.material == "hemp"
 
     def test_returns_correct_process_details(self, test_db):
         """Verify process details match seeded data."""
@@ -692,6 +740,7 @@ class TestGetCo2TransportEmissions:
         alternative = fb_details.get("alternative", {})
 
         assert "transport_emission" in alternative
+        assert alternative["quality"] == pytest.approx(100.0)
         expected_transport = 0.1 / 1000 * 10 * 2.0  # 0.002
         assert alternative["transport_emission"] == pytest.approx(expected_transport)
 
