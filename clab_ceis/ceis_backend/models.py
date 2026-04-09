@@ -42,6 +42,8 @@ class SecondLifeFabricBlock(BaseModel):
     processes: list[Process]
     location_id: Optional[int] = None
     location_name: Optional[str] = None
+    material: Optional[str] = None
+    quality: float = 100.0
 
 
 class FabricBlockInventoryCreate(BaseModel):
@@ -49,7 +51,7 @@ class FabricBlockInventoryCreate(BaseModel):
     processes: list[InventoryProcessInfo]
     location_id: Optional[int] = None
     material_id: Optional[int] = None
-    quality: float
+    quality: float = 100.0
 
 
 class EmissionDetails(BaseModel):

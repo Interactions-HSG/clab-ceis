@@ -123,6 +123,8 @@ def calculate_used_fabric_block_alternative(
     alternative = {
         "id": used_fabric_block.id,
         "location": used_fabric_block.location_name,
+        "material": used_fabric_block.material,
+        "quality": used_fabric_block.quality,
         "process_details": [],
         "transport_emission": 0,
     }
@@ -212,7 +214,14 @@ def process_fabric_block_emissions(
     total_emission = material_emission + production_emission
 
     # Used/alternative fabric block
-    used_fabric_block = get_used_fabric_block(fabric_block_name, already_used_ids)
+    preferred_material = getattr(
+        fabric_block_data.material, "value", fabric_block_data.material
+    )
+    used_fabric_block = get_used_fabric_block(
+        fabric_block_name,
+        already_used_ids,
+        preferred_material=str(preferred_material),
+    )
     used_fabric_block_alternative = {}
 
     if used_fabric_block:
