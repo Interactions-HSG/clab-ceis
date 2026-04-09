@@ -353,27 +353,12 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
 
         if triggered == "add-recipe-fabric-block":
             fabric_block_options = []
-            material_options = []
             try:
                 resp = requests.get(f"{config.BACKEND_API_URL}/fabric-block-types")
                 if resp.status_code == 200:
                     data = resp.json()
                     fabric_block_options = [
                         {"label": fb["name"], "value": fb["id"]} for fb in data
-                    ]
-            except Exception:
-                pass
-
-            try:
-                resp = requests.get(f"{config.BACKEND_API_URL}/materials")
-                if resp.status_code == 200:
-                    data = resp.json()
-                    material_options = [
-                        {
-                            "label": f"{m['name']} ({m['kg_per_sqm']} kg/sqm)",
-                            "value": m["id"],
-                        }
-                        for m in data
                     ]
             except Exception:
                 pass
@@ -393,16 +378,6 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
                                     placeholder="Select fabric block type",
                                     clearable=False,
                                     style={"width": "240px"},
-                                ),
-                                dcc.Dropdown(
-                                    id={
-                                        "type": "recipe-fabric-block-material",
-                                        "index": new_id,
-                                    },
-                                    options=material_options,
-                                    placeholder="Select material",
-                                    clearable=False,
-                                    style={"width": "240px", "marginTop": "6px"},
                                 ),
                             ],
                             style={"flex": "1"},
@@ -435,6 +410,58 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
             )
 
         elif triggered == "remove-recipe-fabric-block" and len(children) > 0:
+            children = children[:-1]
+
+        return children
+
+    @app.callback(
+        Output("recipe-materials-container", "children"),
+        [
+            Input("add-recipe-material", "n_clicks"),
+            Input("remove-recipe-material", "n_clicks"),
+        ],
+        [State("recipe-materials-container", "children")],
+    )
+    def update_recipe_material_fields(add_clicks, remove_clicks, children):
+        ctx = callback_context
+        triggered = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else None
+
+        if children is None:
+            children = []
+
+        if triggered == "add-recipe-material":
+            material_options = []
+            try:
+                resp = requests.get(f"{config.BACKEND_API_URL}/materials")
+                if resp.status_code == 200:
+                    data = resp.json()
+                    material_options = [
+                        {
+                            "label": f"{m['name']} ({m['kg_per_sqm']} kg/sqm)",
+                            "value": m["id"],
+                        }
+                        for m in data
+                    ]
+            except Exception:
+                pass
+
+            new_id = len(children)
+            children.append(
+                html.Div(
+                    [
+                        dcc.Dropdown(
+                            id={"type": "recipe-material", "index": new_id},
+                            options=material_options,
+                            placeholder="Select material",
+                            clearable=False,
+                            style={"width": "240px"},
+                        ),
+                    ],
+                    style={"marginBottom": "8px"},
+                )
+            )
+
+        elif triggered == "remove-recipe-material" and len(children) > 0:
             children = children[:-1]
 
         return children
@@ -518,9 +545,10 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
         Output("garment-recipe-status", "children"),
         Input("add-garment-recipe", "n_clicks"),
         State("recipe-garment-type-name", "value"),
+        State("recipe-garment-price", "value"),
         State({"type": "recipe-fabric-block", "index": ALL}, "value"),
-        State({"type": "recipe-fabric-block-material", "index": ALL}, "value"),
         State({"type": "recipe-fabric-block-amount", "index": ALL}, "value"),
+        State({"type": "recipe-material", "index": ALL}, "value"),
         State({"type": "recipe-process", "index": ALL}, "value"),
         State({"type": "recipe-process-amount", "index": ALL}, "value"),
         prevent_initial_call=True,
@@ -528,25 +556,28 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
     def add_garment_recipe(
         n_clicks,
         garment_type_name,
+        garment_price,
         fabric_block_ids,
-        fabric_material_ids,
         fabric_block_amounts,
+        material_ids,
         process_ids,
         process_amounts,
     ):
         if not garment_type_name:
             return "Please enter a garment type name."
+        if garment_price is None:
+            return "Please enter a garment price in CHF."
+        try:
+            garment_price_value = float(garment_price)
+        except (TypeError, ValueError):
+            return "Garment price must be a valid number."
+        if garment_price_value <= 0:
+            return "Garment price must be greater than 0."
 
         fabric_blocks = []
-        material_ids = set()
-        for fb_id, material_id, amount in zip(
-            fabric_block_ids, fabric_material_ids, fabric_block_amounts
-        ):
+        for fb_id, amount in zip(fabric_block_ids, fabric_block_amounts):
             if fb_id is None:
                 continue
-            if material_id is None:
-                return "Please select a material for each fabric block."
-            material_ids.add(material_id)
             try:
                 fb_amount = int(amount) if amount is not None else 1
             except (TypeError, ValueError):
@@ -562,6 +593,16 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
 
         if not fabric_blocks:
             return "Please add at least one fabric block."
+
+        selected_material_ids = sorted(
+            {
+                material_id
+                for material_id in material_ids
+                if material_id is not None
+            }
+        )
+        if not selected_material_ids:
+            return "Please add at least one material."
 
         processes = []
         for proc_id, amount in zip(process_ids, process_amounts):
@@ -580,7 +621,7 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
         try:
             resp = requests.post(
                 f"{config.BACKEND_API_URL}/garment-types",
-                json={"name": garment_type_name},
+                json={"name": garment_type_name, "price_chf": garment_price_value},
             )
             if resp.status_code in (200, 201):
                 garment_type_id = resp.json().get("id")
@@ -606,7 +647,7 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
                 "fabric_blocks": fabric_blocks,
                 "materials": [
                     {"material_id": material_id}
-                    for material_id in sorted(material_ids)
+                    for material_id in selected_material_ids
                 ],
                 "processes": processes,
             }

@@ -27,12 +27,22 @@ def _fetch_json(path: str):
     return response.json()
 
 
-def _format_fabric_blocks_from_co2(co2_payload: dict) -> list[html.Li]:
+def _format_fabric_blocks(recipe_payload: list[dict]) -> list[html.Li]:
     block_counter: Counter[str] = Counter()
-    for detail in co2_payload.get("fabric_blocks", {}).get("details", []):
+    for index, detail in enumerate(recipe_payload):
         block_name = detail.get("fabric_block")
-        if block_name:
-            block_counter[block_name] += 1
+        amount = detail.get("amount")
+
+        if not block_name:
+            raise ValueError(f"Missing fabric_block in recipe item {index}.")
+        if amount is None:
+            raise ValueError(f"Missing amount for fabric block '{block_name}'.")
+        if not isinstance(amount, int) or amount <= 0:
+            raise ValueError(
+                f"Invalid amount '{amount}' for fabric block '{block_name}'."
+            )
+
+        block_counter[block_name] += amount
 
     return [
         html.Li(f"{block_name} x {count}")
@@ -40,30 +50,24 @@ def _format_fabric_blocks_from_co2(co2_payload: dict) -> list[html.Li]:
     ]
 
 
-def render_recipe_content(co2_payload: dict) -> html.Div:
-    fabric_blocks = _format_fabric_blocks_from_co2(co2_payload)
+def render_recipe_content(recipe_payload: list[dict]) -> html.Div:
+    fabric_blocks = _format_fabric_blocks(recipe_payload)
 
     return html.Div(
         children=[
-            html.H3("Recipe"),
+            html.H3("Fabric Blocks"),
             html.Ul(fabric_blocks or [html.Li("No fabric blocks found.")]),
         ]
     )
 
 
-def render_waiting_for_material_recipe_content() -> html.Div:
-    return html.Div(
-        [
-            html.H3("Recipe"),
-            html.P("Select a material to view recipe details."),
-        ]
-    )
-
-
 def render_co2_content(selected_material_name: str, co2_payload: dict) -> html.Div:
+    try:
+        fabric_blocks_total = co2_payload["fabric_blocks"]["total_emission"]
+        processes_total = co2_payload["processes"]["total_emission"]
+    except KeyError as exc:
+        raise ValueError(f"Missing CO2 payload field: {exc}") from exc
 
-    fabric_blocks_total = co2_payload.get("fabric_blocks", {}).get("total_emission", 0)
-    processes_total = co2_payload.get("processes", {}).get("total_emission", 0)
     total_emission = fabric_blocks_total + processes_total
 
     return html.Div(
@@ -79,7 +83,7 @@ def render_waiting_for_material_co2_content() -> html.Div:
     return html.Div(
         [
             html.H3("CO2 Emissions"),
-            html.P("Select a material to view total CO2."),
+            html.P("Select a material to view CO2 emissions."),
         ]
     )
 
@@ -121,7 +125,23 @@ def garment_page(garment_type_id: int):
             {"label": material["name"], "value": material["id"]}
             for material in materials
         ]
-        recipe_content = render_waiting_for_material_recipe_content()
+        selected_material = materials[0] if len(materials) == 1 else None
+        selected_material_id = (
+            selected_material.get("id") if selected_material is not None else None
+        )
+        try:
+            recipe_payload = _fetch_json(
+                f"/garment-types/{garment_type_id}/fabric-blocks"
+            )
+            recipe_content = render_recipe_content(recipe_payload)
+        except Exception as exc:
+            recipe_content = html.Div(
+                [
+                    html.H3("Fabric Blocks"),
+                    html.P("Unable to load recipe details."),
+                    html.P(str(exc)),
+                ]
+            )
         initial_co2_content = render_waiting_for_material_co2_content()
 
         return html.Div(
@@ -136,7 +156,7 @@ def garment_page(garment_type_id: int):
                         dcc.Dropdown(
                             id="garment-material-dropdown",
                             options=material_options,
-                            value=None,
+                            value=selected_material_id,
                             placeholder="Select a material",
                             clearable=True,
                         ),
@@ -153,7 +173,9 @@ def garment_page(garment_type_id: int):
                         html.Div(
                             className="product-description",
                             children=[
-                                html.Div(id="garment-recipe-content", children=recipe_content),
+                                html.Div(
+                                    id="garment-recipe-content", children=recipe_content
+                                ),
                                 dcc.Loading(
                                     id="garment-co2-loading",
                                     type="circle",
