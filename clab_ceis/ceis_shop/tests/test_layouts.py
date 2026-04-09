@@ -116,22 +116,46 @@ def test_render_co2_content_shows_alternatives_and_capped_discount():
                     {
                         "fabric_block": "80x64",
                         "material": "hemp",
-                        "alternative": {"id": 11, "quality": 80, "material": "cotton"},
+                        "emission": 1.1,
+                        "alternative": {
+                            "id": 11,
+                            "quality": 80,
+                            "material": "cotton",
+                            "emission": 0.2,
+                        },
                     },
                     {
                         "fabric_block": "64x40",
                         "material": "cotton",
-                        "alternative": {"id": 12, "quality": 95, "material": "linen"},
+                        "emission": 0.5,
+                        "alternative": {
+                            "id": 12,
+                            "quality": 95,
+                            "material": "linen",
+                            "emission": 0.15,
+                        },
                     },
                     {
                         "fabric_block": "32x32",
                         "material": "linen",
-                        "alternative": {"id": 13, "quality": 70, "material": "wool"},
+                        "emission": 0.4,
+                        "alternative": {
+                            "id": 13,
+                            "quality": 70,
+                            "material": "wool",
+                            "emission": 0.1,
+                        },
                     },
                     {
                         "fabric_block": "16x16",
                         "material": "silk",
-                        "alternative": {"id": 14, "quality": 100, "material": "silk"},
+                        "emission": 0.0,
+                        "alternative": {
+                            "id": 14,
+                            "quality": 100,
+                            "material": "silk",
+                            "emission": 0.0,
+                        },
                     },
                 ],
             },
@@ -150,4 +174,33 @@ def test_render_co2_content_shows_alternatives_and_capped_discount():
     )
     assert "32x32 can be replaced by a second-life wool block with quality 70 %" in text
     assert "16x16 can be replaced" not in text
+    assert (
+        "Choosing the available alternative fabric blocks would reduce this to "
+        "1.450 kg CO2eq, saving 1.550 kg CO2eq." in text
+    )
     assert "Price: CHF 40.00 (60% discount from CHF 100.00)" in text
+
+
+def test_render_co2_content_shows_no_savings_message_without_replacements():
+    layout = render_co2_content(
+        "hemp",
+        {
+            "fabric_blocks": {
+                "total_emission": 2.0,
+                "details": [
+                    {
+                        "fabric_block": "80x64",
+                        "material": "hemp",
+                        "emission": 2.0,
+                        "alternative": {},
+                    }
+                ],
+            },
+            "processes": {"total_emission": 1.0, "details": []},
+        },
+        base_price_chf=100.0,
+    )
+
+    text = str(layout)
+
+    assert "No CO2-saving fabric block alternatives available." in text
