@@ -19,6 +19,7 @@ from ceis_backend.queries import (
     db_get_locations,
     db_get_materials,
     db_get_materials_for_garment,
+    db_get_recipe_fabric_blocks,
     db_upsert_material,
     db_delete_garment_recipe,
     db_create_fabric_block_type,
@@ -74,7 +75,7 @@ def read_root():
 
 @app.post("/garment-types")
 def create_garment_type(payload: GarmentTypeCreate):
-    return db_create_garment_type(payload.name)
+    return db_create_garment_type(payload.name, payload.price_chf)
 
 
 @app.get("/garment-types")
@@ -95,6 +96,11 @@ def get_materials():
 @app.get("/garment-types/{garment_type_id}/materials")
 def get_materials_for_garment(garment_type_id: int):
     return db_get_materials_for_garment(garment_type_id)
+
+
+@app.get("/garment-types/{garment_type_id}/fabric-blocks")
+def get_recipe_fabric_blocks_for_garment(garment_type_id: int):
+    return db_get_recipe_fabric_blocks(garment_type_id)
 
 
 @app.post("/materials")
@@ -184,6 +190,8 @@ async def create_fabric_block(fabric_block: FabricBlockInventoryCreate):
     return db_create_fabric_block(
         fabric_block.type_id,
         fabric_block.location_id,
+        fabric_block.material_id,
+        fabric_block.quality,
         fabric_block.processes or [],
     )
 

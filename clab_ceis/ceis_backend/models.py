@@ -48,6 +48,8 @@ class FabricBlockInventoryCreate(BaseModel):
     type_id: int
     processes: list[InventoryProcessInfo]
     location_id: Optional[int] = None
+    material_id: Optional[int] = None
+    quality: float
 
 
 class EmissionDetails(BaseModel):
@@ -67,6 +69,7 @@ class GarmentRecipe(BaseModel):
 
 class GarmentTypeCreate(BaseModel):
     name: str
+    price_chf: float
 
 
 class FabricBlockTypeProcessCreate(BaseModel):

@@ -21,6 +21,14 @@ def get_recipe_layout():
                                 type="text",
                                 placeholder="e.g., jacket",
                             ),
+                            html.Label("Garment price (CHF)"),
+                            dcc.Input(
+                                id="recipe-garment-price",
+                                type="number",
+                                min=0,
+                                step=1,
+                                placeholder="e.g., 100",
+                            ),
                             html.H3("Fabric blocks in recipe"),
                             html.Div(id="recipe-fabric-blocks-container", children=[]),
                             html.Div(
@@ -33,6 +41,28 @@ def get_recipe_layout():
                                     html.Button(
                                         "Remove Last Fabric Block",
                                         id="remove-recipe-fabric-block",
+                                        n_clicks=0,
+                                    ),
+                                ],
+                                style={
+                                    "marginTop": "8px",
+                                    "marginBottom": "12px",
+                                    "display": "flex",
+                                    "gap": "8px",
+                                },
+                            ),
+                            html.H3("Materials in recipe"),
+                            html.Div(id="recipe-materials-container", children=[]),
+                            html.Div(
+                                [
+                                    html.Button(
+                                        "Add Material",
+                                        id="add-recipe-material",
+                                        n_clicks=0,
+                                    ),
+                                    html.Button(
+                                        "Remove Last Material",
+                                        id="remove-recipe-material",
                                         n_clicks=0,
                                     ),
                                 ],

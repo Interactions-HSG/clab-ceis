@@ -47,6 +47,24 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
         return []
 
     @app.callback(
+        Output("fabric-material", "options"),
+        Input("url", "pathname"),
+    )
+    def load_materials(pathname):
+        try:
+            resp = requests.get(f"{config.BACKEND_API_URL}/materials")
+
+            if resp.status_code == 200:
+                data = resp.json()
+
+                return [{"label": mat["name"], "value": mat["id"]} for mat in data]
+
+        except Exception:
+            pass
+
+        return []
+
+    @app.callback(
         Output("delete-fabric-block-id", "options"),
         Input("url", "pathname"),
         Input("refresh-fabric-blocks", "n_clicks"),
@@ -159,6 +177,8 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
         [
             State("fabric-type", "value"),
             State("fabric-location", "value"),
+            State("fabric-material", "value"),
+            State("fabric-quality", "value"),
             State({"type": "process-name", "index": ALL}, "value"),
             State({"type": "process-amount", "index": ALL}, "value"),
             State("delete-fabric-block-id", "value"),
@@ -171,6 +191,8 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
         delete_clicks,
         type_val,
         location_val,
+        material_val,
+        quality_val,
         process_names,
         process_amounts,
         delete_id,
@@ -189,12 +211,42 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
             if not type_val:
                 return no_update, "Please select a fabric type.", ""
 
+            if quality_val is None:
+                return no_update, "Please enter a quality percentage.", ""
+            try:
+                quality = float(quality_val)
+            except (TypeError, ValueError):
+                return no_update, "Quality must be a valid number.", ""
+            if quality < 0 or quality > 100:
+                return no_update, "Quality must be between 0 and 100.", ""
+
             processes: list[InventoryProcessInfo] = []
-            for name, amount in zip(process_names, process_amounts):
-                processes.append(InventoryProcessInfo(process_id=name, amount=amount))
+            for name, amount in zip(process_names or [], process_amounts or []):
+                if name is None:
+                    continue
+                if amount is None:
+                    return (
+                        no_update,
+                        "Please provide an amount for each selected process.",
+                        "",
+                    )
+                try:
+                    process_id = int(name)
+                    process_amount = float(amount)
+                except (TypeError, ValueError):
+                    return no_update, "Process inputs must be valid numbers.", ""
+                if process_amount <= 0:
+                    return no_update, "Process amount must be greater than 0.", ""
+                processes.append(
+                    InventoryProcessInfo(process_id=process_id, amount=process_amount)
+                )
 
             payload = FabricBlockInventoryCreate(
-                type_id=type_val, processes=processes, location_id=location_val
+                type_id=type_val,
+                processes=processes,
+                location_id=location_val,
+                material_id=material_val,
+                quality=quality,
             )
             print("Payload:", payload)
             try:

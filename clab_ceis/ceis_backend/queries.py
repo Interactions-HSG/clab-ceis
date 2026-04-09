@@ -14,17 +14,31 @@ from ceis_backend.models import (
 )
 
 
-def db_create_garment_type(name: str) -> dict:
+def db_create_garment_type(name: str, price_chf: float) -> dict:
     """Create a new garment type in the database."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     try:
+        if price_chf <= 0:
+            raise HTTPException(
+                status_code=400, detail="price_chf must be greater than 0"
+            )
+
         cursor.execute(
-            "INSERT INTO garment_types (name) VALUES (?)",
-            (name,),
+            "INSERT INTO garment_types (name, price_chf) VALUES (?, ?)",
+            (name, price_chf),
         )
+        cursor.execute(
+            "SELECT id, name, price_chf FROM garment_types WHERE id = ?",
+            (cursor.lastrowid,),
+        )
+        created = cursor.fetchone()
         conn.commit()
-        return {"id": cursor.lastrowid, "name": name}
+        return {
+            "id": created[0],
+            "name": created[1],
+            "price_chf": float(price_chf),
+        }
     except sqlite3.IntegrityError:
         raise HTTPException(status_code=409, detail="Garment type already exists")
     finally:
@@ -35,10 +49,10 @@ def db_get_garment_types() -> list[dict]:
     """Get all garment types from the database."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("SELECT id, name FROM garment_types")
+    cursor.execute("SELECT id, name, price_chf FROM garment_types")
     garment_types = cursor.fetchall()
     conn.close()
-    return [{"id": gt[0], "name": gt[1]} for gt in garment_types]
+    return [{"id": gt[0], "name": gt[1], "price_chf": gt[2]} for gt in garment_types]
 
 
 def db_get_locations() -> list[dict]:
@@ -95,6 +109,32 @@ def db_get_materials_for_garment(garment_type_id: int) -> list[dict]:
             "activity_id": row[3],
         }
         for row in materials
+    ]
+
+
+def db_get_recipe_fabric_blocks(garment_type_id: int) -> list[dict]:
+    """Get fabric blocks associated with a specific garment recipe."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT ft.id, ft.name, grfb.amount
+        FROM garment_recipe_fabric_blocks grfb
+        JOIN fabric_block_types ft ON ft.id = grfb.fabric_block_id
+        WHERE grfb.garment_type = ?
+        ORDER BY grfb.id
+        """,
+        (garment_type_id,),
+    )
+    fabric_blocks = cursor.fetchall()
+    conn.close()
+    return [
+        {
+            "fabric_block_id": row[0],
+            "fabric_block": row[1],
+            "amount": row[2],
+        }
+        for row in fabric_blocks
     ]
 
 
@@ -474,19 +514,32 @@ def db_create_garment_recipe(
 
 
 def db_create_fabric_block(
-    type_id: int, location_id: int | None, processes: list
+    type_id: int,
+    location_id: int | None,
+    material_id: int | None,
+    quality: float,
+    processes: list,
 ) -> dict:
     """Create a new fabric block in the inventory."""
+    if quality < 0 or quality > 100:
+        raise HTTPException(status_code=400, detail="quality must be between 0 and 100")
+
     co2eq = None  # Placeholder
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
+    if material_id is not None:
+        cursor.execute("SELECT 1 FROM materials WHERE id = ?", (material_id,))
+        if cursor.fetchone() is None:
+            conn.close()
+            raise HTTPException(status_code=400, detail="Invalid material")
+
     cursor.execute(
         """
-        INSERT INTO fabric_blocks_inventory (type_id, co2eq, location_id)
-        VALUES (?, ?, ?)
+        INSERT INTO fabric_blocks_inventory (type_id, co2eq, location_id, material_id, quality)
+        VALUES (?, ?, ?, ?, ?)
         """,
-        (type_id, co2eq, location_id),
+        (type_id, co2eq, location_id, material_id, quality),
     )
     fabric_block_id = cursor.lastrowid
     if not fabric_block_id:
@@ -499,7 +552,10 @@ def db_create_fabric_block(
             INSERT INTO processes_fabric_blocks_inventory (process_id, amount, fabric_block_id)
             VALUES (?, ?, ?)
             """,
-            [(process.process_id, process.amount, fabric_block_id) for process in processes],
+            [
+                (process.process_id, process.amount, fabric_block_id)
+                for process in processes
+            ],
         )
 
     conn.commit()
@@ -513,9 +569,10 @@ def db_get_fabric_blocks(type_filter: str | None = None) -> list[dict]:
     cursor = conn.cursor()
     cursor.execute(
         """
-                   SELECT fbi.id, fbi.type_id, fbi.co2eq, fbi.garment_id, l.name as location_name
+                   SELECT fbi.id, fbi.type_id, fbi.co2eq, fbi.garment_id, l.name as location_name, m.name as material_name, fbi.quality
                    FROM fabric_blocks_inventory fbi
                    LEFT JOIN locations l ON fbi.location_id = l.id
+                   LEFT JOIN materials m ON fbi.material_id = m.id
                    WHERE fbi.type_id = ? OR ? IS NULL
                    """,
         (type_filter, type_filter),
@@ -524,7 +581,7 @@ def db_get_fabric_blocks(type_filter: str | None = None) -> list[dict]:
 
     fabric_blocks = []
     for fb in fabric_blocks_data:
-        fb_id, fb_type, fb_co2eq, garment_id, location_name = fb
+        fb_id, fb_type, fb_co2eq, garment_id, location_name, material_name, quality = fb
         cursor.execute(
             "SELECT name FROM fabric_block_types WHERE id = ?",
             (fb_type,),
@@ -549,6 +606,8 @@ def db_get_fabric_blocks(type_filter: str | None = None) -> list[dict]:
                 "co2eq": fb_co2eq,
                 "garment_id": garment_id,
                 "location": location_name,
+                "material": material_name,
+                "quality": quality,
                 "processes": processes,
             }
         )

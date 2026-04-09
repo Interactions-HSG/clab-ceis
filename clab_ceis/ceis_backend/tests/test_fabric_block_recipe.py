@@ -406,6 +406,28 @@ class TestGetLocationsEndpoint:
         assert response.json() == []
 
 
+class TestGetGarmentRecipeFabricBlocksEndpoint:
+    def test_returns_fabric_blocks_for_existing_garment(self, test_db):
+        client = TestClient(app)
+
+        response = client.get("/garment-types/1/fabric-blocks")
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert isinstance(payload, list)
+        assert len(payload) > 0
+        assert "fabric_block" in payload[0]
+        assert "amount" in payload[0]
+
+    def test_returns_empty_list_for_unknown_garment(self, test_db):
+        client = TestClient(app)
+
+        response = client.get("/garment-types/999999/fabric-blocks")
+
+        assert response.status_code == 200
+        assert response.json() == []
+
+
 class TestCreateFabricBlockWithLocation:
     """Test case: create_fabric_block stores fabric block with location_id."""
 
@@ -947,7 +969,7 @@ class TestGetCo2TransportEmissions:
             (
                 process
                 for process in process_details
-                if process.get("process") == "garment transport inside supply chain"
+                if process.get("process") == "transport inside supply chain"
             ),
             None,
         )

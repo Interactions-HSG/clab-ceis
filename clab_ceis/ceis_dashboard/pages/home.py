@@ -28,6 +28,8 @@ def get_index_layout():
                 columns=[
                     {"name": "id", "id": "id"},
                     {"name": "type", "id": "type"},
+                    {"name": "material", "id": "material"},
+                    {"name": "quality (%)", "id": "quality"},
                     {"name": "co2eq", "id": "co2eq"},
                     {"name": "garment_id", "id": "garment_id"},
                     {"name": "location", "id": "location"},
@@ -71,6 +73,33 @@ def get_index_layout():
                         options=[],
                         placeholder="Select a location",
                         clearable=True,
+                    ),
+                ],
+                style={"marginBottom": "12px", "maxWidth": "400px"},
+            ),
+            html.Div(
+                [
+                    html.Label("Material"),
+                    dcc.Dropdown(
+                        id="fabric-material",
+                        options=[],
+                        placeholder="Select a material",
+                        clearable=True,
+                    ),
+                ],
+                style={"marginBottom": "12px", "maxWidth": "400px"},
+            ),
+            html.Div(
+                [
+                    html.Label("Quality (%)"),
+                    dcc.Input(
+                        id="fabric-quality",
+                        type="number",
+                        min=0,
+                        max=100,
+                        step=1,
+                        value=100,
+                        placeholder="e.g., 95",
                     ),
                 ],
                 style={"marginBottom": "12px", "maxWidth": "400px"},
