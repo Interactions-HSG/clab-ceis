@@ -101,6 +101,21 @@ def _build_alternative_fabric_block_items(co2_payload: dict) -> list[html.Li]:
     return items
 
 
+def _get_alternative_emissions(co2_payload: dict) -> float | None:
+    alternative_total = co2_payload.get("processes", {}).get("total_emission", 0.0)
+    has_alternative = False
+
+    for detail in co2_payload.get("fabric_blocks", {}).get("details", []):
+        alternative = detail.get("alternative") or {}
+        if alternative.get("id") is not None:
+            alternative_total += float(alternative.get("emission", 0))
+            has_alternative = True
+        else:
+            alternative_total += float(detail.get("emission", 0))
+
+    return alternative_total if has_alternative else None
+
+
 def render_co2_content(
     selected_material_name: str, co2_payload: dict, base_price_chf: float | None = None
 ) -> html.Div:
@@ -111,6 +126,12 @@ def render_co2_content(
         raise ValueError(f"Missing CO2 payload field: {exc}") from exc
 
     total_emission = fabric_blocks_total + processes_total
+    alternative_emission = _get_alternative_emissions(co2_payload)
+    co2_saved = (
+        total_emission - alternative_emission
+        if alternative_emission is not None
+        else None
+    )
     discount_rate = _get_discount_rate(co2_payload)
     discounted_price = (
         base_price_chf * (1 - discount_rate) if base_price_chf is not None else None
@@ -122,6 +143,15 @@ def render_co2_content(
             html.H3("CO2 Emissions"),
             html.P(f"Material for CO2 calculation: {selected_material_name}."),
             html.P(f"Total: {total_emission:.3f} kg CO2eq"),
+            (
+                html.P(
+                    "Choosing the available alternative fabric blocks would reduce "
+                    f"this to {alternative_emission:.3f} kg CO2eq, saving "
+                    f"{co2_saved:.3f} kg CO2eq."
+                )
+                if alternative_emission is not None and co2_saved is not None
+                else html.P("No CO2-saving fabric block alternatives available.")
+            ),
             html.H3("Alternatives"),
             html.Ul(
                 alternative_items
