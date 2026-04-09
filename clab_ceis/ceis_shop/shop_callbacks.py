@@ -9,9 +9,7 @@ from dash.dependencies import Input, Output
 from ceis_shop import config
 from ceis_shop.layouts.garment import (
     render_co2_content,
-    render_recipe_content,
     render_waiting_for_material_co2_content,
-    render_waiting_for_material_recipe_content,
 )
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "ceis_dashboard"))
@@ -86,7 +84,6 @@ def get_callbacks(app):
         )
 
     @app.callback(
-        Output("garment-recipe-content", "children"),
         Output("garment-co2-content", "children"),
         Input("garment-material-dropdown", "value"),
         Input("garment-type-id-store", "data"),
@@ -95,13 +92,10 @@ def get_callbacks(app):
     def update_garment_recipe_and_co2(material_id, garment_type_id, materials):
         if not garment_type_id or not materials:
             unavailable = html.Div("Material and garment information is unavailable.")
-            return unavailable, unavailable
+            return unavailable
 
-        if not material_id:
-            return (
-                render_waiting_for_material_recipe_content(),
-                render_waiting_for_material_co2_content(),
-            )
+        if material_id is None:
+            return render_waiting_for_material_co2_content()
 
         selected_material = next(
             (material for material in materials if material.get("id") == material_id),
@@ -119,13 +113,6 @@ def get_callbacks(app):
             response.raise_for_status()
             co2_payload = response.json()
         except Exception as exc:
-            recipe_error = html.Div(
-                [
-                    html.H3("Recipe"),
-                    html.P("Unable to load recipe for selected material."),
-                    html.P(str(exc)),
-                ]
-            )
             co2_error = html.Div(
                 [
                     html.H3("CO2 Emissions"),
@@ -133,9 +120,6 @@ def get_callbacks(app):
                     html.P(str(exc)),
                 ]
             )
-            return recipe_error, co2_error
+            return co2_error
 
-        return (
-            render_recipe_content(co2_payload),
-            render_co2_content(selected_material_name, co2_payload),
-        )
+        return render_co2_content(selected_material_name, co2_payload)

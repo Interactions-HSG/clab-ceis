@@ -234,6 +234,8 @@ def register_co2_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
                 )
                 continue
 
-            sections.append(_build_material_co2_section(garment_name, material_name, co2_data))
+            sections.append(
+                _build_material_co2_section(garment_name, material_name, co2_data)
+            )
 
         return html.Div(sections)

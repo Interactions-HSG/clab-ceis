@@ -6,12 +6,14 @@ from ceis_backend.manufacturer_distance_sync import (
     sync_manufacturer_distances_if_changed,
 )
 
+
 def create_tables(cursor):
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS garment_types (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE
+            name TEXT NOT NULL UNIQUE,
+            price_chf REAL NOT NULL
         )
     """
     )
@@ -130,9 +132,12 @@ def create_tables(cursor):
             co2eq INTEGER,
             garment_id INTEGER,
             location_id INTEGER,
+            material_id INTEGER,
+            quality REAL NOT NULL,
             FOREIGN KEY (type_id) REFERENCES fabric_block_types (id) ON DELETE CASCADE,
             FOREIGN KEY (garment_id) REFERENCES garments_inventory (id) ON DELETE CASCADE,
-            FOREIGN KEY (location_id) REFERENCES locations (id) ON DELETE SET NULL
+            FOREIGN KEY (location_id) REFERENCES locations (id) ON DELETE SET NULL,
+            FOREIGN KEY (material_id) REFERENCES materials (id) ON DELETE SET NULL
         )
     """
     )
@@ -221,7 +226,6 @@ def create_tables(cursor):
     )
 
 
-
 def seed_data(cursor):
     cursor.execute("SELECT seeded FROM seed_meta WHERE id = 1;")
     if cursor.fetchone()[0] != 0:
@@ -242,25 +246,25 @@ def seed_data(cursor):
         ('silk', 0.082, 20936),
         ('mikado silk', 0.13, 20936);
 
-        INSERT OR IGNORE INTO garment_types (name) VALUES
-        ('Basic Trousers'),
-        ('Full Trousers'),
-        ('Basic Jumpsuit short sleeves'),
-        ('Basic Jumpsuit long sleeves'),
-        ('Elegant cowl neck top'),
-        ('Elegant cowl neck dress'),
-        ('Wrap Skirt'),
-        ('Daily dress with pocket'),
-        ('Cocktail fitted dress'),
-        ('Long tabard'),
-        ('Cocoon jacket'),
-        ('Orka jacket'),
-        ('Nordlys Dress'),
-        ('Mangata Dress'),
-        ('Måne top'),
-        ('Sommar Skirt'),
-        ('Basic Unisex Shirt with pocket'),
-        ('Basic Crop Top');
+        INSERT OR IGNORE INTO garment_types (name, price_chf) VALUES
+        ('Basic Trousers', 100),
+        ('Full Trousers', 100),
+        ('Basic Jumpsuit short sleeves', 100),
+        ('Basic Jumpsuit long sleeves', 100),
+        ('Elegant cowl neck top', 100),
+        ('Elegant cowl neck dress', 100),
+        ('Wrap Skirt', 100),
+        ('Daily dress with pocket', 100),
+        ('Cocktail fitted dress', 100),
+        ('Long tabard', 100),
+        ('Cocoon jacket', 100),
+        ('Orka jacket', 100),
+        ('Nordlys Dress', 100),
+        ('Mangata Dress', 100),
+        ('Måne top', 100),
+        ('Sommar Skirt', 100),
+        ('Basic Unisex Shirt with pocket', 100),
+        ('Basic Crop Top', 100);
 
         INSERT OR IGNORE INTO fabric_block_types (name, sqm) VALUES
         ('80x64', 0.512),
