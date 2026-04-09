@@ -13,7 +13,7 @@ def create_tables(cursor):
         CREATE TABLE IF NOT EXISTS garment_types (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL UNIQUE,
-            price_chf REAL NOT NULL
+            price_chf REAL NOT NULL DEFAULT 100
         )
     """
     )
@@ -133,7 +133,7 @@ def create_tables(cursor):
             garment_id INTEGER,
             location_id INTEGER,
             material_id INTEGER,
-            quality REAL NOT NULL,
+            quality REAL NOT NULL DEFAULT 100,
             FOREIGN KEY (type_id) REFERENCES fabric_block_types (id) ON DELETE CASCADE,
             FOREIGN KEY (garment_id) REFERENCES garments_inventory (id) ON DELETE CASCADE,
             FOREIGN KEY (location_id) REFERENCES locations (id) ON DELETE SET NULL,

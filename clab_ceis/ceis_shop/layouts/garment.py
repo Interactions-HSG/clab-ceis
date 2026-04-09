@@ -61,7 +61,49 @@ def render_recipe_content(recipe_payload: list[dict]) -> html.Div:
     )
 
 
-def render_co2_content(selected_material_name: str, co2_payload: dict) -> html.Div:
+def _get_discount_rate(co2_payload: dict) -> float:
+    fabric_block_details = co2_payload.get("fabric_blocks", {}).get("details", [])
+    lower_quality_blocks = 0
+
+    for detail in fabric_block_details:
+        alternative = detail.get("alternative") or {}
+        quality = alternative.get("quality")
+        if quality is not None and float(quality) < 100:
+            lower_quality_blocks += 1
+
+    return min(
+        lower_quality_blocks * 0.2, 0.6
+    )  # 20% discount per lower-quality block, capped at 60% total discount
+
+
+def _build_alternative_fabric_block_items(co2_payload: dict) -> list[html.Li]:
+    items: list[html.Li] = []
+
+    for detail in co2_payload.get("fabric_blocks", {}).get("details", []):
+        alternative = detail.get("alternative") or {}
+        alternative_id = alternative.get("id")
+        quality = alternative.get("quality")
+        alternative_material = alternative.get("material") or "unknown material"
+
+        if alternative_id is None or quality is None:
+            continue
+        if float(quality) >= 100:
+            continue
+
+        items.append(
+            html.Li(
+                f"{detail.get('fabric_block', 'Unknown')} can be replaced by a "
+                f"second-life {alternative_material} block "
+                f"with quality {float(quality):.0f} %"
+            )
+        )
+
+    return items
+
+
+def render_co2_content(
+    selected_material_name: str, co2_payload: dict, base_price_chf: float | None = None
+) -> html.Div:
     try:
         fabric_blocks_total = co2_payload["fabric_blocks"]["total_emission"]
         processes_total = co2_payload["processes"]["total_emission"]
@@ -69,12 +111,30 @@ def render_co2_content(selected_material_name: str, co2_payload: dict) -> html.D
         raise ValueError(f"Missing CO2 payload field: {exc}") from exc
 
     total_emission = fabric_blocks_total + processes_total
+    discount_rate = _get_discount_rate(co2_payload)
+    discounted_price = (
+        base_price_chf * (1 - discount_rate) if base_price_chf is not None else None
+    )
+    alternative_items = _build_alternative_fabric_block_items(co2_payload)
 
     return html.Div(
         children=[
             html.H3("CO2 Emissions"),
             html.P(f"Material for CO2 calculation: {selected_material_name}."),
             html.P(f"Total: {total_emission:.3f} kg CO2eq"),
+            html.H3("Alternatives"),
+            html.Ul(
+                alternative_items
+                or [html.Li("No second-life fabric block replacements available.")]
+            ),
+            (
+                html.P(
+                    f"Price: CHF {discounted_price:.2f} "
+                    f"({int(discount_rate * 100)}% discount from CHF {base_price_chf:.2f})"
+                )
+                if discounted_price is not None
+                else html.P("Price unavailable.")
+            ),
         ]
     )
 
@@ -150,6 +210,7 @@ def garment_page(garment_type_id: int):
                 html.H1(garment["name"], className="product-title"),
                 dcc.Store(id="garment-type-id-store", data=garment_type_id),
                 dcc.Store(id="garment-materials-store", data=materials),
+                dcc.Store(id="garment-base-price-store", data=garment.get("price_chf")),
                 html.Div(
                     [
                         html.Label("Material", htmlFor="garment-material-dropdown"),
@@ -173,6 +234,13 @@ def garment_page(garment_type_id: int):
                         html.Div(
                             className="product-description",
                             children=[
+                                (
+                                    html.P(
+                                        f"Base price: CHF {float(garment['price_chf']):.2f}"
+                                    )
+                                    if garment.get("price_chf") is not None
+                                    else html.P("Base price unavailable.")
+                                ),
                                 html.Div(
                                     id="garment-recipe-content", children=recipe_content
                                 ),

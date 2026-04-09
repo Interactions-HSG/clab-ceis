@@ -88,8 +88,11 @@ def get_callbacks(app):
         Input("garment-material-dropdown", "value"),
         Input("garment-type-id-store", "data"),
         Input("garment-materials-store", "data"),
+        Input("garment-base-price-store", "data"),
     )
-    def update_garment_recipe_and_co2(material_id, garment_type_id, materials):
+    def update_garment_recipe_and_co2(
+        material_id, garment_type_id, materials, garment_base_price
+    ):
         if not garment_type_id or not materials:
             unavailable = html.Div("Material and garment information is unavailable.")
             return unavailable
@@ -122,4 +125,6 @@ def get_callbacks(app):
             )
             return co2_error
 
-        return render_co2_content(selected_material_name, co2_payload)
+        return render_co2_content(
+            selected_material_name, co2_payload, garment_base_price
+        )

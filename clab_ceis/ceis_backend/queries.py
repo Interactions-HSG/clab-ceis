@@ -809,17 +809,27 @@ def get_manufacturer_distance_km(
 
 
 def get_used_fabric_block(
-    fabric_block_name: str, already_used_ids: list[int]
+    fabric_block_name: str,
+    already_used_ids: list[int],
+    preferred_material: str | None = None,
 ) -> SecondLifeFabricBlock | None:
-    """Get a used/secondhand fabric block from inventory, excluding already-used IDs."""
+    """Get a fabric block from inventory, excluding already-used IDs."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     base_query = """
-        SELECT fbi.id, fbi.type_id, fbi.co2eq, fbi.location_id, l.name as location_name
+        SELECT fbi.id, fbi.type_id, fbi.co2eq, fbi.location_id, l.name as location_name,
+    """
+    base_query += "fbi.quality"
+    base_query += ", "
+    base_query += "m.name"
+    base_query += """
         FROM fabric_blocks_inventory fbi
         JOIN fabric_block_types fbt ON fbi.type_id = fbt.id
         LEFT JOIN locations l ON fbi.location_id = l.id
+    """
+    base_query += "LEFT JOIN materials m ON fbi.material_id = m.id"
+    base_query += """
         WHERE fbt.name = ?
     """
 
@@ -830,6 +840,12 @@ def get_used_fabric_block(
         base_query += f" AND fbi.id NOT IN ({placeholders})"
         params.extend(str(id) for id in already_used_ids)
 
+    if preferred_material:
+        base_query += " ORDER BY CASE WHEN m.name = ? THEN 0 ELSE 1 END, fbi.id"
+        params.append(preferred_material)
+    else:
+        base_query += " ORDER BY fbi.id"
+
     base_query += " LIMIT 1"
 
     cursor.execute(base_query, params)
@@ -839,7 +855,15 @@ def get_used_fabric_block(
         conn.close()
         return None
 
-    fb_id, fb_type_id, fb_co2eq, fb_location_id, fb_location_name = result
+    (
+        fb_id,
+        fb_type_id,
+        fb_co2eq,
+        fb_location_id,
+        fb_location_name,
+        fb_quality,
+        fb_material,
+    ) = result
     cursor.execute(
         """
         SELECT pt.name, pfbi.amount, pt.activity_id
@@ -864,6 +888,8 @@ def get_used_fabric_block(
         processes=processes,
         location_id=fb_location_id,
         location_name=fb_location_name,
+        material=fb_material,
+        quality=float(fb_quality),
     )
 
 
