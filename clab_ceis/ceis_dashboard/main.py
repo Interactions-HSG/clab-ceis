@@ -6,6 +6,7 @@ from pages.recipe import get_recipe_layout
 from pages.flow import get_dashboard_layout
 from pages.home import get_index_layout
 from pages.co2 import get_co2_layout
+from pages.designer_balance import get_designer_balance_layout
 import ceis_data
 import ceis_callbacks
 import config
@@ -71,6 +72,8 @@ class CeisMonitor:
                 return get_dashboard_layout(fetch_strategy_progress())
             elif pathname == "/add-recipe":
                 return self._add_recipe_layout
+            elif pathname == "/designer-balance":
+                return get_designer_balance_layout()
             elif pathname and pathname.startswith("/co2/"):
                 try:
                     garment_type_id = int(pathname.split("/co2/")[1])
