@@ -62,6 +62,16 @@ def fetch_materials_for_garment(garment_type_id: int) -> list[dict]:
         return []
 
 
+def fetch_strategy_progress() -> dict:
+    try:
+        resp = requests.get(f"{config.BACKEND_API_URL}/strategy-progress")
+        if resp.status_code != 200:
+            return {}
+        return resp.json()
+    except Exception:
+        return {}
+
+
 def get_co2(
     garment_type_id: int, material_id: int
 ) -> GarmentCo2Response | None:

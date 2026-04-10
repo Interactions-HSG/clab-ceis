@@ -13,7 +13,7 @@ def create_tables(cursor):
         CREATE TABLE IF NOT EXISTS garment_types (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL UNIQUE,
-            price_chf REAL NOT NULL DEFAULT 100
+            price_chf REAL NOT NULL
         )
     """
     )
@@ -119,6 +119,7 @@ def create_tables(cursor):
             type_id INTEGER NOT NULL,
             co2eq INTEGER,
             price INTEGER,
+            sold INTEGER NOT NULL DEFAULT 0,
             FOREIGN KEY (type_id) REFERENCES garment_types (id) ON DELETE CASCADE
         )
     """
@@ -134,6 +135,7 @@ def create_tables(cursor):
             location_id INTEGER,
             material_id INTEGER,
             quality REAL NOT NULL DEFAULT 100,
+            second_life INTEGER NOT NULL DEFAULT 1,
             FOREIGN KEY (type_id) REFERENCES fabric_block_types (id) ON DELETE CASCADE,
             FOREIGN KEY (garment_id) REFERENCES garments_inventory (id) ON DELETE CASCADE,
             FOREIGN KEY (location_id) REFERENCES locations (id) ON DELETE SET NULL,
@@ -446,12 +448,57 @@ def seed_data(cursor):
     cursor.execute("UPDATE seed_meta SET seeded = 1 WHERE id = 1;")
 
 
+def seed_demo_sales_data(cursor):
+    cursor.execute("SELECT COUNT(*) FROM garments_inventory")
+    existing_garments = cursor.fetchone()[0]
+    if existing_garments > 0:
+        return
+
+    cursor.executescript(
+        """
+        INSERT INTO garments_inventory (type_id, co2eq, price, sold) VALUES
+        ((SELECT id FROM garment_types WHERE name='Basic Crop Top'), NULL, 100, 1),
+        ((SELECT id FROM garment_types WHERE name='Wrap Skirt'), NULL, 100, 1),
+        ((SELECT id FROM garment_types WHERE name='Basic Trousers'), NULL, 100, 1),
+        ((SELECT id FROM garment_types WHERE name='Elegant cowl neck top'), NULL, 100, 0);
+
+        INSERT INTO fabric_blocks_inventory (type_id, co2eq, garment_id, location_id, material_id, quality, second_life) VALUES
+        -- Basic Crop Top: 80x64 x1, 40x14 x3
+        ((SELECT id FROM fabric_block_types WHERE name='80x64'), NULL, 1, (SELECT id FROM locations WHERE name='St. Gallen'), (SELECT id FROM materials WHERE name='hemp'), 87, 1),
+        ((SELECT id FROM fabric_block_types WHERE name='40x14'), NULL, 1, (SELECT id FROM locations WHERE name='Dornbirn'), (SELECT id FROM materials WHERE name='hemp'), 93, 1),
+        ((SELECT id FROM fabric_block_types WHERE name='40x14'), NULL, 1, (SELECT id FROM locations WHERE name='St. Gallen'), (SELECT id FROM materials WHERE name='hemp'), 100, 0),
+        ((SELECT id FROM fabric_block_types WHERE name='40x14'), NULL, 1, (SELECT id FROM locations WHERE name='Sigmaringen'), (SELECT id FROM materials WHERE name='hemp'), 100, 0),
+        -- Wrap Skirt: 100x80 x1, 40x14 x2, 140x14 x1
+        ((SELECT id FROM fabric_block_types WHERE name='100x80'), NULL, 2, (SELECT id FROM locations WHERE name='St. Gallen'), (SELECT id FROM materials WHERE name='hemp'), 89, 1),
+        ((SELECT id FROM fabric_block_types WHERE name='40x14'), NULL, 2, (SELECT id FROM locations WHERE name='Ravensburg'), (SELECT id FROM materials WHERE name='hemp'), 100, 0),
+        ((SELECT id FROM fabric_block_types WHERE name='40x14'), NULL, 2, (SELECT id FROM locations WHERE name='Dornbirn'), (SELECT id FROM materials WHERE name='hemp'), 100, 0),
+        ((SELECT id FROM fabric_block_types WHERE name='140x14'), NULL, 2, (SELECT id FROM locations WHERE name='Ravensburg'), (SELECT id FROM materials WHERE name='hemp'), 100, 0),
+        -- Basic Trousers: 100x64 x2, 64x40 x2, 20x15 x4
+        ((SELECT id FROM fabric_block_types WHERE name='100x64'), NULL, 3, (SELECT id FROM locations WHERE name='Sigmaringen'), (SELECT id FROM materials WHERE name='cotton'), 88, 1),
+        ((SELECT id FROM fabric_block_types WHERE name='100x64'), NULL, 3, (SELECT id FROM locations WHERE name='St. Gallen'), (SELECT id FROM materials WHERE name='cotton'), 100, 0),
+        ((SELECT id FROM fabric_block_types WHERE name='64x40'), NULL, 3, (SELECT id FROM locations WHERE name='St. Gallen'), (SELECT id FROM materials WHERE name='cotton'), 100, 0),
+        ((SELECT id FROM fabric_block_types WHERE name='64x40'), NULL, 3, (SELECT id FROM locations WHERE name='Dornbirn'), (SELECT id FROM materials WHERE name='cotton'), 100, 0),
+        ((SELECT id FROM fabric_block_types WHERE name='20x15'), NULL, 3, (SELECT id FROM locations WHERE name='St. Gallen'), (SELECT id FROM materials WHERE name='cotton'), 100, 0),
+        ((SELECT id FROM fabric_block_types WHERE name='20x15'), NULL, 3, (SELECT id FROM locations WHERE name='Sigmaringen'), (SELECT id FROM materials WHERE name='cotton'), 100, 0),
+        ((SELECT id FROM fabric_block_types WHERE name='20x15'), NULL, 3, (SELECT id FROM locations WHERE name='Ravensburg'), (SELECT id FROM materials WHERE name='cotton'), 100, 0),
+        ((SELECT id FROM fabric_block_types WHERE name='20x15'), NULL, 3, (SELECT id FROM locations WHERE name='Dornbirn'), (SELECT id FROM materials WHERE name='cotton'), 100, 0),
+        -- Elegant cowl neck top: 64x40 x2, 4x48 x2
+        ((SELECT id FROM fabric_block_types WHERE name='64x40'), NULL, 4, (SELECT id FROM locations WHERE name='St. Gallen'), (SELECT id FROM materials WHERE name='silk'), 86, 1),
+        ((SELECT id FROM fabric_block_types WHERE name='64x40'), NULL, 4, (SELECT id FROM locations WHERE name='Ravensburg'), (SELECT id FROM materials WHERE name='silk'), 100, 0),
+        ((SELECT id FROM fabric_block_types WHERE name='4x48'), NULL, 4, (SELECT id FROM locations WHERE name='Dornbirn'), (SELECT id FROM materials WHERE name='silk'), 100, 0),
+        ((SELECT id FROM fabric_block_types WHERE name='4x48'), NULL, 4, (SELECT id FROM locations WHERE name='Sigmaringen'), (SELECT id FROM materials WHERE name='silk'), 100, 0),
+        ((SELECT id FROM fabric_block_types WHERE name='64x40'), NULL, NULL, (SELECT id FROM locations WHERE name='St. Gallen'), (SELECT id FROM materials WHERE name='silk'), 91, 1);
+        """
+    )
+
+
 def init_sqlite_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     create_tables(cursor)
     seed_data(cursor)
+    seed_demo_sales_data(cursor)
 
     conn.commit()
     conn.close()

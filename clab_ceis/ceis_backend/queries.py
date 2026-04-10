@@ -14,6 +14,9 @@ from ceis_backend.models import (
 )
 
 
+STRATEGIST_CIRCULARITY_THRESHOLD = 30.0
+
+
 def db_create_garment_type(name: str, price_chf: float) -> dict:
     """Create a new garment type in the database."""
     conn = sqlite3.connect(DB_PATH)
@@ -83,6 +86,295 @@ def db_get_materials() -> list[dict]:
         }
         for row in materials
     ]
+
+
+def db_get_strategy_progress() -> dict:
+    """Aggregate strategist-facing progress metrics from sold garments."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        WITH sold_garments AS (
+            SELECT gi.id, gi.type_id, gi.co2eq
+            FROM garments_inventory gi
+            WHERE gi.sold = 1
+        ),
+        total_recipe AS (
+            SELECT sg.id AS garment_id,
+                   COALESCE(SUM(fbt.sqm * grfb.amount), 0) AS total_recipe_sqm,
+                   COALESCE(SUM(grfb.amount), 0) AS total_recipe_blocks
+            FROM sold_garments sg
+            LEFT JOIN garment_recipe_fabric_blocks grfb
+                ON grfb.garment_type = sg.type_id
+            LEFT JOIN fabric_block_types fbt
+                ON fbt.id = grfb.fabric_block_id
+            GROUP BY sg.id
+        ),
+        second_life AS (
+            SELECT sg.id AS garment_id,
+                   COALESCE(COUNT(fbi.id), 0) AS second_life_blocks,
+                   COALESCE(SUM(fbt.sqm), 0) AS second_life_sqm
+            FROM sold_garments sg
+            LEFT JOIN fabric_blocks_inventory fbi
+                ON fbi.garment_id = sg.id
+               AND fbi.second_life = 1
+            LEFT JOIN fabric_block_types fbt
+                ON fbt.id = fbi.type_id
+            GROUP BY sg.id
+        )
+        SELECT sg.id,
+               gt.name,
+               sg.co2eq,
+               tr.total_recipe_blocks,
+               sl.second_life_blocks,
+               tr.total_recipe_sqm,
+               sl.second_life_sqm
+        FROM sold_garments sg
+        JOIN garment_types gt ON gt.id = sg.type_id
+        LEFT JOIN total_recipe tr ON tr.garment_id = sg.id
+        LEFT JOIN second_life sl ON sl.garment_id = sg.id
+        ORDER BY sg.id
+        """
+    )
+    sold_garment_rows = cursor.fetchall()
+    conn.close()
+
+    sold_garments = []
+    total_recipe_blocks = 0
+    total_second_life_blocks = 0
+    total_recipe_sqm = 0.0
+    total_second_life_sqm = 0.0
+    total_co2 = 0.0
+
+    for row in sold_garment_rows:
+        (
+            garment_id,
+            garment_name,
+            co2eq,
+            recipe_blocks,
+            second_life_blocks,
+            recipe_sqm,
+            second_life_sqm,
+        ) = row
+        recipe_blocks = int(recipe_blocks or 0)
+        second_life_blocks = int(second_life_blocks or 0)
+        recipe_sqm = float(recipe_sqm or 0)
+        second_life_sqm = float(second_life_sqm or 0)
+        co2eq = float(co2eq or 0)
+
+        total_recipe_blocks += recipe_blocks
+        total_second_life_blocks += second_life_blocks
+        total_recipe_sqm += recipe_sqm
+        total_second_life_sqm += second_life_sqm
+        total_co2 += co2eq
+
+        circularity_pct = (
+            round((second_life_blocks / recipe_blocks) * 100, 2)
+            if recipe_blocks
+            else 0.0
+        )
+        fabric_saved_pct = (
+            round((second_life_sqm / recipe_sqm) * 100, 2) if recipe_sqm else 0.0
+        )
+        sold_garments.append(
+            {
+                "garment_id": garment_id,
+                "garment_name": garment_name,
+                "recipe_fabric_blocks": recipe_blocks,
+                "second_life_fabric_blocks": second_life_blocks,
+                "circularity_pct": circularity_pct,
+                "fabric_saved_pct": fabric_saved_pct,
+                "co2eq": round(co2eq, 2),
+            }
+        )
+
+    circularity_pct = (
+        round((total_second_life_blocks / total_recipe_blocks) * 100, 2)
+        if total_recipe_blocks
+        else 0.0
+    )
+    fabric_saved_pct = (
+        round((total_second_life_sqm / total_recipe_sqm) * 100, 2)
+        if total_recipe_sqm
+        else 0.0
+    )
+
+    return {
+        "thresholds": {
+            "circularity_pct": STRATEGIST_CIRCULARITY_THRESHOLD,
+        },
+        "aggregates": {
+            "sold_garments": len(sold_garments),
+            "circularity_pct": circularity_pct,
+            "circularity_threshold_delta": round(
+                circularity_pct - STRATEGIST_CIRCULARITY_THRESHOLD, 2
+            ),
+            "fabric_saved_pct": fabric_saved_pct,
+            "environmental_cost_co2eq": round(total_co2, 2),
+            "second_life_fabric_blocks_sold": total_second_life_blocks,
+            "recipe_fabric_blocks_sold": total_recipe_blocks,
+        },
+        "sold_garments": sold_garments,
+    }
+
+
+def db_get_sold_garments_for_co2() -> list[dict]:
+    """Return sold garments that are still missing persisted CO2 values."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT gi.id, gi.type_id, gt.name
+        FROM garments_inventory gi
+        JOIN garment_types gt ON gt.id = gi.type_id
+        WHERE gi.sold = 1
+          AND gi.co2eq IS NULL
+        ORDER BY gi.id
+        """
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"id": row[0], "type_id": row[1], "name": row[2]} for row in rows]
+
+
+def db_get_inventory_fabric_blocks_for_garment(garment_id: int) -> list[dict]:
+    """Return actual fabric blocks linked to a garment inventory record."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT fbi.id,
+               fbt.id,
+               fbt.name,
+               fbt.sqm,
+               fbi.location_id,
+               l.name,
+               fbi.quality,
+               fbi.second_life,
+               m.id,
+               m.name,
+               m.kg_per_sqm,
+               m.activity_id
+        FROM fabric_blocks_inventory fbi
+        JOIN fabric_block_types fbt ON fbt.id = fbi.type_id
+        LEFT JOIN locations l ON l.id = fbi.location_id
+        LEFT JOIN materials m ON m.id = fbi.material_id
+        WHERE fbi.garment_id = ?
+        ORDER BY fbi.id
+        """,
+        (garment_id,),
+    )
+    rows = cursor.fetchall()
+
+    fabric_blocks = []
+    for row in rows:
+        (
+            inventory_id,
+            type_id,
+            type_name,
+            sqm,
+            location_id,
+            location_name,
+            quality,
+            second_life,
+            material_id,
+            material_name,
+            kg_per_sqm,
+            activity_id,
+        ) = row
+
+        cursor.execute(
+            """
+            SELECT pt.name, pfbi.amount, pt.activity_id
+            FROM processes_fabric_blocks_inventory pfbi
+            JOIN process_types pt ON pt.id = pfbi.process_id
+            WHERE pfbi.fabric_block_id = ?
+            ORDER BY pfbi.id
+            """,
+            (inventory_id,),
+        )
+        process_rows = cursor.fetchall()
+        processes = [
+            Process(name=process_name, amount=amount, activity_id=process_activity_id)
+            for process_name, amount, process_activity_id in process_rows
+        ]
+
+        fabric_blocks.append(
+            {
+                "inventory_id": inventory_id,
+                "type_id": type_id,
+                "type_name": type_name,
+                "sqm": float(sqm or 0),
+                "location_id": location_id,
+                "location_name": location_name,
+                "quality": float(quality or 0),
+                "second_life": bool(second_life),
+                "material_id": material_id,
+                "material_name": material_name,
+                "kg_per_sqm": float(kg_per_sqm or 0),
+                "activity_id": activity_id,
+                "processes": processes,
+            }
+        )
+
+    conn.close()
+    return fabric_blocks
+
+
+def db_get_garment_processes(garment_type_id: int) -> list[Process]:
+    """Return recipe-level assembly processes for a garment type."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT pt.name, grp.amount, pt.activity_id
+        FROM garment_recipe_processes grp
+        JOIN process_types pt ON pt.id = grp.process_id
+        WHERE grp.garment_type = ?
+        ORDER BY grp.id
+        """,
+        (garment_type_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [
+        Process(name=process_name, amount=amount, activity_id=activity_id)
+        for process_name, amount, activity_id in rows
+    ]
+
+
+def db_get_garment_inventory_processes(garment_id: int) -> list[Process]:
+    """Return garment-inventory-specific processes for a garment record."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT pt.name, pgi.amount, pt.activity_id
+        FROM processes_garments_inventory pgi
+        JOIN process_types pt ON pt.id = pgi.process_id
+        WHERE pgi.garment_id = ?
+        ORDER BY pgi.id
+        """,
+        (garment_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [
+        Process(name=process_name, amount=amount, activity_id=activity_id)
+        for process_name, amount, activity_id in rows
+    ]
+
+
+def db_update_garment_inventory_co2(garment_id: int, co2eq: float) -> None:
+    """Persist the computed CO2 value for a garment inventory record."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE garments_inventory SET co2eq = ? WHERE id = ?",
+        (round(co2eq, 6), garment_id),
+    )
+    conn.commit()
+    conn.close()
 
 
 def db_get_materials_for_garment(garment_type_id: int) -> list[dict]:
@@ -536,10 +828,10 @@ def db_create_fabric_block(
 
     cursor.execute(
         """
-        INSERT INTO fabric_blocks_inventory (type_id, co2eq, location_id, material_id, quality)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO fabric_blocks_inventory (type_id, co2eq, location_id, material_id, quality, second_life)
+        VALUES (?, ?, ?, ?, ?, ?)
         """,
-        (type_id, co2eq, location_id, material_id, quality),
+        (type_id, co2eq, location_id, material_id, quality, 1),
     )
     fabric_block_id = cursor.lastrowid
     if not fabric_block_id:
@@ -831,6 +1123,7 @@ def get_used_fabric_block(
     base_query += "LEFT JOIN materials m ON fbi.material_id = m.id"
     base_query += """
         WHERE fbt.name = ?
+          AND fbi.garment_id IS NULL
     """
 
     params = [fabric_block_name]
