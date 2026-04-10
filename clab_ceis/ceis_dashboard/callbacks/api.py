@@ -72,9 +72,41 @@ def fetch_strategy_progress() -> dict:
         return {}
 
 
-def get_co2(
-    garment_type_id: int, material_id: int
-) -> GarmentCo2Response | None:
+def fetch_designer_balance_options() -> dict:
+    try:
+        resp = requests.get(f"{config.BACKEND_API_URL}/designer-balance/options")
+        if resp.status_code != 200:
+            return {}
+        return resp.json()
+    except Exception:
+        return {}
+
+
+def fetch_designer_balance_scenario(
+    garment_type_id: int,
+    material_id: int,
+    fabric_supplier: str | None,
+    garment_supplier: str | None,
+    finishing_supplier: str | None,
+) -> dict:
+    try:
+        resp = requests.get(
+            f"{config.BACKEND_API_URL}/designer-balance/{garment_type_id}",
+            params={
+                "material_id": material_id,
+                "fabric_supplier": fabric_supplier,
+                "garment_supplier": garment_supplier,
+                "finishing_supplier": finishing_supplier,
+            },
+        )
+        if resp.status_code != 200:
+            return {}
+        return resp.json()
+    except Exception:
+        return {}
+
+
+def get_co2(garment_type_id: int, material_id: int) -> GarmentCo2Response | None:
     try:
         resp = requests.get(
             f"{config.BACKEND_API_URL}/co2/{garment_type_id}",

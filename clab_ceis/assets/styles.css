@@ -27,9 +27,9 @@
 .order-form {
     display: flex;
     justify-content: space-evenly; /* Distributes items with equal space between */
-    align-items: flex-start;      /* Aligns items to the top */
-    gap: 60px;                    /* Adds horizontal spacing */
-    margin-bottom: 20px;          /* Space below the products */
+    align-items: flex-start; /* Aligns items to the top */
+    gap: 60px; /* Adds horizontal spacing */
+    margin-bottom: 20px; /* Space below the products */
 }
 
 /* Individual Product */
@@ -67,7 +67,6 @@
     gap: 10px;
     margin-top: 20px;
 }
-
 
 .quote-button:hover {
     background-color: #0056b3;
@@ -152,8 +151,6 @@
 .quote-button:hover {
     background-color: #0056b3;
 }
-
-
 
 /* Footer */
 .footer {
@@ -270,4 +267,110 @@
     font-size: 14px;
     color: #555;
     margin-top: 20px;
+}
+
+.designer-balance-page {
+    padding-bottom: 48px;
+}
+
+.designer-balance-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin: 24px 0;
+}
+
+.designer-balance-control {
+    background: linear-gradient(180deg, #f8fafc 0%, #ecfeff 100%);
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    padding: 14px;
+}
+
+.designer-balance-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 18px;
+    margin: 18px 0;
+}
+
+.designer-balance-stack {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+    margin: 18px 0;
+}
+
+.designer-balance-panel {
+    background: #ffffff;
+    border: 1px solid #dbeafe;
+    border-radius: 16px;
+    padding: 18px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+.designer-balance-panel-wide {
+    margin-top: 18px;
+}
+
+.designer-balance-leg-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 12px;
+    margin: 8px 0 14px;
+}
+
+.designer-balance-leg-card {
+    border: 1px solid #67e8f9;
+    background: linear-gradient(180deg, #ecfeff 0%, #cffafe 100%);
+    border-radius: 12px;
+    padding: 10px 12px;
+}
+
+.designer-balance-leg-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #134e4a;
+}
+
+.designer-balance-leg-details {
+    margin-top: 6px;
+    font-size: 0.88rem;
+    color: #0f172a;
+    line-height: 1.3;
+}
+
+.designer-balance-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-top: 20px;
+}
+
+.designer-balance-metric-card {
+    border-radius: 16px;
+    padding: 18px;
+    background: linear-gradient(145deg, #0f172a 0%, #155e75 100%);
+    color: #f8fafc;
+    min-height: 140px;
+}
+
+.designer-balance-metric-title {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    opacity: 0.85;
+}
+
+.designer-balance-metric-value {
+    font-size: 1.9rem;
+    font-weight: 700;
+    margin-top: 10px;
+}
+
+.designer-balance-metric-subtitle {
+    font-size: 0.9rem;
+    margin-top: 10px;
+    line-height: 1.4;
+    color: #dbeafe;
 }

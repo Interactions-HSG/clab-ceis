@@ -1100,6 +1100,81 @@ def get_manufacturer_distance_km(
         conn.close()
 
 
+def db_get_manufacturer_distance_row(
+    source_company: str, destination_company: str
+) -> dict | None:
+    """Return the stored transport row between two manufacturers."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT source_company,
+                   source_role_group,
+                   source_location,
+                   destination_company,
+                   destination_role_group,
+                   destination_location,
+                   distance_km
+            FROM manufacturer_distances
+            WHERE source_company = ? AND destination_company = ?
+            LIMIT 1
+            """,
+            (source_company, destination_company),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+        return {
+            "source_company": row[0],
+            "source_role_group": row[1],
+            "source_location": row[2],
+            "destination_company": row[3],
+            "destination_role_group": row[4],
+            "destination_location": row[5],
+            "distance_km": float(row[6]),
+        }
+    finally:
+        conn.close()
+
+
+def db_get_manufacturers(role_group: str | None = None) -> list[dict]:
+    """Return manufacturers, optionally filtered by role group."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    try:
+        if role_group is None:
+            cursor.execute(
+                """
+                SELECT company, role, role_group, location
+                FROM manufacturers
+                ORDER BY role_group, company
+                """
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT company, role, role_group, location
+                FROM manufacturers
+                WHERE role_group = ?
+                ORDER BY company
+                """,
+                (role_group,),
+            )
+        rows = cursor.fetchall()
+        return [
+            {
+                "company": row[0],
+                "role": row[1],
+                "role_group": row[2],
+                "location": row[3],
+            }
+            for row in rows
+        ]
+    finally:
+        conn.close()
+
+
 def get_used_fabric_block(
     fabric_block_name: str,
     already_used_ids: list[int],

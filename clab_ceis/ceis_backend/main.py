@@ -13,6 +13,10 @@ from ceis_backend.utils import (
     calculate_replacement_fabric_blocks_emissions,
     refresh_sold_garment_co2_values,
 )
+from ceis_backend.designer_balance import (
+    get_designer_balance_options,
+    get_designer_balance_scenario,
+)
 from ceis_backend.wiser_bridge import WiserClient, WiserClientError
 from ceis_backend.queries import (
     db_create_garment_type,
@@ -106,6 +110,30 @@ def get_strategy_progress(
 @app.get("/garment-types/{garment_type_id}/materials")
 def get_materials_for_garment(garment_type_id: int):
     return db_get_materials_for_garment(garment_type_id)
+
+
+@app.get("/designer-balance/options")
+def get_designer_balance_page_options():
+    return get_designer_balance_options()
+
+
+@app.get("/designer-balance/{garment_type_id}")
+def get_designer_balance(
+    garment_type_id: int,
+    material_id: int | None = None,
+    fabric_supplier: str | None = None,
+    garment_supplier: str | None = None,
+    finishing_supplier: str | None = None,
+    wiser_client: WiserClient = Depends(get_wiser_client),
+):
+    return get_designer_balance_scenario(
+        garment_type_id,
+        wiser_client,
+        material_id=material_id,
+        fabric_supplier_name=fabric_supplier,
+        garment_supplier_name=garment_supplier,
+        finishing_supplier_name=finishing_supplier,
+    )
 
 
 @app.get("/garment-types/{garment_type_id}/fabric-blocks")
