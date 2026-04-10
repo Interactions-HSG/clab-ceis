@@ -44,3 +44,23 @@ def test_fetch_fabric_blocks_formats_processes(monkeypatch):
 
     assert len(result) == 1
     assert result[0]["processes"] == "sewing(0.42)"
+
+
+def test_fetch_strategy_progress_returns_payload(monkeypatch):
+    payload = {
+        "aggregates": {
+            "circularity_pct": 42.0,
+            "fabric_saved_pct": 37.5,
+            "environmental_cost_co2eq": 54.0,
+        }
+    }
+
+    def fake_get(url):
+        assert url.endswith("/strategy-progress")
+        return _Response(200, payload)
+
+    monkeypatch.setattr(api.requests, "get", fake_get)
+
+    result = api.fetch_strategy_progress()
+
+    assert result == payload

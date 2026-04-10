@@ -11,6 +11,7 @@ from ceis_backend.utils import (
     calculate_transport_emission,
     build_scenario_activities,
     calculate_replacement_fabric_blocks_emissions,
+    refresh_sold_garment_co2_values,
 )
 from ceis_backend.wiser_bridge import WiserClient, WiserClientError
 from ceis_backend.queries import (
@@ -18,6 +19,7 @@ from ceis_backend.queries import (
     db_get_garment_types,
     db_get_locations,
     db_get_materials,
+    db_get_strategy_progress,
     db_get_materials_for_garment,
     db_get_recipe_fabric_blocks,
     db_upsert_material,
@@ -91,6 +93,14 @@ def get_locations():
 @app.get("/materials")
 def get_materials():
     return db_get_materials()
+
+
+@app.get("/strategy-progress")
+def get_strategy_progress(
+    wiser_client: WiserClient = Depends(get_wiser_client),
+):
+    refresh_sold_garment_co2_values(wiser_client)
+    return db_get_strategy_progress()
 
 
 @app.get("/garment-types/{garment_type_id}/materials")

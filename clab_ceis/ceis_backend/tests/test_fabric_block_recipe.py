@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from ceis_backend.db_init import init_sqlite_db, create_tables
-from ceis_backend.utils import get_co2_for_garment
+from ceis_backend.utils import get_co2_for_garment, get_co2_for_sold_garment
 from ceis_backend.queries import get_fabric_block_recipe, get_used_fabric_block
 from ceis_backend.models import Process
 from ceis_backend.main import delete_fabric_block_type
@@ -118,6 +118,199 @@ class TestInventoryProcessTables:
             "processes_garments_inventory",
         ]
 
+    def test_garments_inventory_has_sold_column_after_init(self, test_db):
+        conn = sqlite3.connect("ceis_backend.db")
+        cursor = conn.cursor()
+
+        cursor.execute("PRAGMA table_info(garments_inventory)")
+        columns = {row[1] for row in cursor.fetchall()}
+        conn.close()
+
+        assert "sold" in columns
+
+    def test_fabric_blocks_inventory_has_second_life_column_after_init(self, test_db):
+        conn = sqlite3.connect("ceis_backend.db")
+        cursor = conn.cursor()
+
+        cursor.execute("PRAGMA table_info(fabric_blocks_inventory)")
+        columns = {row[1] for row in cursor.fetchall()}
+        conn.close()
+
+        assert "second_life" in columns
+
+
+class TestStrategistProgress:
+    def test_strategy_progress_endpoint_returns_seeded_data(self, test_db):
+        with TestClient(app) as client:
+            client.app.state.wiser_client = _build_mock_wiser_client(
+                {
+                    276186: 5.0,
+                    6756: 4.0,
+                    6566: 0.5,
+                    17901: 0.1,
+                }
+            )
+
+            response = client.get("/strategy-progress")
+
+            assert response.status_code == 200
+            payload = response.json()
+            assert payload["thresholds"]["circularity_pct"] == 30.0
+            assert payload["aggregates"]["sold_garments"] >= 3
+            assert payload["aggregates"]["circularity_pct"] > 0
+            assert payload["aggregates"]["fabric_saved_pct"] > 0
+            assert payload["aggregates"]["environmental_cost_co2eq"] > 0
+            assert payload["aggregates"]["second_life_fabric_blocks_sold"] == 4
+            assert len(payload["sold_garments"]) >= 3
+
+        conn = sqlite3.connect("ceis_backend.db")
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT COUNT(*) FROM garments_inventory WHERE sold = 1 AND co2eq IS NOT NULL"
+        )
+        persisted_count = cursor.fetchone()[0]
+        conn.close()
+        assert persisted_count >= 3
+
+    def test_strategy_progress_does_not_recalculate_existing_co2(self, test_db):
+        with TestClient(app) as client:
+            client.app.state.wiser_client = _build_mock_wiser_client(
+                {
+                    276186: 5.0,
+                    6756: 4.0,
+                    6566: 0.5,
+                    17901: 0.1,
+                    21893: 0.2,
+                }
+            )
+            first_response = client.get("/strategy-progress")
+            assert first_response.status_code == 200
+
+            def _fail_if_called(_activity_id):
+                raise AssertionError("CO2 should not be recalculated once persisted")
+
+            failing_wiser_client = MagicMock()
+            failing_wiser_client.get_emission_per_unit.side_effect = _fail_if_called
+            client.app.state.wiser_client = failing_wiser_client
+
+            second_response = client.get("/strategy-progress")
+            assert second_response.status_code == 200
+
+    def test_sold_garment_co2_includes_recipe_and_inventory_processes(self, clean_db):
+        conn = sqlite3.connect("ceis_backend.db")
+        cursor = conn.cursor()
+
+        cursor.execute("INSERT INTO locations (name) VALUES ('St. Gallen')")
+        location_id = cursor.lastrowid
+
+        cursor.execute(
+            "INSERT INTO materials (name, kg_per_sqm, activity_id) VALUES (?, ?, ?)",
+            ("cotton", 2.0, 1001),
+        )
+        material_id = cursor.lastrowid
+
+        cursor.execute(
+            "INSERT INTO garment_types (name, price_chf) VALUES (?, ?)",
+            ("Sold Garment Test", 100),
+        )
+        garment_type_id = cursor.lastrowid
+
+        cursor.execute(
+            "INSERT INTO fabric_block_types (name, sqm) VALUES (?, ?)",
+            ("Sold Block Test", 1.5),
+        )
+        fabric_block_type_id = cursor.lastrowid
+
+        cursor.execute(
+            "INSERT INTO process_types (name, unit, activity_id) VALUES (?, ?, ?)",
+            ("block-recipe-process", "kg", 2001),
+        )
+        block_recipe_process_id = cursor.lastrowid
+        cursor.execute(
+            "INSERT INTO process_types (name, unit, activity_id) VALUES (?, ?, ?)",
+            ("block-inventory-process", "kg", 2002),
+        )
+        block_inventory_process_id = cursor.lastrowid
+        cursor.execute(
+            "INSERT INTO process_types (name, unit, activity_id) VALUES (?, ?, ?)",
+            ("garment-recipe-process", "kg", 2003),
+        )
+        garment_recipe_process_id = cursor.lastrowid
+        cursor.execute(
+            "INSERT INTO process_types (name, unit, activity_id) VALUES (?, ?, ?)",
+            ("garment-inventory-process", "kg", 2004),
+        )
+        garment_inventory_process_id = cursor.lastrowid
+
+        cursor.execute(
+            "INSERT INTO garment_recipe_materials (garment_type, material_id) VALUES (?, ?)",
+            (garment_type_id, material_id),
+        )
+        cursor.execute(
+            "INSERT INTO garment_recipe_fabric_blocks (garment_type, fabric_block_id, amount) VALUES (?, ?, ?)",
+            (garment_type_id, fabric_block_type_id, 1),
+        )
+        cursor.execute(
+            "INSERT INTO fabric_block_recipe_processes (fabric_block_type, process_id, amount) VALUES (?, ?, ?)",
+            (fabric_block_type_id, block_recipe_process_id, 3),
+        )
+        cursor.execute(
+            "INSERT INTO garment_recipe_processes (garment_type, process_id, amount) VALUES (?, ?, ?)",
+            (garment_type_id, garment_recipe_process_id, 2),
+        )
+        cursor.execute(
+            "INSERT INTO garments_inventory (type_id, co2eq, price, sold) VALUES (?, ?, ?, ?)",
+            (garment_type_id, None, 100, 1),
+        )
+        garment_id = cursor.lastrowid
+        cursor.execute(
+            """
+            INSERT INTO fabric_blocks_inventory (type_id, co2eq, garment_id, location_id, material_id, quality, second_life)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (fabric_block_type_id, None, garment_id, location_id, material_id, 100, 1),
+        )
+        inventory_fabric_block_id = cursor.lastrowid
+        cursor.execute(
+            """
+            INSERT INTO processes_fabric_blocks_inventory (process_id, amount, fabric_block_id)
+            VALUES (?, ?, ?)
+            """,
+            (block_inventory_process_id, 4, inventory_fabric_block_id),
+        )
+        cursor.execute(
+            """
+            INSERT INTO processes_garments_inventory (process_id, amount, garment_id)
+            VALUES (?, ?, ?)
+            """,
+            (garment_inventory_process_id, 1, garment_id),
+        )
+        conn.commit()
+        conn.close()
+
+        wiser_client = _build_mock_wiser_client(
+            {
+                1001: 10.0,
+                2001: 2.0,
+                2002: 5.0,
+                2003: 7.0,
+                2004: 11.0,
+                7309: 0.0,
+            }
+        )
+
+        result = get_co2_for_sold_garment(garment_id, garment_type_id, wiser_client)
+
+        expected_block_emission = (3 * 2.0) + (4 * 5.0)
+        expected_garment_process_emission = (2 * 7.0) + (1 * 11.0)
+
+        assert result.fabric_blocks.total_emission == expected_block_emission
+        assert result.processes.total_emission == expected_garment_process_emission
+        assert result.fabric_blocks.details[0]["material_emission"] == 0
+        assert result.fabric_blocks.details[0]["production_emission"] == 6.0
+        assert result.fabric_blocks.details[0]["inventory_process_emission"] == 20.0
+        assert len(result.processes.details) == 2
+
 
 class TestGetRecipeForFabricBlock:
     """Test cases 2 & 3: get_fabric_block_recipe function."""
@@ -206,6 +399,56 @@ class TestUsedFabricBlockSelection:
         )
         assert dyeing_process is not None
         assert dyeing_process.amount == 0.01
+
+    def test_excludes_blocks_already_assigned_to_a_garment(self, clean_db):
+        conn = sqlite3.connect("ceis_backend.db")
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "INSERT INTO fabric_block_types (name, sqm) VALUES (?, ?)",
+            ("AssignedBlock", 1.0),
+        )
+        fabric_block_type_id = cursor.lastrowid
+        cursor.execute(
+            "INSERT INTO materials (name, kg_per_sqm, activity_id) VALUES (?, ?, ?)",
+            ("cotton", 1.0, 1001),
+        )
+        material_id = cursor.lastrowid
+        cursor.execute(
+            "INSERT INTO garment_types (name, price_chf) VALUES (?, ?)",
+            ("Assigned Garment", 100),
+        )
+        garment_type_id = cursor.lastrowid
+        cursor.execute(
+            "INSERT INTO garments_inventory (type_id, price, sold) VALUES (?, ?, ?)",
+            (garment_type_id, 100, 0),
+        )
+        garment_id = cursor.lastrowid
+
+        cursor.execute(
+            """
+            INSERT INTO fabric_blocks_inventory (type_id, co2eq, garment_id, location_id, material_id, quality, second_life)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (fabric_block_type_id, None, garment_id, None, material_id, 100, 1),
+        )
+        cursor.execute(
+            """
+            INSERT INTO fabric_blocks_inventory (type_id, co2eq, garment_id, location_id, material_id, quality, second_life)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (fabric_block_type_id, None, None, None, material_id, 100, 1),
+        )
+        unassigned_block_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+
+        selected = get_used_fabric_block(
+            "AssignedBlock", already_used_ids=[], preferred_material="cotton"
+        )
+
+        assert selected is not None
+        assert selected.id == unassigned_block_id
 
     def test_returns_empty_list_for_nonexistent_fabric_block(self, test_db):
         """Test case 3: Returns None for non-existent fabric block."""
@@ -675,7 +918,7 @@ class TestGetCo2TransportEmissions:
 
         # Insert garment type
         cursor.execute(
-            "INSERT INTO garment_types (name) VALUES ('TransportTestGarment')"
+            "INSERT INTO garment_types (name, price_chf) VALUES ('TransportTestGarment', 0)"
         )
         garment_id = cursor.lastrowid
 
@@ -796,7 +1039,9 @@ class TestGetCo2TransportEmissions:
             )
 
         # Insert garment type
-        cursor.execute("INSERT INTO garment_types (name) VALUES ('NoLocationGarment')")
+        cursor.execute(
+            "INSERT INTO garment_types (name, price_chf) VALUES ('NoLocationGarment', 0)"
+        )
         garment_id = cursor.lastrowid
 
         # Insert fabric block type
@@ -900,7 +1145,7 @@ class TestGetCo2TransportEmissions:
 
         # Insert garment type
         cursor.execute(
-            "INSERT INTO garment_types (name) VALUES ('UnknownLocationGarment')"
+            "INSERT INTO garment_types (name, price_chf) VALUES ('UnknownLocationGarment', 0)"
         )
         garment_id = cursor.lastrowid
         assert garment_id is not None
@@ -954,8 +1199,8 @@ class TestGetCo2TransportEmissions:
         cursor = conn.cursor()
 
         cursor.execute(
-            "INSERT INTO garment_types (name) VALUES (?)",
-            ("SupplyChainTransportGarment",),
+            "INSERT INTO garment_types (name, price_chf) VALUES (?, ?)",
+            ("SupplyChainTransportGarment", 0),
         )
         garment_id = cursor.lastrowid
         assert garment_id is not None
@@ -1104,7 +1349,10 @@ class TestGetCo2FabricBlockProductionEmissions:
         )
 
         # Insert garment type
-        cursor.execute("INSERT INTO garment_types (name) VALUES (?)", ("TestGarment",))
+        cursor.execute(
+            "INSERT INTO garment_types (name, price_chf) VALUES (?, ?)",
+            ("TestGarment", 0),
+        )
         garment_id = cursor.lastrowid
 
         # Insert fabric block type
@@ -1222,7 +1470,8 @@ class TestGetCo2FabricBlockProductionEmissions:
 
         # Insert garment type
         cursor.execute(
-            "INSERT INTO garment_types (name) VALUES (?)", ("NoProcessGarment",)
+            "INSERT INTO garment_types (name, price_chf) VALUES (?, ?)",
+            ("NoProcessGarment", 0),
         )
         garment_id = cursor.lastrowid
         assert garment_id is not None
@@ -1299,7 +1548,8 @@ class TestGetCo2FabricBlockProductionEmissions:
 
         # Insert garment type
         cursor.execute(
-            "INSERT INTO garment_types (name) VALUES (?)", ("MultiProcessGarment",)
+            "INSERT INTO garment_types (name, price_chf) VALUES (?, ?)",
+            ("MultiProcessGarment", 0),
         )
         garment_id = cursor.lastrowid
         assert garment_id is not None

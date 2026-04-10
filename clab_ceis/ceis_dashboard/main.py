@@ -9,6 +9,7 @@ from pages.co2 import get_co2_layout
 import ceis_data
 import ceis_callbacks
 import config
+from callbacks.api import fetch_strategy_progress
 
 
 class CeisMonitor:
@@ -27,8 +28,6 @@ class CeisMonitor:
         ceis_callbacks.get_callbacks(self._app, self._model)
 
     def make_layout(self) -> None:
-        self._dashboard_layout = get_dashboard_layout()
-
         self._add_recipe_layout = get_recipe_layout()
 
         self._index_layout = get_index_layout()
@@ -69,7 +68,7 @@ class CeisMonitor:
         )
         def display_page(pathname):
             if pathname == "/dashboard":
-                return self._dashboard_layout
+                return get_dashboard_layout(fetch_strategy_progress())
             elif pathname == "/add-recipe":
                 return self._add_recipe_layout
             elif pathname and pathname.startswith("/co2/"):

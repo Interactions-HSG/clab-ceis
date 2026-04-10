@@ -24,6 +24,11 @@ from ceis_backend.data.location_details import (
     SUPPLY_CHAIN_TRANSPORT_PROCESS_NAME,
 )
 from ceis_backend.queries import (
+    db_get_garment_processes,
+    db_get_garment_inventory_processes,
+    db_get_inventory_fabric_blocks_for_garment,
+    db_get_sold_garments_for_co2,
+    db_update_garment_inventory_co2,
     get_fabric_block_recipe,
     get_full_garment_recipe,
     get_used_fabric_block,
@@ -324,6 +329,117 @@ def get_co2_for_garment(
         )
 
     return emission_details
+
+
+def get_co2_for_sold_garment(
+    garment_id: int,
+    garment_type_id: int,
+    wiser_client: WiserClient,
+) -> GarmentCo2Response:
+    """Calculate CO2 emissions for a sold garment from its actual linked fabric blocks."""
+    inventory_fabric_blocks = db_get_inventory_fabric_blocks_for_garment(garment_id)
+    if not inventory_fabric_blocks:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Sold garment {garment_id} has no linked fabric blocks",
+        )
+
+    emission_details = GarmentCo2Response(
+        fabric_blocks=EmissionDetails(details=[], total_emission=0),
+        processes=EmissionDetails(details=[], total_emission=0),
+    )
+
+    for block in inventory_fabric_blocks:
+        material_name = block.get("material_name")
+        activity_id = block.get("activity_id")
+        if material_name is None or activity_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Fabric block {block['inventory_id']} linked to garment "
+                    f"{garment_id} is missing material information"
+                ),
+            )
+
+        block_weight_kg = float(block["kg_per_sqm"]) * float(block["sqm"])
+        fabric_block_recipe = get_fabric_block_recipe(
+            block["type_name"], int(block["material_id"])
+        )
+        if fabric_block_recipe is None:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Fabric block recipe not found for '{block['type_name']}' "
+                    f"and material '{material_name}'"
+                ),
+            )
+
+        material_emission_per_unit = wiser_client.get_emission_per_unit(activity_id)
+        material_emission = 0
+        if not block.get("second_life", True):
+            material_emission = (
+                material_emission_per_unit * block_weight_kg
+                if material_emission_per_unit is not None
+                else 0
+            )
+
+        recipe_production_emission, recipe_production_details = (
+            calculate_process_emissions(wiser_client, fabric_block_recipe.processes)
+        )
+
+        inventory_process_emission, inventory_process_details = (
+            calculate_process_emissions(wiser_client, block["processes"])
+        )
+        total_block_emission = (
+            material_emission + recipe_production_emission + inventory_process_emission
+        )
+
+        emission_details.fabric_blocks.details.append(
+            {
+                "fabric_block": block["type_name"],
+                "material": material_name,
+                "amount_kg": block_weight_kg,
+                "activity_id": activity_id,
+                "emission": total_block_emission,
+                "material_emission": material_emission,
+                "production_emission": recipe_production_emission,
+                "production_processes": recipe_production_details,
+                "inventory_process_emission": inventory_process_emission,
+                "inventory_processes": inventory_process_details,
+            }
+        )
+        emission_details.fabric_blocks.total_emission += total_block_emission
+
+    recipe_garment_processes = db_get_garment_processes(garment_type_id)
+    inventory_garment_processes = db_get_garment_inventory_processes(garment_id)
+
+    recipe_process_total, recipe_process_details = calculate_process_emissions(
+        wiser_client, recipe_garment_processes
+    )
+    inventory_process_total, inventory_process_details = calculate_process_emissions(
+        wiser_client, inventory_garment_processes
+    )
+    emission_details.processes.details = (
+        recipe_process_details + inventory_process_details
+    )
+    emission_details.processes.total_emission = (
+        recipe_process_total + inventory_process_total
+    )
+
+    return emission_details
+
+
+def refresh_sold_garment_co2_values(wiser_client: WiserClient) -> None:
+    """Recalculate and persist CO2 values for sold garments."""
+    sold_garments = db_get_sold_garments_for_co2()
+    for garment in sold_garments:
+        emission_details = get_co2_for_sold_garment(
+            garment["id"], garment["type_id"], wiser_client
+        )
+        total_co2 = float(emission_details.fabric_blocks.total_emission) + float(
+            emission_details.processes.total_emission
+        )
+        db_update_garment_inventory_co2(garment["id"], total_co2)
 
 
 def calculate_replacement_fabric_blocks_emissions(

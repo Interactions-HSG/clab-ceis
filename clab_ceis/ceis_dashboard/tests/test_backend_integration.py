@@ -88,6 +88,8 @@ def test_dashboard_api_reads_seeded_backend_data(tmp_path):
             l["id"] for l in locations.json() if l["name"] == "St. Gallen"
         )
 
+        baseline_blocks = api.fetch_fabric_blocks()
+
         create_response = requests.post(
             f"{base_url}/fabric-blocks",
             json={
@@ -100,9 +102,15 @@ def test_dashboard_api_reads_seeded_backend_data(tmp_path):
         assert create_response.status_code == 200
 
         blocks = api.fetch_fabric_blocks()
-        assert len(blocks) == 1
-        assert blocks[0]["type"] == first_fb_type_name
-        assert "sewing(0.5)" in blocks[0]["processes"]
+        assert len(blocks) == len(baseline_blocks) + 1
+
+        matching_blocks = [
+            block
+            for block in blocks
+            if block["type"] == first_fb_type_name
+            and "sewing(0.5)" in block["processes"]
+        ]
+        assert matching_blocks
     finally:
         proc.terminate()
         proc.wait(timeout=10)
