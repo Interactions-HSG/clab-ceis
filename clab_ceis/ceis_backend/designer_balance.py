@@ -8,8 +8,10 @@ from fastapi import HTTPException
 from ceis_backend.config import BASE_DIR
 from ceis_backend.data.location_details import ACTIVITY_ID_TRANSPORT
 from ceis_backend.queries import (
+    db_get_fabric_block_types,
     db_get_garment_types,
     db_get_manufacturer_distance_row,
+    db_get_materials,
     db_get_manufacturers,
     db_get_materials_for_garment,
     db_get_process_types,
@@ -36,6 +38,58 @@ def get_designer_balance_options() -> dict:
             "garment": db_get_manufacturers("garment"),
             "finishing": db_get_manufacturers("finishing"),
         },
+    }
+
+
+def get_designer_garment_reference_data(wiser_client: WiserClient) -> dict:
+    mock_data = load_designer_balance_mock_data()
+
+    materials = []
+    for material in db_get_materials():
+        material_mock = _mock_material_data(material["name"], mock_data)
+        materials.append(
+            {
+                **material,
+                "cost_per_kg_chf": _safe_round(
+                    float(material_mock.get("cost_per_kg_chf", 0))
+                ),
+                "longevity_wears": int(material_mock.get("longevity_wears", 0)),
+            }
+        )
+
+    process_rows = []
+    process_defs = mock_data.get("process_types", {})
+    for process_type in db_get_process_types():
+        process_mock = process_defs.get(
+            process_type["name"].lower(), process_defs.get("default", {})
+        )
+        ecological_unit_cost = None
+        try:
+            ecological_unit_cost = wiser_client.get_emission_per_unit(
+                process_type["activity_id"]
+            )
+        except Exception:
+            ecological_unit_cost = None
+
+        process_rows.append(
+            {
+                **process_type,
+                "economic_cost_per_unit_chf": _safe_round(
+                    float(process_mock.get("cost_per_unit_chf", 0))
+                ),
+                "ecological_cost_per_unit_co2eq": (
+                    _safe_round(float(ecological_unit_cost), 6)
+                    if ecological_unit_cost is not None
+                    else None
+                ),
+            }
+        )
+
+    return {
+        "garment_types": db_get_garment_types(),
+        "materials": materials,
+        "process_types": process_rows,
+        "fabric_block_types": db_get_fabric_block_types(),
     }
 
 
@@ -435,7 +489,7 @@ def get_designer_balance_scenario(
             {
                 "process_type": process_type["name"],
                 "unit": process_type.get("unit") or "",
-                "average_usage_per_garment": _safe_round(usage["amount"], 3),
+                "total_usage_per_garment": _safe_round(usage["amount"], 3),
                 "economic_cost_chf": _safe_round(usage["economic_cost_chf"]),
                 "co2eq_kg": _safe_round(usage["co2eq_kg"], 3),
             }

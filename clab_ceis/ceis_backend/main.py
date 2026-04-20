@@ -14,6 +14,7 @@ from ceis_backend.utils import (
     refresh_sold_garment_co2_values,
 )
 from ceis_backend.designer_balance import (
+    get_designer_garment_reference_data,
     get_designer_balance_options,
     get_designer_balance_scenario,
 )
@@ -115,6 +116,13 @@ def get_materials_for_garment(garment_type_id: int):
 @app.get("/designer-balance/options")
 def get_designer_balance_page_options():
     return get_designer_balance_options()
+
+
+@app.get("/designer-garment/reference")
+def get_designer_garment_reference(
+    wiser_client: WiserClient = Depends(get_wiser_client),
+):
+    return get_designer_garment_reference_data(wiser_client)
 
 
 @app.get("/designer-balance/{garment_type_id}")

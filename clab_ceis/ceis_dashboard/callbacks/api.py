@@ -82,6 +82,16 @@ def fetch_designer_balance_options() -> dict:
         return {}
 
 
+def fetch_designer_garment_reference() -> dict:
+    try:
+        resp = requests.get(f"{config.BACKEND_API_URL}/designer-garment/reference")
+        if resp.status_code != 200:
+            return {}
+        return resp.json()
+    except Exception:
+        return {}
+
+
 def fetch_designer_balance_scenario(
     garment_type_id: int,
     material_id: int,

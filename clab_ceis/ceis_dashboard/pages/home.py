@@ -17,6 +17,12 @@ def get_index_layout():
                 href="/designer-balance",
                 id="designer-balance-link",
             ),
+            html.Br(),
+            dcc.Link(
+                "New Garment Designer",
+                href="/garment-designer",
+                id="garment-designer-link",
+            ),
             html.H1("Welcome"),
             dcc.Link(
                 "Add Recipe",
