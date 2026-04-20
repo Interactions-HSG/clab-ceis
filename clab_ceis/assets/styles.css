@@ -374,3 +374,42 @@
     line-height: 1.4;
     color: #dbeafe;
 }
+
+.garment-designer-page {
+    padding-bottom: 48px;
+}
+
+.garment-designer-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+    margin: 20px 0;
+}
+
+.garment-designer-control {
+    background: linear-gradient(180deg, #f8fafc 0%, #ecfeff 100%);
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    padding: 12px;
+}
+
+.garment-designer-control input {
+    width: 100%;
+    margin-top: 8px;
+    padding: 8px;
+}
+
+.garment-designer-stack {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    margin-top: 8px;
+}
+
+.garment-designer-panel {
+    background: #ffffff;
+    border: 1px solid #dbeafe;
+    border-radius: 14px;
+    padding: 16px;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}

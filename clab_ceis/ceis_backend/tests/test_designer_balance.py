@@ -210,3 +210,30 @@ def test_designer_balance_supplier_switch_changes_transport_balance(
         alpha_payload["summary"]["total_delay_days"]
         < beta_payload["summary"]["total_delay_days"]
     )
+
+
+def test_designer_garment_reference_endpoint_returns_design_inputs(
+    tmp_path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CEIS_DISABLE_DISTANCE_SYNC", "1")
+    init_sqlite_db()
+
+    with TestClient(app) as client:
+        client.app.state.wiser_client = _build_mock_wiser_client(
+            {
+                6566: 1.0,
+                21893: 2.0,
+                17901: 0.1,
+            }
+        )
+        response = client.get("/designer-garment/reference")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["garment_types"]
+    assert payload["materials"]
+    assert payload["process_types"]
+    assert payload["fabric_block_types"]
+    assert "longevity_wears" in payload["materials"][0]
+    assert "economic_cost_per_unit_chf" in payload["process_types"][0]

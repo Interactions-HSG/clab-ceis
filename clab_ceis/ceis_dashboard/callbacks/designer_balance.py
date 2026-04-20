@@ -338,15 +338,15 @@ def _build_balance_content(scenario: dict):
                 [
                     html.H2("Process Types Overview"),
                     html.P(
-                        "Average usage per garment is calculated for the currently selected garment type and current supplier scenario."
+                        "Total usage per garment is calculated for the currently selected garment type and current supplier scenario."
                     ),
                     _build_table(
                         [
                             {"name": "Process type", "id": "process_type"},
                             {"name": "Unit", "id": "unit"},
                             {
-                                "name": "Average usage per garment",
-                                "id": "average_usage_per_garment",
+                                "name": "Total usage per garment",
+                                "id": "total_usage_per_garment",
                             },
                             {"name": "Economic Cost (CHF)", "id": "economic_cost_chf"},
                             {"name": "CO2eq (kg)", "id": "co2eq_kg"},
