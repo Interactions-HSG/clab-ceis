@@ -104,7 +104,7 @@ def get_designer_garment_reference_data(wiser_client: WiserClient) -> dict:
         "materials": materials,
         "process_types": process_rows,
         "fabric_block_types": _build_fabric_block_reference_rows(
-            fabric_block_types, materials, wiser_client, emission_cache
+            fabric_block_types, materials, wiser_client, emission_cache, mock_data
         ),
     }
 
@@ -141,46 +141,126 @@ def _get_material_distance_to_manufacturer_km(material_name: str) -> float | Non
     return material_distances.get(material_name.lower())
 
 
-def _calculate_fabric_block_reference_emission(
+def _build_fabric_block_process_breakdown(
     fabric_block_type: dict,
-    material: dict,
     wiser_client: WiserClient,
     emission_cache: dict[int, float | None],
-) -> float | None:
-    block_weight_kg = float(material["kg_per_sqm"]) * float(fabric_block_type["sqm"])
+    mock_data: dict,
+) -> tuple[list[dict], float, float | None]:
+    process_rows = []
+    total_process_cost = 0.0
+    total_process_co2 = 0.0
 
-    material_emission_per_unit = _get_emission_per_unit(
-        wiser_client, material.get("activity_id"), emission_cache
-    )
-    if material_emission_per_unit is None:
-        return None
-    total_emission = material_emission_per_unit * block_weight_kg
-
-    for _, process_amount, process_activity_id in get_fabric_block_processes_for_emission(
+    for process_name, process_amount, process_activity_id in get_fabric_block_processes_for_emission(
         fabric_block_type["id"]
     ):
         process_emission_per_unit = _get_emission_per_unit(
             wiser_client, process_activity_id, emission_cache
         )
         if process_emission_per_unit is None:
-            return None
-        total_emission += process_emission_per_unit * float(process_amount)
+            total_process_co2 = None
+            process_emission = None
+        else:
+            process_emission = process_emission_per_unit * float(process_amount)
+            if total_process_co2 is not None:
+                total_process_co2 += process_emission
+
+        process_cost = _process_cost(process_name, float(process_amount), mock_data)
+        total_process_cost += process_cost
+        process_rows.append(
+            {
+                "process": process_name,
+                "amount": _safe_round(process_amount, 3),
+                "economic_cost_chf": _safe_round(process_cost),
+                "co2eq_kg": (
+                    _safe_round(process_emission, 3)
+                    if process_emission is not None
+                    else None
+                ),
+            }
+        )
+
+    return process_rows, _safe_round(total_process_cost), (
+        _safe_round(total_process_co2, 3) if total_process_co2 is not None else None
+    )
+
+
+def _build_fabric_block_reference_row(
+    fabric_block_type: dict,
+    material: dict,
+    wiser_client: WiserClient,
+    emission_cache: dict[int, float | None],
+    mock_data: dict,
+) -> dict:
+    block_weight_kg = float(material["kg_per_sqm"]) * float(fabric_block_type["sqm"])
+
+    material_emission_per_unit = _get_emission_per_unit(
+        wiser_client, material.get("activity_id"), emission_cache
+    )
+    material_emission = (
+        material_emission_per_unit * block_weight_kg
+        if material_emission_per_unit is not None
+        else None
+    )
+    material_cost = float(material.get("cost_per_kg_chf") or 0) * block_weight_kg
+
+    block_processes, block_process_cost, block_process_co2 = (
+        _build_fabric_block_process_breakdown(
+            fabric_block_type, wiser_client, emission_cache, mock_data
+        )
+    )
 
     distance_km = _get_material_distance_to_manufacturer_km(material["name"])
-    if distance_km is None:
-        return None
-
     transport_emission = calculate_transport_emission(
-        distance_km,
+        float(distance_km or 0),
         block_weight_kg,
         _get_emission_per_unit(
             wiser_client, ACTIVITY_ID_LONG_DISTANCE_TRANSPORT, emission_cache
         ),
     )
-    if transport_emission is None:
-        return None
+    if distance_km is not None:
+        block_processes.append(
+            {
+                "process": "material transport to manufacturer",
+                "amount": _safe_round(distance_km, 3),
+                "economic_cost_chf": 0.0,
+                "co2eq_kg": (
+                    _safe_round(transport_emission, 3)
+                    if transport_emission is not None
+                    else None
+                ),
+            }
+        )
 
-    return _safe_round(total_emission + transport_emission, 3)
+    total_co2 = None
+    if (
+        material_emission is not None
+        and block_process_co2 is not None
+        and transport_emission is not None
+    ):
+        total_co2 = material_emission + block_process_co2 + transport_emission
+
+    return {
+        "id": fabric_block_type["id"],
+        "name": fabric_block_type["name"],
+        "sqm": fabric_block_type["sqm"],
+        "material": material["name"],
+        "weight_kg": _safe_round(block_weight_kg, 3),
+        "material_cost_chf": _safe_round(material_cost),
+        "block_process_cost_chf": _safe_round(block_process_cost),
+        "total_cost_chf": _safe_round(material_cost + block_process_cost),
+        "material_co2eq_kg": (
+            _safe_round(material_emission, 3) if material_emission is not None else None
+        ),
+        "block_process_co2eq_kg": block_process_co2,
+        "transport_co2eq_kg": (
+            _safe_round(transport_emission, 3)
+            if transport_emission is not None
+            else None
+        ),
+        "co2eq_kg": _safe_round(total_co2, 3) if total_co2 is not None else None,
+        "processes": block_processes,
+    }
 
 
 def _build_fabric_block_reference_rows(
@@ -188,20 +268,19 @@ def _build_fabric_block_reference_rows(
     materials: list[dict],
     wiser_client: WiserClient,
     emission_cache: dict[int, float | None],
+    mock_data: dict,
 ) -> list[dict]:
     rows = []
     for fabric_block_type in fabric_block_types:
         for material in materials:
             rows.append(
-                {
-                    "id": fabric_block_type["id"],
-                    "name": fabric_block_type["name"],
-                    "sqm": fabric_block_type["sqm"],
-                    "material": material["name"],
-                    "co2eq_kg": _calculate_fabric_block_reference_emission(
-                        fabric_block_type, material, wiser_client, emission_cache
-                    ),
-                }
+                _build_fabric_block_reference_row(
+                    fabric_block_type,
+                    material,
+                    wiser_client,
+                    emission_cache,
+                    mock_data,
+                )
             )
     return rows
 
