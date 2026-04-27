@@ -4,6 +4,10 @@ from dash import dcc, html
 def get_garment_designer_layout():
     return html.Div(
         [
+            dcc.Store(id="garment-designer-reference-data-store", data={}),
+            dcc.Store(id="garment-designer-reference-scenario-store", data={}),
+            dcc.Store(id="garment-designer-custom-bom-store", data=[]),
+            dcc.Store(id="garment-designer-custom-process-store", data=[]),
             dcc.Link(
                 "Home",
                 href="/",

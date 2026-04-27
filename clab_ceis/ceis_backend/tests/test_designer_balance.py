@@ -253,4 +253,8 @@ def test_designer_garment_reference_endpoint_returns_design_inputs(
         if fabric_block["name"] == "80x64" and fabric_block["material"] == "hemp"
     )
     assert hemp_block["sqm"] == 0.512
+    assert hemp_block["weight_kg"] == 0.108
+    assert hemp_block["material_cost_chf"] == 2.58
+    assert hemp_block["block_process_cost_chf"] == 0.09
     assert hemp_block["co2eq_kg"] == 0.929
+    assert hemp_block["processes"]
