@@ -222,6 +222,9 @@ def test_designer_garment_reference_endpoint_returns_design_inputs(
     with TestClient(app) as client:
         client.app.state.wiser_client = _build_mock_wiser_client(
             {
+                276186: 8.0,
+                6756: 6.0,
+                20936: 10.0,
                 6566: 1.0,
                 21893: 2.0,
                 17901: 0.1,
@@ -236,4 +239,18 @@ def test_designer_garment_reference_endpoint_returns_design_inputs(
     assert payload["process_types"]
     assert payload["fabric_block_types"]
     assert "longevity_wears" in payload["materials"][0]
+    assert "co2eq_per_kg" in payload["materials"][0]
     assert "economic_cost_per_unit_chf" in payload["process_types"][0]
+
+    hemp_material = next(
+        material for material in payload["materials"] if material["name"] == "hemp"
+    )
+    assert hemp_material["co2eq_per_kg"] == 8.0
+
+    hemp_block = next(
+        fabric_block
+        for fabric_block in payload["fabric_block_types"]
+        if fabric_block["name"] == "80x64" and fabric_block["material"] == "hemp"
+    )
+    assert hemp_block["sqm"] == 0.512
+    assert hemp_block["co2eq_kg"] == 0.929
