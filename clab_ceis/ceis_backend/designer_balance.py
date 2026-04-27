@@ -6,7 +6,13 @@ from functools import lru_cache
 from fastapi import HTTPException
 
 from ceis_backend.config import BASE_DIR
-from ceis_backend.data.location_details import ACTIVITY_ID_TRANSPORT
+from ceis_backend.data.location_details import (
+    ACTIVITY_ID_LONG_DISTANCE_TRANSPORT,
+    ACTIVITY_ID_TRANSPORT,
+    COTTON_DISTANCE_TO_MANUFACTURER_KM,
+    HEMP_DISTANCE_TO_MANUFACTURER_KM,
+    SILK_DISTANCE_TO_MANUFACTURER_KM,
+)
 from ceis_backend.queries import (
     db_get_fabric_block_types,
     db_get_garment_types,
@@ -15,6 +21,7 @@ from ceis_backend.queries import (
     db_get_manufacturers,
     db_get_materials_for_garment,
     db_get_process_types,
+    get_fabric_block_processes_for_emission,
     get_full_garment_recipe,
 )
 from ceis_backend.utils import calculate_transport_emission, get_co2_for_garment
@@ -43,10 +50,14 @@ def get_designer_balance_options() -> dict:
 
 def get_designer_garment_reference_data(wiser_client: WiserClient) -> dict:
     mock_data = load_designer_balance_mock_data()
+    emission_cache: dict[int, float | None] = {}
 
     materials = []
     for material in db_get_materials():
         material_mock = _mock_material_data(material["name"], mock_data)
+        material_emission_per_unit = _get_emission_per_unit(
+            wiser_client, material["activity_id"], emission_cache
+        )
         materials.append(
             {
                 **material,
@@ -54,6 +65,11 @@ def get_designer_garment_reference_data(wiser_client: WiserClient) -> dict:
                     float(material_mock.get("cost_per_kg_chf", 0))
                 ),
                 "longevity_wears": int(material_mock.get("longevity_wears", 0)),
+                "co2eq_per_kg": (
+                    _safe_round(material_emission_per_unit, 3)
+                    if material_emission_per_unit is not None
+                    else None
+                ),
             }
         )
 
@@ -63,13 +79,9 @@ def get_designer_garment_reference_data(wiser_client: WiserClient) -> dict:
         process_mock = process_defs.get(
             process_type["name"].lower(), process_defs.get("default", {})
         )
-        ecological_unit_cost = None
-        try:
-            ecological_unit_cost = wiser_client.get_emission_per_unit(
-                process_type["activity_id"]
-            )
-        except Exception:
-            ecological_unit_cost = None
+        ecological_unit_cost = _get_emission_per_unit(
+            wiser_client, process_type["activity_id"], emission_cache
+        )
 
         process_rows.append(
             {
@@ -85,16 +97,113 @@ def get_designer_garment_reference_data(wiser_client: WiserClient) -> dict:
             }
         )
 
+    fabric_block_types = db_get_fabric_block_types()
+
     return {
         "garment_types": db_get_garment_types(),
         "materials": materials,
         "process_types": process_rows,
-        "fabric_block_types": db_get_fabric_block_types(),
+        "fabric_block_types": _build_fabric_block_reference_rows(
+            fabric_block_types, materials, wiser_client, emission_cache
+        ),
     }
 
 
 def _safe_round(value: float | int | None, digits: int = 2) -> float:
     return round(float(value or 0), digits)
+
+
+def _get_emission_per_unit(
+    wiser_client: WiserClient,
+    activity_id: int | None,
+    emission_cache: dict[int, float | None] | None = None,
+) -> float | None:
+    if activity_id is None:
+        return None
+    if emission_cache is not None and activity_id in emission_cache:
+        return emission_cache[activity_id]
+    try:
+        emission_per_unit = wiser_client.get_emission_per_unit(activity_id)
+    except Exception:
+        emission_per_unit = None
+    if emission_cache is not None:
+        emission_cache[activity_id] = emission_per_unit
+    return emission_per_unit
+
+
+def _get_material_distance_to_manufacturer_km(material_name: str) -> float | None:
+    material_distances = {
+        "hemp": HEMP_DISTANCE_TO_MANUFACTURER_KM,
+        "cotton": COTTON_DISTANCE_TO_MANUFACTURER_KM,
+        "silk": SILK_DISTANCE_TO_MANUFACTURER_KM,
+        "mikado silk": SILK_DISTANCE_TO_MANUFACTURER_KM,
+    }
+    return material_distances.get(material_name.lower())
+
+
+def _calculate_fabric_block_reference_emission(
+    fabric_block_type: dict,
+    material: dict,
+    wiser_client: WiserClient,
+    emission_cache: dict[int, float | None],
+) -> float | None:
+    block_weight_kg = float(material["kg_per_sqm"]) * float(fabric_block_type["sqm"])
+
+    material_emission_per_unit = _get_emission_per_unit(
+        wiser_client, material.get("activity_id"), emission_cache
+    )
+    if material_emission_per_unit is None:
+        return None
+    total_emission = material_emission_per_unit * block_weight_kg
+
+    for _, process_amount, process_activity_id in get_fabric_block_processes_for_emission(
+        fabric_block_type["id"]
+    ):
+        process_emission_per_unit = _get_emission_per_unit(
+            wiser_client, process_activity_id, emission_cache
+        )
+        if process_emission_per_unit is None:
+            return None
+        total_emission += process_emission_per_unit * float(process_amount)
+
+    distance_km = _get_material_distance_to_manufacturer_km(material["name"])
+    if distance_km is None:
+        return None
+
+    transport_emission = calculate_transport_emission(
+        distance_km,
+        block_weight_kg,
+        _get_emission_per_unit(
+            wiser_client, ACTIVITY_ID_LONG_DISTANCE_TRANSPORT, emission_cache
+        ),
+    )
+    if transport_emission is None:
+        return None
+
+    return _safe_round(total_emission + transport_emission, 3)
+
+
+def _build_fabric_block_reference_rows(
+    fabric_block_types: list[dict],
+    materials: list[dict],
+    wiser_client: WiserClient,
+    emission_cache: dict[int, float | None],
+) -> list[dict]:
+    rows = []
+    for fabric_block_type in fabric_block_types:
+        for material in materials:
+            rows.append(
+                {
+                    "id": fabric_block_type["id"],
+                    "name": fabric_block_type["name"],
+                    "sqm": fabric_block_type["sqm"],
+                    "material": material["name"],
+                    "co2eq_kg": _calculate_fabric_block_reference_emission(
+                        fabric_block_type, material, wiser_client, emission_cache
+                    ),
+                }
+            )
+    return rows
 
 
 def _mock_material_data(material_name: str, mock_data: dict) -> dict:

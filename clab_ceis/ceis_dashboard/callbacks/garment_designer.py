@@ -149,13 +149,14 @@ def register_garment_designer_callbacks(app: Dash, data: ceis_data.CeisData) -> 
             [
                 html.Div(
                     [
-                        html.H2("Material Reference (Longevity + Economic)"),
+                        html.H2("Material Reference"),
                         _table(
                             [
                                 {"name": "Material", "id": "name"},
                                 {"name": "kg/sqm", "id": "kg_per_sqm"},
                                 {"name": "Longevity (wears)", "id": "longevity_wears"},
                                 {"name": "Cost per kg (CHF)", "id": "cost_per_kg_chf"},
+                                {"name": "CO2eq per kg", "id": "co2eq_per_kg"},
                             ],
                             materials,
                             "garment-designer-material-reference",
@@ -188,10 +189,19 @@ def register_garment_designer_callbacks(app: Dash, data: ceis_data.CeisData) -> 
                 html.Div(
                     [
                         html.H2("Fabric Block Catalog"),
+                        html.P(
+                            "CO2eq includes the material itself, the fabric block recipe processes, and material transport to the manufacturer."
+                        ),
                         _table(
                             [
                                 {"name": "Fabric block type", "id": "name"},
                                 {"name": "ID", "id": "id"},
+                                {"name": "sqm", "id": "sqm"},
+                                {"name": "Material", "id": "material"},
+                                {
+                                    "name": "CO2eq (kg, material + block processes + transport)",
+                                    "id": "co2eq_kg",
+                                },
                             ],
                             fabric_block_types,
                             "garment-designer-fabric-block-reference",

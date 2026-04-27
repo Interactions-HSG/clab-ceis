@@ -590,10 +590,13 @@ def db_get_fabric_block_types() -> list[dict]:
     """Get all fabric block types from the database."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("SELECT id, name FROM fabric_block_types")
+    cursor.execute("SELECT id, name, sqm FROM fabric_block_types")
     fabric_block_types = cursor.fetchall()
     conn.close()
-    return [{"id": fb_type[0], "name": fb_type[1]} for fb_type in fabric_block_types]
+    return [
+        {"id": fb_type[0], "name": fb_type[1], "sqm": fb_type[2]}
+        for fb_type in fabric_block_types
+    ]
 
 
 def db_delete_fabric_block_type(type_id: int) -> dict:
