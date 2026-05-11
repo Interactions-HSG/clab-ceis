@@ -35,6 +35,20 @@
             }
         },
         {
+            "name": "CEIS Shop (with Backend)",
+            "type": "debugpy",
+            "request": "launch",
+            "python": "${workspaceFolder}/clab_ceis/ceis_shop/.venv/bin/python",
+            "program": "${workspaceFolder}/clab_ceis/ceis_shop/main.py",
+            "cwd": "${workspaceFolder}/clab_ceis/ceis_shop",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "preLaunchTask": "Start CEIS Backend",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
             "name": "CEIS Dashboard (standalone)",
             "type": "debugpy",
             "request": "launch",
