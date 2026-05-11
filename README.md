@@ -12,6 +12,7 @@ The overall idea is presented by the following diagram:
 
 ![alt text](doc/assets/overview.drawio.svg)
 
+
 ## How to run
 
 All components can be run from the workspace root using `uv`:
@@ -35,6 +36,10 @@ uv run --directory clab_ceis/ceis_shop main.py
 ```
 
 Then connect to `http://localhost:8050` (shop) and `http://localhost:8051` (dashboard)
+
+### Running with the Devcontainer
+
+The `.devcontainer/post-create.sh` script installs dependencies for all components on container creation. If the environment variable `CLAB_RUN_CEIS` is set, it also starts the backend, dashboard, and shop in the background automatically.
 
 ## How to run tests
 

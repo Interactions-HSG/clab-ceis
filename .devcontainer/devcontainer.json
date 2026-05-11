@@ -1,7 +1,7 @@
 {
 	"name": "clab-ceis",
 	"image": "mcr.microsoft.com/vscode/devcontainers/python:3",
-    "postCreateCommand": ".devcontainer/postCreate.sh",
+    "postCreateCommand": ".devcontainer/post-create.sh",
 	"forwardPorts": [
 		8051,
 		8052
