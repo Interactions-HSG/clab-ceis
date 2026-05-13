@@ -1,5 +1,7 @@
 from dash import html, dcc
 
+from ceis_shop.layouts.ui import shop_home_link
+
 
 def top_page():
     return html.Div(
@@ -10,7 +12,7 @@ def top_page():
                     html.Div("Circular Lab Shop", className="brand"),
                     html.Nav(
                         [
-                            dcc.Link("Garments", href="/"),
+                            dcc.Link("Home", href="/", className="home-nav-link"),
                             dcc.Link("End of life", href="/scenarios"),
                         ],
                         className="shop-actions",
@@ -20,10 +22,16 @@ def top_page():
             ),
             html.Section(
                 [
-                    html.Div("Garment detail", className="shop-kicker"),
-                    html.H1("Top", className="product-title"),
+                    html.Div(
+                        [
+                            html.Div("Garment detail", className="shop-kicker"),
+                            html.H1("Top", className="product-title"),
+                        ],
+                        className="shop-hero-copy",
+                    ),
+                    shop_home_link(),
                 ],
-                className="shop-hero",
+                className="shop-hero shop-hero-with-action",
             ),
             html.Div(
                 className="product-content",
@@ -45,11 +53,6 @@ def top_page():
                         ],
                     ),
                 ],
-            ),
-            dcc.Link(
-                "Back to Home",
-                href="/",
-                className="back-link",
             ),
         ],
     )

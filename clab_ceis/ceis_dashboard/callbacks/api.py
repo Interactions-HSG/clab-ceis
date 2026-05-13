@@ -24,7 +24,11 @@ def fetch_fabric_blocks():
             else:
                 block["processes"] = str(processes)
 
-        return backend_data
+        return [
+            block
+            for block in backend_data
+            if block.get("garment_id") in (None, "")
+        ]
 
     except Exception:
         return []

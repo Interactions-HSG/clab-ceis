@@ -5,6 +5,15 @@ from unittest.mock import Mock, patch
 from ceis_shop.layouts.scenarios import scenarios_page
 from ceis_shop.layouts.garment import garment_page, render_co2_content
 from ceis_shop.layouts.home import home_page
+from ceis_shop.main import app as shop_app
+
+
+def test_app_shell_does_not_render_global_home_link():
+    children = list(shop_app.layout.children)
+
+    assert children[1].id == "page-content"
+    assert "page-home-link" not in str(shop_app.layout)
+    assert "shop-home-button" not in str(shop_app.layout)
 
 
 def test_home_page_contains_expected_links():
@@ -24,6 +33,8 @@ def test_home_page_contains_expected_links():
     assert "/garment/1" in text
     assert "/garment/2" in text
     assert "/scenarios" in text
+    assert "page-home-link" not in text
+    assert "shop-home-button" not in text
 
 
 def test_scenarios_page_contains_scenarios_section():
@@ -32,7 +43,10 @@ def test_scenarios_page_contains_scenarios_section():
 
     assert "End of Life Options" in text
     assert "customer-repair-content" in text
-    assert "Back to Home" in text
+    assert "page-home-link" in text
+    assert "shop-home-button" in text
+    assert "Button" in text
+    assert "Back to Home" not in text
 
 
 def test_garment_page_contains_recipe_and_co2_sections():
@@ -69,9 +83,11 @@ def test_garment_page_contains_recipe_and_co2_sections():
     assert "CO2 Emissions" in text
     assert "Select a material to view recipe details." not in text
     assert "Select a material to view CO2 emissions." in text
-    assert "Base price: CHF 100.00" in text
     assert "garment-material-dropdown" in text
-    assert "Back to Home" in text
+    assert "page-home-link" in text
+    assert "shop-home-button" in text
+    assert "Button" in text
+    assert "Back to Home" not in text
 
 
 def test_garment_page_auto_uses_single_material_for_co2_without_blocking_layout():

@@ -10,6 +10,7 @@ def get_designer_balance_layout():
                 "Design tradeoffs",
                 "Garment Scenario Planner",
                 "Inspect one garment type at a time, switch suppliers, and review how materials, processes, transport, delays, and margin change together.",
+                show_home=True,
             ),
             dcc.Loading(
                 id="designer-balance-loading",

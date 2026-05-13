@@ -1,5 +1,7 @@
 from dash import dcc, html
 
+from ceis_shop.layouts.ui import shop_home_link
+
 
 def scenarios_page():
     return html.Div(
@@ -10,7 +12,7 @@ def scenarios_page():
                     html.Div("Circular Lab Shop", className="brand"),
                     html.Nav(
                         [
-                            dcc.Link("Garments", href="/"),
+                            dcc.Link("Home", href="/", className="home-nav-link"),
                             dcc.Link("End of life", href="/scenarios"),
                         ],
                         className="shop-actions",
@@ -20,14 +22,20 @@ def scenarios_page():
             ),
             html.Section(
                 [
-                    html.Div("Circular services", className="shop-kicker"),
-                    html.H1("End of Life Options", className="header-title"),
-                    html.P(
-                        "Compare practical return, repair, and replacement scenarios for the current garment journey.",
-                        className="shop-intro",
+                    html.Div(
+                        [
+                            html.Div("Circular services", className="shop-kicker"),
+                            html.H1("End of Life Options", className="header-title"),
+                            html.P(
+                                "Compare practical return, repair, and replacement scenarios for the current garment journey.",
+                                className="shop-intro",
+                            ),
+                        ],
+                        className="shop-hero-copy",
                     ),
+                    shop_home_link(),
                 ],
-                className="shop-hero",
+                className="shop-hero shop-hero-with-action",
             ),
             html.Section(
                 className="panel",
@@ -43,6 +51,5 @@ def scenarios_page():
                     ),
                 ],
             ),
-            dcc.Link("Back to Home", href="/", className="back-link"),
         ],
     )

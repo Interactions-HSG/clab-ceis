@@ -196,6 +196,11 @@ ul {
     background: rgba(255, 255, 255, 0.72);
 }
 
+.nav-links a.home-nav-link,
+.shop-actions a.home-nav-link {
+    display: none;
+}
+
 .nav-links a:hover,
 .shop-actions a:hover,
 .back-link:hover {
@@ -211,6 +216,46 @@ ul {
     gap: 12px;
     margin-bottom: 22px;
     padding-bottom: 22px;
+}
+
+.page-hero-with-action,
+.shop-hero-with-action {
+    align-items: start;
+    grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.page-hero-copy,
+.shop-hero-copy {
+    display: grid;
+    gap: 12px;
+}
+
+.page-home-link {
+    align-items: center;
+    background: var(--ink);
+    border: 1px solid var(--ink);
+    border-radius: 8px;
+    color: #ffffff;
+    display: inline-flex;
+    font-weight: 900;
+    justify-content: center;
+    justify-self: end;
+    min-height: 42px;
+    padding: 10px 14px;
+    text-decoration: none;
+    width: max-content;
+}
+
+.page-home-link:hover {
+    background: var(--accent-strong);
+    border-color: var(--accent-strong);
+    color: #ffffff;
+    text-decoration: none;
+}
+
+.page-home-link:focus-visible {
+    outline: 3px solid var(--warning);
+    outline-offset: 3px;
 }
 
 .page-kicker,
@@ -310,8 +355,157 @@ ul {
     min-height: 120px;
 }
 
+.garment-designer-loading {
+    min-height: 220px;
+}
+
+.garment-designer-content {
+    min-height: 120px;
+}
+
+.co2-assessment-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    display: grid;
+    gap: 18px;
+    padding: 20px;
+}
+
+.co2-assessment-header {
+    align-items: start;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    gap: 14px;
+    justify-content: space-between;
+    padding-bottom: 16px;
+}
+
+.co2-assessment-header h3 {
+    font-size: 1.35rem;
+    margin-bottom: 0;
+}
+
+.co2-material-badge {
+    background: var(--accent-soft);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--accent-strong);
+    font-weight: 900;
+    padding: 8px 11px;
+    white-space: nowrap;
+}
+
+.co2-metric-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.co2-metric-card {
+    background: var(--surface-soft);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    min-height: 124px;
+    padding: 15px;
+}
+
+.co2-metric-card-positive {
+    background: var(--accent-soft);
+    border-color: rgba(47, 111, 94, 0.28);
+}
+
+.co2-metric-title {
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.co2-metric-value {
+    color: var(--ink);
+    font-size: 1.45rem;
+    font-weight: 900;
+    margin-top: 8px;
+}
+
+.co2-metric-subtitle {
+    color: var(--muted);
+    font-size: 0.88rem;
+    margin-top: 8px;
+}
+
+.co2-detail-grid {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.co2-detail-panel {
+    background: var(--surface-soft);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    padding: 16px;
+}
+
+.co2-detail-panel h4 {
+    margin-bottom: 8px;
+}
+
+.co2-detail-panel p {
+    color: var(--muted);
+    font-size: 0.92rem;
+}
+
+.co2-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.9rem;
+    width: 100%;
+}
+
+.co2-table th,
+.co2-table td {
+    border-bottom: 1px solid var(--line);
+    padding: 10px;
+    text-align: left;
+    vertical-align: top;
+}
+
+.co2-table th {
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.co2-table tr:last-child td {
+    border-bottom: 0;
+}
+
+.co2-table tbody tr:hover {
+    background: rgba(223, 238, 232, 0.55);
+}
+
 .table-panel {
     overflow: hidden;
+}
+
+.assessment-grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.assessment-product {
+    height: 100%;
+}
+
+.inventory-page > .panel,
+.inventory-page > .fabric-add-form {
+    margin-bottom: 18px;
 }
 
 .recipe-page .wrapper > h2 {
@@ -550,6 +744,15 @@ ul {
         align-items: flex-start;
         flex-direction: column;
         margin-top: -18px;
+    }
+
+    .page-hero-with-action,
+    .shop-hero-with-action {
+        grid-template-columns: 1fr;
+    }
+
+    .page-home-link {
+        justify-self: start;
     }
 
     h1,

@@ -5,6 +5,7 @@ import requests
 from dash import dcc, html
 
 from ceis_shop import config
+from ceis_shop.layouts.ui import shop_home_link
 
 # Map seeded garments to existing shop asset photos where available.
 GARMENT_IMAGE_MAP = {
@@ -207,9 +208,26 @@ def garment_page(garment_type_id: int):
             return html.Div(
                 [
                     _shop_topbar(),
-                    html.H1(garment["name"], className="product-title"),
+                    html.Section(
+                        [
+                            html.Div(
+                                [
+                                    html.Div(
+                                        "Garment configurator",
+                                        className="shop-kicker",
+                                    ),
+                                    html.H1(
+                                        garment["name"],
+                                        className="product-title",
+                                    ),
+                                ],
+                                className="shop-hero-copy",
+                            ),
+                            shop_home_link(),
+                        ],
+                        className="shop-hero shop-hero-with-action",
+                    ),
                     html.P("No materials configured for this garment."),
-                    dcc.Link("Back to Home", href="/", className="back-link"),
                 ],
                 className="product-detail",
             )
@@ -243,14 +261,22 @@ def garment_page(garment_type_id: int):
                 _shop_topbar(),
                 html.Section(
                     [
-                        html.Div("Garment configurator", className="shop-kicker"),
-                        html.H1(garment["name"], className="product-title"),
-                        html.P(
-                            "Review the material choice, bill of fabric blocks, circular substitutions, and estimated climate impact.",
-                            className="shop-intro",
+                        html.Div(
+                            [
+                                html.Div(
+                                    "Garment configurator", className="shop-kicker"
+                                ),
+                                html.H1(garment["name"], className="product-title"),
+                                html.P(
+                                    "Review the material choice, bill of fabric blocks, circular substitutions, and estimated climate impact.",
+                                    className="shop-intro",
+                                ),
+                            ],
+                            className="shop-hero-copy",
                         ),
+                        shop_home_link(),
                     ],
-                    className="shop-hero",
+                    className="shop-hero shop-hero-with-action",
                 ),
                 dcc.Store(id="garment-type-id-store", data=garment_type_id),
                 dcc.Store(id="garment-materials-store", data=materials),
@@ -281,14 +307,12 @@ def garment_page(garment_type_id: int):
                                 (
                                     html.Div(
                                         [
-                                            html.Div("Base price", className="metric-title"),
+                                            html.Div(
+                                                "Base price", className="metric-title"
+                                            ),
                                             html.Div(
                                                 f"CHF {float(garment['price_chf']):.2f}",
                                                 className="metric-value",
-                                            ),
-                                            html.Div(
-                                                f"Base price: CHF {float(garment['price_chf']):.2f}",
-                                                className="designer-balance-metric-subtitle",
                                             ),
                                         ],
                                         className="metric-card",
@@ -311,7 +335,6 @@ def garment_page(garment_type_id: int):
                         ),
                     ],
                 ),
-                dcc.Link("Back to Home", href="/", className="back-link"),
             ],
         )
     except Exception as exc:
@@ -319,9 +342,26 @@ def garment_page(garment_type_id: int):
             className="product-detail",
             children=[
                 _shop_topbar(),
-                html.H1("Unable to load garment"),
-                html.P(str(exc)),
-                dcc.Link("Back to Home", href="/", className="back-link"),
+                html.Section(
+                    [
+                        html.Div(
+                            [
+                                html.Div(
+                                    "Garment configurator",
+                                    className="shop-kicker",
+                                ),
+                                html.H1(
+                                    "Unable to load garment",
+                                    className="product-title",
+                                ),
+                                html.P(str(exc), className="shop-intro"),
+                            ],
+                            className="shop-hero-copy",
+                        ),
+                        shop_home_link(),
+                    ],
+                    className="shop-hero shop-hero-with-action",
+                ),
             ],
         )
 
@@ -332,7 +372,7 @@ def _shop_topbar():
             html.Div("Circular Lab Shop", className="brand"),
             html.Nav(
                 [
-                    dcc.Link("Garments", href="/"),
+                    dcc.Link("Home", href="/", className="home-nav-link"),
                     dcc.Link("End of life", href="/scenarios"),
                 ],
                 className="shop-actions",

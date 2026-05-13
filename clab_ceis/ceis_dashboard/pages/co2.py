@@ -10,6 +10,7 @@ def get_co2_layout(garment_type_id: int):
                 "Assessment",
                 "CO2 Assessment",
                 "Review garment-level material and process emissions with circular fabric block alternatives.",
+                show_home=True,
             ),
             dcc.Store(id="co2-garment-id", data=garment_type_id),
             dcc.Loading(

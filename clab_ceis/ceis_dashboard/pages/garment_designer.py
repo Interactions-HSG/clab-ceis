@@ -14,53 +14,62 @@ def get_garment_designer_layout():
                 "Prototype",
                 "New Garment Designer",
                 "Design new garments with material longevity, process economics, ecology, and recipe-level fabric block and process references.",
-            ),
-            html.Div(
-                [
-                    html.Div(
-                        [
-                            html.Label("New garment name"),
-                            dcc.Input(
-                                id="garment-designer-name",
-                                type="text",
-                                placeholder="e.g., Modular Utility Jacket",
-                            ),
-                        ],
-                        className="garment-designer-control",
-                    ),
-                    html.Div(
-                        [
-                            html.Label("Target sales price (CHF)"),
-                            dcc.Input(
-                                id="garment-designer-target-price",
-                                type="number",
-                                min=0,
-                                step=1,
-                                placeholder="e.g., 220",
-                            ),
-                        ],
-                        className="garment-designer-control",
-                    ),
-                    html.Div(
-                        [
-                            html.Label("Reference garment type"),
-                            dcc.Dropdown(
-                                id="garment-designer-reference-garment",
-                                options=[],
-                                placeholder="Select a reference garment",
-                                clearable=False,
-                            ),
-                        ],
-                        className="garment-designer-control",
-                    ),
-                ],
-                className="garment-designer-controls",
+                show_home=True,
             ),
             dcc.Loading(
                 id="garment-designer-loading",
                 type="circle",
-                color="#155e75",
-                children=html.Div(id="garment-designer-content"),
+                color="#1f5146",
+                parent_className="garment-designer-loading",
+                children=html.Div(
+                    [
+                        html.Div(
+                            [
+                                html.Div(
+                                    [
+                                        html.Label("New garment name"),
+                                        dcc.Input(
+                                            id="garment-designer-name",
+                                            type="text",
+                                            placeholder="e.g., Modular Utility Jacket",
+                                        ),
+                                    ],
+                                    className="garment-designer-control",
+                                ),
+                                html.Div(
+                                    [
+                                        html.Label("Target sales price (CHF)"),
+                                        dcc.Input(
+                                            id="garment-designer-target-price",
+                                            type="number",
+                                            min=0,
+                                            step=1,
+                                            placeholder="e.g., 220",
+                                        ),
+                                    ],
+                                    className="garment-designer-control",
+                                ),
+                                html.Div(
+                                    [
+                                        html.Label("Reference garment type"),
+                                        dcc.Dropdown(
+                                            id="garment-designer-reference-garment",
+                                            options=[],
+                                            placeholder="Select a reference garment",
+                                            clearable=False,
+                                        ),
+                                    ],
+                                    className="garment-designer-control",
+                                ),
+                            ],
+                            className="garment-designer-controls",
+                        ),
+                        html.Div(
+                            id="garment-designer-content",
+                            className="garment-designer-content",
+                        ),
+                    ],
+                ),
             ),
         ],
         className="wrapper garment-designer-page",
