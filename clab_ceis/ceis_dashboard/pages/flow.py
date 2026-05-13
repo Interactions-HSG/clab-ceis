@@ -117,6 +117,7 @@ def get_dashboard_layout(progress_data: dict | None = None):
                 "Strategy",
                 "Lifecycle Strategy Board",
                 "Track product lifecycle loops, resource events, and progress against circularity targets.",
+                show_home=True,
             ),
             html.Div(
                 [

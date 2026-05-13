@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from dash import Dash, dcc, html
+from dash import Dash, dcc, html, no_update
 from dash.dependencies import Input, Output
 
 from ceis_shop.layouts.scenarios import scenarios_page
@@ -19,6 +19,7 @@ app = Dash(
 )
 server = app.server
 
+
 # Define app layout
 app.layout = html.Div(
     children=[
@@ -30,6 +31,17 @@ app.layout = html.Div(
 
 # Register callbacks
 get_callbacks(app)
+
+
+@app.callback(
+    Output("url", "pathname"),
+    [Input("shop-home-button", "n_clicks")],
+    prevent_initial_call=True,
+)
+def navigate_home(n_clicks):
+    if n_clicks:
+        return "/"
+    return no_update
 
 
 # Page routing callback

@@ -60,7 +60,10 @@ class CeisMonitor:
 
         # App-level layout handling routing (client-side)
         self._layout = html.Div(
-            [dcc.Location(id="url", refresh=False), html.Div(id="page-content")],
+            [
+                dcc.Location(id="url", refresh=False),
+                html.Div(id="page-content"),
+            ],
             className="app-shell",
         )
         self._app.layout = self._layout

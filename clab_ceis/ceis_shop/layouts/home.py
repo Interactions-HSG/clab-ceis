@@ -28,10 +28,6 @@ def home_page():
                             className="product-thumb",
                         ),
                         html.Div(garment["name"], className="product-label"),
-                        html.Div(
-                            "Configure material, impact, and price",
-                            className="product-meta",
-                        ),
                     ],
                 ),
             )
@@ -53,7 +49,7 @@ def home_page():
                     html.Div("Circular Lab Shop", className="brand"),
                     html.Nav(
                         [
-                            dcc.Link("Garments", href="/"),
+                            dcc.Link("Home", href="/", className="home-nav-link"),
                             dcc.Link("End of life", href="/scenarios"),
                         ],
                         className="shop-actions",

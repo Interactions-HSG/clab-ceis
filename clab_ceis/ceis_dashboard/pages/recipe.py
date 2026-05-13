@@ -12,6 +12,7 @@ def get_recipe_layout():
                         "Reference data",
                         "Add Recipe",
                         "Create garment recipes, fabric block types, process types, and material references for downstream circularity calculations.",
+                        show_home=True,
                     ),
                     html.H2("Add Garment Recipe"),
                     html.Div(

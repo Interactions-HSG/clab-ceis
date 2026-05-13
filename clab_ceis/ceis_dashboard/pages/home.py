@@ -1,37 +1,27 @@
+from urllib.parse import quote
+
 from dash import html, dcc, dash_table
 
 from ceis_dashboard.callbacks.api import fetch_garment_types
 from pages.ui import app_topbar, page_hero
 
+GARMENT_IMAGE_MAP = {
+    "Basic Trousers": "1. Basic trousers.JPG",
+    "Full Trousers": "2. Full Trousers.JPG",
+    "Elegant cowl neck top": "5. Elegant cowl neck top.JPG",
+    "Wrap Skirt": "7. Wrap Skirt.JPG",
+    "Cocktail fitted dress": "9. Cocktail fitted dress.jpg",
+    "Long tabard": "10. Long Tabard.JPG",
+    "Orka jacket": "12. Orka jacket Refashion by SOLVE (1).jpg",
+    "Nordlys Dress": "13. Nordlys dress.jpg",
+    "Mangata Dress": "14. Mångata dress Refashion by SOLVE (1).jpg",
+    "Måne top": "15. Måne top Refashion SOLVE (2).jpg",
+}
+
 
 def get_index_layout():
     inventory_form = html.Div(
         [
-            html.Div(
-                [
-                    dcc.Link(
-                        "Lifecycle Strategy Board",
-                        href="/dashboard",
-                        id="dashboard-link",
-                    ),
-                    dcc.Link(
-                        "Garment Scenario Planner",
-                        href="/designer-balance",
-                        id="designer-balance-link",
-                    ),
-                    dcc.Link(
-                        "New Garment Designer",
-                        href="/garment-designer",
-                        id="garment-designer-link",
-                    ),
-                    dcc.Link(
-                        "Add Recipe",
-                        href="/add-recipe",
-                        id="add-recipe-link",
-                    ),
-                ],
-                className="nav-links",
-            ),
             html.H2("Second-hand Fabric Block Inventory"),
             html.Button(
                 "Refresh Fabric Blocks",
@@ -46,7 +36,6 @@ def get_index_layout():
                     {"name": "material", "id": "material"},
                     {"name": "quality (%)", "id": "quality"},
                     {"name": "co2eq", "id": "co2eq"},
-                    {"name": "garment_id", "id": "garment_id"},
                     {"name": "location", "id": "location"},
                     {
                         "name": "processes",
@@ -164,12 +153,19 @@ def get_index_layout():
     )
 
     garment_types = fetch_garment_types()
-    co2_links = [
-        html.Li(
-            dcc.Link(
-                f"{garment['name']} CO2 Assessment",
-                href=f"/co2/{garment['id']}",
-            )
+    co2_cards = [
+        dcc.Link(
+            href=f"/co2/{garment['id']}",
+            children=html.Div(
+                [
+                    html.Div(
+                        _assessment_image(garment["name"]),
+                        className="product-thumb",
+                    ),
+                    html.Div(garment["name"], className="product-label"),
+                ],
+                className="product assessment-product",
+            ),
         )
         for garment in garment_types
     ]
@@ -177,8 +173,15 @@ def get_index_layout():
     co2_form = html.Div(
         [
             html.H2("CO2 Assessment"),
-            html.P("Open a garment page to view its CO2 details."),
-            html.Ul(co2_links or [html.Li("No garment types available.")]),
+            html.P("Select a garment to review its material and process emissions."),
+            (
+                html.Div(co2_cards, className="assessment-grid")
+                if co2_cards
+                else html.Div(
+                    "No garment types available.",
+                    className="panel-muted",
+                )
+            ),
         ],
         className="panel",
     )
@@ -192,7 +195,20 @@ def get_index_layout():
                 "Manage reusable fabric inventory, recipe references, and garment-level assessments from one cockpit.",
             ),
             inventory_form,
-            html.Div([fabric_form, co2_form], className="dashboard-grid"),
+            fabric_form,
+            co2_form,
         ],
-        className="wrapper",
+        className="wrapper inventory-page",
+    )
+
+
+def _assessment_image(garment_name: str):
+    file_name = GARMENT_IMAGE_MAP.get(garment_name)
+    if not file_name:
+        return html.Div("Image pending", className="product-image-fallback")
+
+    encoded_name = quote(file_name)
+    return html.Img(
+        src=f"/assets/Garment Photos/{encoded_name}",
+        alt=garment_name,
     )
