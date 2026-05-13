@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sqlite3
+from pathlib import Path
 from threading import Lock
 from time import time
 from typing import Any
@@ -7,11 +9,15 @@ from typing import Any
 import requests
 
 from ceis_backend.config import (
+    DB_PATH,
     WISER_SP3_API_USER,
     WISER_SP3_API_KEY,
     WISER_AUTH_URL,
     WISER_API_BASE_URL,
 )
+
+
+EMISSION_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
 
 
 class WiserClientError(RuntimeError):
@@ -32,6 +38,7 @@ class WiserClient:
         password: str = WISER_SP3_API_KEY,
         timeout_seconds: float = 30.0,
         token_refresh_margin_seconds: int = 30,
+        emission_cache_ttl_seconds: int = EMISSION_CACHE_TTL_SECONDS,
     ) -> None:
         self.auth_url = auth_url
         self.api_base_url = api_base_url.rstrip("/")
@@ -39,6 +46,7 @@ class WiserClient:
         self.password = password
         self.timeout_seconds = timeout_seconds
         self.token_refresh_margin_seconds = token_refresh_margin_seconds
+        self.emission_cache_ttl_seconds = emission_cache_ttl_seconds
         self._access_token: str | None = None
         self._token_expires_at = 0.0
         self._token_lock = Lock()
@@ -56,6 +64,10 @@ class WiserClient:
         return search_results
 
     def get_emission_per_unit(self, activity_id: int) -> float | None:
+        cache_hit, cached_emission = self._get_cached_emission_per_unit(activity_id)
+        if cache_hit:
+            return cached_emission
+
         print(f"Fetching Wiser emission per unit for activity {activity_id}")
         body = self._request_json(
             "GET",
@@ -70,8 +82,69 @@ class WiserClient:
 
         for item in lcia_results:
             if item.get("method", {}).get("name") == "IPCC 2021":
-                return item.get("emissions")
+                emission_per_unit = item.get("emissions")
+                self._cache_emission_per_unit(activity_id, emission_per_unit)
+                return emission_per_unit
+
+        self._cache_emission_per_unit(activity_id, None)
         return None
+
+    def _get_cached_emission_per_unit(
+        self, activity_id: int
+    ) -> tuple[bool, float | None]:
+        if not Path(DB_PATH).exists():
+            return False, None
+
+        try:
+            with sqlite3.connect(DB_PATH) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    SELECT emission_per_unit, cached_at
+                    FROM activity_emission_cache
+                    WHERE activity_id = ?
+                    """,
+                    (activity_id,),
+                )
+                row = cursor.fetchone()
+        except sqlite3.Error:
+            return False, None
+
+        if row is None:
+            return False, None
+
+        emission_per_unit, cached_at = row
+        try:
+            cache_age_seconds = time() - float(cached_at)
+        except (TypeError, ValueError):
+            return False, None
+
+        if cache_age_seconds > self.emission_cache_ttl_seconds:
+            return False, None
+
+        return True, emission_per_unit
+
+    def _cache_emission_per_unit(
+        self, activity_id: int, emission_per_unit: float | None
+    ) -> None:
+        if not Path(DB_PATH).exists():
+            return
+
+        try:
+            with sqlite3.connect(DB_PATH) as conn:
+                conn.execute(
+                    """
+                    INSERT INTO activity_emission_cache
+                        (activity_id, emission_per_unit, cached_at)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(activity_id) DO UPDATE SET
+                        emission_per_unit = excluded.emission_per_unit,
+                        cached_at = excluded.cached_at
+                    """,
+                    (activity_id, emission_per_unit, time()),
+                )
+        except sqlite3.Error:
+            return
 
     def _request_json(self, method: str, path: str, **kwargs: Any) -> dict[str, Any]:
         url = f"{self.api_base_url}/{path.lstrip('/')}"
