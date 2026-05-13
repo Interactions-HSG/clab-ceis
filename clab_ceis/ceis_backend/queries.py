@@ -13,7 +13,6 @@ from ceis_backend.models import (
     Process,
 )
 
-
 STRATEGIST_CIRCULARITY_THRESHOLD = 30.0
 
 
@@ -92,8 +91,7 @@ def db_get_strategy_progress() -> dict:
     """Aggregate strategist-facing progress metrics from sold garments."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute(
-        """
+    cursor.execute("""
         WITH sold_garments AS (
             SELECT gi.id, gi.type_id, gi.co2eq
             FROM garments_inventory gi
@@ -134,8 +132,7 @@ def db_get_strategy_progress() -> dict:
         LEFT JOIN total_recipe tr ON tr.garment_id = sg.id
         LEFT JOIN second_life sl ON sl.garment_id = sg.id
         ORDER BY sg.id
-        """
-    )
+        """)
     sold_garment_rows = cursor.fetchall()
     conn.close()
 
@@ -222,16 +219,14 @@ def db_get_sold_garments_for_co2() -> list[dict]:
     """Return sold garments that are still missing persisted CO2 values."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute(
-        """
+    cursor.execute("""
         SELECT gi.id, gi.type_id, gt.name
         FROM garments_inventory gi
         JOIN garment_types gt ON gt.id = gi.type_id
         WHERE gi.sold = 1
           AND gi.co2eq IS NULL
         ORDER BY gi.id
-        """
-    )
+        """)
     rows = cursor.fetchall()
     conn.close()
     return [{"id": row[0], "type_id": row[1], "name": row[2]} for row in rows]
@@ -868,7 +863,8 @@ def db_get_fabric_blocks(type_filter: str | None = None) -> list[dict]:
                    FROM fabric_blocks_inventory fbi
                    LEFT JOIN locations l ON fbi.location_id = l.id
                    LEFT JOIN materials m ON fbi.material_id = m.id
-                   WHERE fbi.type_id = ? OR ? IS NULL
+                   WHERE (? IS NULL OR fbi.type_id = ?)
+                     AND fbi.garment_id IS NULL
                    """,
         (type_filter, type_filter),
     )
@@ -1147,13 +1143,11 @@ def db_get_manufacturers(role_group: str | None = None) -> list[dict]:
     cursor = conn.cursor()
     try:
         if role_group is None:
-            cursor.execute(
-                """
+            cursor.execute("""
                 SELECT company, role, role_group, location
                 FROM manufacturers
                 ORDER BY role_group, company
-                """
-            )
+                """)
         else:
             cursor.execute(
                 """

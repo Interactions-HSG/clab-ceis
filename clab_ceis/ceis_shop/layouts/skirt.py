@@ -5,7 +5,26 @@ def skirt_page():
     return html.Div(
         className="product-detail",
         children=[
-            html.H1("Skirt", className="product-title"),
+            html.Header(
+                [
+                    html.Div("Circular Lab Shop", className="brand"),
+                    html.Nav(
+                        [
+                            dcc.Link("Garments", href="/"),
+                            dcc.Link("End of life", href="/scenarios"),
+                        ],
+                        className="shop-actions",
+                    ),
+                ],
+                className="shop-topbar",
+            ),
+            html.Section(
+                [
+                    html.Div("Garment detail", className="shop-kicker"),
+                    html.H1("Skirt", className="product-title"),
+                ],
+                className="shop-hero",
+            ),
             html.Div(
                 className="product-content",
                 children=[
@@ -14,7 +33,6 @@ def skirt_page():
                         children=html.Img(
                             src="/assets/skirt.jpg",
                             alt="Skirt",
-                            style={"width": "100%", "border-radius": "8px"},
                         ),
                     ),
                     html.Div(
@@ -22,22 +40,15 @@ def skirt_page():
                         children=[
                             html.P(
                                 "Wrapped Skirt made of double-sided fabric, in light blue and dark blue colors.",
-                                style={"font-size": "18px"},
                             ),
                         ],
                     ),
                 ],
-                style={"display": "flex", "gap": "20px"},
             ),
             dcc.Link(
                 "Back to Home",
                 href="/",
                 className="back-link",
-                style={
-                    "margin-top": "20px",
-                    "display": "block",
-                    "text-align": "center",
-                },
             ),
         ],
     )

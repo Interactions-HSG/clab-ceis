@@ -188,8 +188,8 @@ def _build_material_co2_section(garment_name: str, material_name: str, co2_data)
                 ],
                 style={"width": "100%", "maxWidth": "900px"},
             ),
-            html.Hr(),
-        ]
+        ],
+        className="panel-muted",
     )
 
 
@@ -238,4 +238,4 @@ def register_co2_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
                 _build_material_co2_section(garment_name, material_name, co2_data)
             )
 
-        return html.Div(sections)
+        return html.Div(sections, className="garment-designer-stack")

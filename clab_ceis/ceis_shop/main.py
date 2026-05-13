@@ -23,8 +23,9 @@ server = app.server
 app.layout = html.Div(
     children=[
         dcc.Location(id="url", refresh=False),
-        html.Div(id="page-content", style={"padding": "20px"}),
-    ]
+        html.Div(id="page-content"),
+    ],
+    className="app-shell",
 )
 
 # Register callbacks

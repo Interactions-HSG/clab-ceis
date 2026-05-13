@@ -1,415 +1,572 @@
-/* Wrapper to Center the Page */
-
-.wrapper {
-    margin: 0 auto;
-    max-width: 1024px;
-    padding: 10px;
+:root {
+    --bg: #f4f2ec;
+    --surface: #ffffff;
+    --surface-soft: #faf8f2;
+    --ink: #1d2420;
+    --muted: #68716b;
+    --line: #ded9ce;
+    --line-strong: #c8c1b3;
+    --accent: #2f6f5e;
+    --accent-strong: #1f5146;
+    --accent-soft: #dfeee8;
+    --warning: #b56a2b;
+    --danger: #b84a45;
+    --shadow: 0 16px 36px rgba(36, 43, 38, 0.08);
 }
 
-/* Card for Shadows and Padding */
-.card {
-    margin-bottom: 24px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    background-color: #fff;
-    border-radius: 8px;
-    padding: 20px;
+* {
+    box-sizing: border-box;
 }
 
-/* Header Title */
-.header-title {
-    font-size: 28px;
-    font-weight: bold;
-    text-align: center;
+body {
     margin: 0;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(244, 242, 236, 0.86)),
+        var(--bg);
+    color: var(--ink);
+    font-family:
+        Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        sans-serif;
+    line-height: 1.5;
 }
 
-/* Order Form as Flexbox */
-.order-form {
-    display: flex;
-    justify-content: space-evenly; /* Distributes items with equal space between */
-    align-items: flex-start; /* Aligns items to the top */
-    gap: 60px; /* Adds horizontal spacing */
-    margin-bottom: 20px; /* Space below the products */
-}
-
-/* Individual Product */
-.product {
-    text-align: center;
-    flex: 1; /* Equal width for all items */
-}
-
-/* Product Images */
-.product-image {
-    width: 200px;
-    height: auto;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    margin-bottom: 10px;
-    transition: transform 0.3s ease;
-}
-
-/* Zoom Effect on Hover */
-.product-image:hover {
-    transform: scale(1.05);
-}
-
-/* Product Label */
-.product-label {
-    font-size: 16px;
-    font-weight: bold;
-}
-
-/* Dropdown and Button Centered */
-.form-actions {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    margin-top: 20px;
-}
-
-.quote-button:hover {
-    background-color: #0056b3;
-}
-
-/* Center and Structure the Main Layout */
-.wrapper {
-    margin-right: auto;
-    margin-left: auto;
-    max-width: 1024px;
-    padding-right: 10px;
-    padding-left: 10px;
-    margin-top: 32px;
-}
-
-/* Add Shadow and Padding to Card Components */
-.card {
-    margin-bottom: 24px;
-    box-shadow: 0 4px 6px 0 rgba(0, 0, 0, 0.18);
-    background-color: #fff;
-    border-radius: 8px;
-    padding: 20px;
-}
-
-/* Header Styles */
-.header-title {
-    font-size: 28px;
-    font-weight: bold;
-    margin: 0;
-    text-align: center;
-}
-
-/* Products Section */
-.order-form {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 20px;
-}
-
-.product {
-    text-align: center;
-}
-
-.product-image {
-    width: 200px;
-    height: auto;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    margin-bottom: 10px;
-}
-
-.product-label {
-    font-size: 16px;
-    font-weight: bold;
-}
-
-/* Dropdown and Button */
-.form-actions {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    margin-top: 20px;
-}
-
-.dcc-dropdown {
-    width: 250px;
-    margin: 0 auto;
-}
-
-.quote-button {
-    background-color: #007bff;
-    color: #fff;
-    border: none;
-    border-radius: 5px;
-    padding: 10px 15px;
-    cursor: pointer;
-    font-size: 16px;
-}
-
-.quote-button:hover {
-    background-color: #0056b3;
-}
-
-/* Footer */
-.footer {
-    text-align: center;
-    padding: 10px;
-    font-size: 14px;
-    color: #555;
-    background-color: #f9f9f9; /* Optional: light background for the footer */
-    position: fixed; /* Fix the footer to the bottom of the viewport */
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1); /* Optional: top shadow for the footer */
-}
-/* General Wrapper */
-.wrapper {
-    margin: 0 auto;
-    max-width: 1024px;
-    padding: 20px;
-}
-
-/* Card Style for Sections */
-.card {
-    margin-bottom: 24px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    background-color: #fff;
-    border-radius: 8px;
-    padding: 20px;
-}
-
-/* Header Title */
-.header-title {
-    font-size: 28px;
-    text-align: center;
-    font-weight: bold;
-}
-
-/* Flexbox for Product Content */
-.order-form {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 40px;
-}
-
-/* Individual Product Card */
-.product {
-    text-align: center;
-    flex: 1;
-    border-radius: 8px;
-    transition: transform 0.3s ease;
-}
-
-.product:hover {
-    transform: scale(1.05);
-    cursor: pointer;
-}
-
-.product-label {
-    display: block;
-    margin-top: 10px;
-    font-size: 16px;
-    font-weight: bold;
-}
-
-/* Product Detail Page */
-.product-detail {
-    margin: 0 auto;
-    max-width: 800px;
-    padding: 20px;
-}
-
-.product-title {
-    text-align: center;
-    font-size: 32px;
-    margin-bottom: 20px;
-}
-
-.product-content {
-    display: flex;
-    align-items: flex-start;
-    gap: 20px;
-}
-
-.product-description {
-    flex: 1;
-    font-size: 18px;
-    line-height: 1.6;
-}
-
-.product-image {
-    flex: 1;
-    max-width: 300px;
-}
-
-/* Back Link */
-.back-link {
-    display: block;
-    text-align: center;
-    margin-top: 20px;
-    font-size: 16px;
-    color: #007bff;
+a {
+    color: var(--accent-strong);
+    font-weight: 700;
     text-decoration: none;
 }
 
-.back-link:hover {
+a:hover {
+    color: var(--accent);
     text-decoration: underline;
 }
 
-/* Footer */
-.footer {
-    text-align: center;
-    padding: 10px;
-    font-size: 14px;
-    color: #555;
-    margin-top: 20px;
+button,
+.quote-button {
+    min-height: 42px;
+    border: 1px solid var(--accent-strong);
+    border-radius: 8px;
+    background: var(--accent-strong);
+    color: #ffffff;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 800;
+    padding: 10px 14px;
+    transition:
+        background 160ms ease,
+        border-color 160ms ease,
+        box-shadow 160ms ease,
+        transform 160ms ease;
 }
 
-.designer-balance-page {
-    padding-bottom: 48px;
+button:hover,
+.quote-button:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 8px 18px rgba(47, 111, 94, 0.18);
+    transform: translateY(-1px);
 }
 
-.designer-balance-controls {
+button[id*="remove"],
+button[id*="delete"],
+button[id*="clear"] {
+    background: #ffffff;
+    border-color: var(--line-strong);
+    color: var(--danger);
+}
+
+button[id*="remove"]:hover,
+button[id*="delete"]:hover,
+button[id*="clear"]:hover {
+    border-color: var(--danger);
+    background: #fff7f6;
+    color: var(--danger);
+}
+
+input,
+textarea,
+.Select-control {
+    border: 1px solid var(--line-strong) !important;
+    border-radius: 8px !important;
+    color: var(--ink);
+    min-height: 40px;
+}
+
+input {
+    width: 100%;
+    margin-top: 8px;
+    padding: 9px 10px;
+}
+
+label {
+    display: block;
+    color: var(--muted);
+    font-size: 0.85rem;
+    font-weight: 800;
+    margin-bottom: 7px;
+}
+
+h1,
+h2,
+h3,
+p {
+    margin-top: 0;
+}
+
+h1 {
+    font-size: 2.25rem;
+    line-height: 1.08;
+    margin-bottom: 12px;
+}
+
+h2 {
+    font-size: 1.25rem;
+    line-height: 1.2;
+    margin-bottom: 14px;
+}
+
+h3 {
+    font-size: 1rem;
+    line-height: 1.25;
+    margin-bottom: 10px;
+}
+
+ul {
+    padding-left: 20px;
+}
+
+.wrapper,
+.product-detail {
+    width: min(1180px, calc(100% - 32px));
+    margin: 0 auto;
+    padding: 28px 0 56px;
+}
+
+#page-content {
+    min-height: 100vh;
+}
+
+.app-shell {
+    min-height: 100vh;
+}
+
+.app-topbar,
+.shop-topbar {
+    align-items: center;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    gap: 18px;
+    justify-content: space-between;
+    margin: -28px calc(50% - 50vw) 28px;
+    padding: 14px max(16px, calc((100vw - 1180px) / 2));
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: rgba(250, 248, 242, 0.94);
+    backdrop-filter: blur(10px);
+}
+
+.brand,
+.logo {
+    color: var(--ink);
+    font-size: 0.98rem;
+    font-weight: 900;
+    letter-spacing: 0;
+}
+
+.nav-links,
+.shop-actions {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.nav-links a,
+.shop-actions a,
+.back-link {
+    align-items: center;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    display: inline-flex;
+    min-height: 38px;
+    justify-content: center;
+    padding: 8px 11px;
+    text-decoration: none;
+    background: rgba(255, 255, 255, 0.72);
+}
+
+.nav-links a:hover,
+.shop-actions a:hover,
+.back-link:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    text-decoration: none;
+}
+
+.page-hero,
+.shop-hero {
+    border-bottom: 1px solid var(--line);
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 16px;
-    margin: 24px 0;
+    gap: 12px;
+    margin-bottom: 22px;
+    padding-bottom: 22px;
 }
 
-.designer-balance-control {
-    background: linear-gradient(180deg, #f8fafc 0%, #ecfeff 100%);
-    border: 1px solid #cbd5e1;
-    border-radius: 12px;
+.page-kicker,
+.shop-kicker {
+    color: var(--accent-strong);
+    font-size: 0.8rem;
+    font-weight: 900;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.page-intro,
+.shop-intro,
+.product-description p {
+    color: var(--muted);
+    font-size: 1rem;
+    max-width: 760px;
+}
+
+.page-grid,
+.dashboard-grid {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.dashboard-stack {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.panel,
+.card,
+.fabric-add-form,
+.designer-balance-panel,
+.garment-designer-panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    padding: 20px;
+}
+
+.card {
+    margin-bottom: 18px;
+}
+
+.panel-muted {
+    background: var(--surface-soft);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.form-grid,
+.designer-balance-controls,
+.garment-designer-controls {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    margin: 18px 0;
+}
+
+.form-actions,
+.button-row {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 14px 0;
+}
+
+.form-actions {
+    justify-content: flex-start;
+}
+
+.designer-balance-control,
+.garment-designer-control,
+.field-panel {
+    background: var(--surface-soft);
+    border: 1px solid var(--line);
+    border-radius: 8px;
     padding: 14px;
 }
 
-.designer-balance-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    gap: 18px;
-    margin: 18px 0;
+.designer-balance-control input,
+.garment-designer-control input {
+    width: 100%;
 }
 
-.designer-balance-stack {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 18px;
-    margin: 18px 0;
+.designer-balance-loading {
+    min-height: 220px;
 }
 
-.designer-balance-panel {
-    background: #ffffff;
-    border: 1px solid #dbeafe;
-    border-radius: 16px;
-    padding: 18px;
-    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+.designer-balance-content {
+    min-height: 120px;
 }
 
-.designer-balance-panel-wide {
+.table-panel {
+    overflow: hidden;
+}
+
+.recipe-page .wrapper > h2 {
     margin-top: 18px;
+}
+
+.recipe-page .wrapper > h2 + div {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    padding: 20px;
+}
+
+.recipe-page .wrapper > h2 + div > label,
+.recipe-page .wrapper > h2 + div > input,
+.recipe-page .wrapper > h2 + div > button,
+.recipe-page .wrapper > h2 + div > div {
+    max-width: 760px;
+}
+
+.dash-table-container,
+.dash-spreadsheet-container {
+    font-family: inherit;
+}
+
+.dash-spreadsheet-container .dash-spreadsheet-inner table {
+    border-collapse: collapse !important;
+}
+
+.dash-spreadsheet-container th {
+    background: var(--surface-soft) !important;
+    color: var(--ink) !important;
+}
+
+.dash-spreadsheet-container td,
+.dash-spreadsheet-container th {
+    border-color: var(--line) !important;
+}
+
+.order-form,
+.product-grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.product,
+.product-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--ink);
+    display: grid;
+    gap: 12px;
+    min-height: 146px;
+    overflow: hidden;
+    padding: 12px;
+    transition:
+        border-color 160ms ease,
+        box-shadow 160ms ease,
+        transform 160ms ease;
+}
+
+.product:hover,
+.product-card:hover {
+    border-color: var(--accent);
+    box-shadow: var(--shadow);
+    transform: translateY(-2px);
+}
+
+.product-thumb {
+    aspect-ratio: 4 / 3;
+    background: var(--accent-soft);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.product-thumb img,
+.product-image img {
+    display: block;
+    height: 100%;
+    object-fit: cover;
+    width: 100%;
+}
+
+.product-label {
+    color: var(--ink);
+    font-size: 1rem;
+    font-weight: 900;
+}
+
+.product-meta,
+.metric-subtitle {
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.product-title,
+.header-title {
+    font-size: 2.25rem;
+    line-height: 1.08;
+    margin-bottom: 12px;
+    text-align: left;
+}
+
+.product-content {
+    align-items: start;
+    display: grid;
+    gap: 20px;
+    grid-template-columns: minmax(260px, 0.9fr) minmax(300px, 1.1fr);
+}
+
+.product-image {
+    aspect-ratio: 4 / 5;
+    background: var(--surface-soft);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    width: 100%;
+}
+
+.product-image-fallback {
+    align-items: center;
+    aspect-ratio: 4 / 5;
+    background: var(--surface-soft);
+    color: var(--muted);
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+}
+
+.product-description {
+    display: grid;
+    gap: 16px;
+}
+
+.shop-summary,
+.impact-summary {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.metric-card,
+.designer-balance-metric-card {
+    background: var(--ink);
+    border-radius: 8px;
+    color: #ffffff;
+    min-height: 126px;
+    padding: 16px;
+}
+
+.metric-title,
+.designer-balance-metric-title {
+    color: rgba(255, 255, 255, 0.76);
+    font-size: 0.78rem;
+    font-weight: 900;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.metric-value,
+.designer-balance-metric-value {
+    font-size: 1.65rem;
+    font-weight: 900;
+    margin-top: 8px;
+}
+
+.designer-balance-metric-subtitle {
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 0.9rem;
+    margin-top: 8px;
+}
+
+.designer-balance-grid,
+.designer-balance-stack,
+.garment-designer-stack {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: minmax(0, 1fr);
+    margin: 18px 0;
 }
 
 .designer-balance-leg-cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: 12px;
-    margin: 8px 0 14px;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    margin: 10px 0 14px;
 }
 
 .designer-balance-leg-card {
-    border: 1px solid #67e8f9;
-    background: linear-gradient(180deg, #ecfeff 0%, #cffafe 100%);
-    border-radius: 12px;
-    padding: 10px 12px;
+    background: var(--surface-soft);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px;
 }
 
 .designer-balance-leg-title {
-    font-size: 0.9rem;
-    font-weight: 700;
-    color: #134e4a;
+    color: var(--accent-strong);
+    font-size: 0.92rem;
+    font-weight: 900;
 }
 
 .designer-balance-leg-details {
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.4;
     margin-top: 6px;
-    font-size: 0.88rem;
-    color: #0f172a;
-    line-height: 1.3;
 }
 
 .designer-balance-metrics {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 16px;
-    margin-top: 20px;
-}
-
-.designer-balance-metric-card {
-    border-radius: 16px;
-    padding: 18px;
-    background: linear-gradient(145deg, #0f172a 0%, #155e75 100%);
-    color: #f8fafc;
-    min-height: 140px;
-}
-
-.designer-balance-metric-title {
-    font-size: 0.9rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    opacity: 0.85;
-}
-
-.designer-balance-metric-value {
-    font-size: 1.9rem;
-    font-weight: 700;
-    margin-top: 10px;
-}
-
-.designer-balance-metric-subtitle {
-    font-size: 0.9rem;
-    margin-top: 10px;
-    line-height: 1.4;
-    color: #dbeafe;
-}
-
-.garment-designer-page {
-    padding-bottom: 48px;
-}
-
-.garment-designer-controls {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 14px;
-    margin: 20px 0;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    margin: 18px 0;
 }
 
-.garment-designer-control {
-    background: linear-gradient(180deg, #f8fafc 0%, #ecfeff 100%);
-    border: 1px solid #cbd5e1;
-    border-radius: 12px;
-    padding: 12px;
-}
-
-.garment-designer-control input {
-    width: 100%;
-    margin-top: 8px;
-    padding: 8px;
-}
-
-.garment-designer-stack {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 16px;
-    margin-top: 8px;
-}
-
-.garment-designer-panel {
-    background: #ffffff;
-    border: 1px solid #dbeafe;
-    border-radius: 14px;
+.footer {
+    color: var(--muted);
+    font-size: 0.86rem;
     padding: 16px;
-    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+    text-align: center;
+}
+
+@media (max-width: 760px) {
+    .wrapper,
+    .product-detail {
+        width: min(100% - 24px, 1180px);
+        padding-top: 18px;
+    }
+
+    .app-topbar,
+    .shop-topbar {
+        align-items: flex-start;
+        flex-direction: column;
+        margin-top: -18px;
+    }
+
+    h1,
+    .product-title,
+    .header-title {
+        font-size: 1.75rem;
+    }
+
+    .product-content {
+        grid-template-columns: 1fr;
+    }
+
+    .panel,
+    .card,
+    .fabric-add-form,
+    .designer-balance-panel,
+    .garment-designer-panel {
+        padding: 16px;
+    }
 }

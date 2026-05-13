@@ -5,7 +5,26 @@ def top_page():
     return html.Div(
         className="product-detail",
         children=[
-            html.H1("Top", className="product-title"),
+            html.Header(
+                [
+                    html.Div("Circular Lab Shop", className="brand"),
+                    html.Nav(
+                        [
+                            dcc.Link("Garments", href="/"),
+                            dcc.Link("End of life", href="/scenarios"),
+                        ],
+                        className="shop-actions",
+                    ),
+                ],
+                className="shop-topbar",
+            ),
+            html.Section(
+                [
+                    html.Div("Garment detail", className="shop-kicker"),
+                    html.H1("Top", className="product-title"),
+                ],
+                className="shop-hero",
+            ),
             html.Div(
                 className="product-content",
                 children=[
@@ -14,7 +33,6 @@ def top_page():
                         children=html.Img(
                             src="/assets/top.jpg",
                             alt="Top",
-                            style={"width": "100%", "border-radius": "8px"},
                         ),
                     ),
                     html.Div(
@@ -23,22 +41,15 @@ def top_page():
                             html.P(
                                 "Crop top made from fine hemp fabric in a linen weave."
                                 "Loose fit with a T-shape geometric opening at the neck.",
-                                style={"font-size": "18px"},
                             ),
                         ],
                     ),
                 ],
-                style={"display": "flex", "gap": "20px"},
             ),
             dcc.Link(
                 "Back to Home",
                 href="/",
                 className="back-link",
-                style={
-                    "margin-top": "20px",
-                    "display": "block",
-                    "text-align": "center",
-                },
             ),
         ],
     )
