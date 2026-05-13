@@ -33,8 +33,15 @@ def test_fetch_fabric_blocks_formats_processes(monkeypatch):
                 {
                     "id": 5,
                     "type": "80x64",
+                    "garment_id": None,
                     "processes": [{"type": "sewing", "amount": 0.42}],
-                }
+                },
+                {
+                    "id": 6,
+                    "type": "64x40",
+                    "garment_id": 12,
+                    "processes": [{"type": "cutting", "amount": 1.0}],
+                },
             ],
         )
 
@@ -43,6 +50,7 @@ def test_fetch_fabric_blocks_formats_processes(monkeypatch):
     result = api.fetch_fabric_blocks()
 
     assert len(result) == 1
+    assert result[0]["id"] == 5
     assert result[0]["processes"] == "sewing(0.42)"
 
 

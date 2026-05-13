@@ -1,4 +1,5 @@
 from dash import dcc, html
+from pages.ui import app_topbar, page_hero
 
 
 def get_garment_designer_layout():
@@ -8,14 +9,11 @@ def get_garment_designer_layout():
             dcc.Store(id="garment-designer-reference-scenario-store", data={}),
             dcc.Store(id="garment-designer-custom-bom-store", data=[]),
             dcc.Store(id="garment-designer-custom-process-store", data=[]),
-            dcc.Link(
-                "Home",
-                href="/",
-                id="garment-designer-home-link",
-            ),
-            html.H1("New Garment Designer"),
-            html.P(
-                "Use this view to design new garments with material longevity, process economics/ecology, and recipe-level fabric block/process references."
+            app_topbar(),
+            page_hero(
+                "Prototype",
+                "New Garment Designer",
+                "Design new garments with material longevity, process economics, ecology, and recipe-level fabric block and process references.",
             ),
             html.Div(
                 [

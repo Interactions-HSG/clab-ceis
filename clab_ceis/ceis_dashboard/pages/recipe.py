@@ -1,4 +1,5 @@
 from dash import dcc, html
+from pages.ui import app_topbar, page_hero
 
 
 def get_recipe_layout():
@@ -6,12 +7,12 @@ def get_recipe_layout():
         [
             html.Div(
                 [
-                    dcc.Link(
-                        "Home",
-                        href="/",
-                        id="home-link",
+                    app_topbar(),
+                    page_hero(
+                        "Reference data",
+                        "Add Recipe",
+                        "Create garment recipes, fabric block types, process types, and material references for downstream circularity calculations.",
                     ),
-                    html.H1("Add Recipe"),
                     html.H2("Add Garment Recipe"),
                     html.Div(
                         [
@@ -350,5 +351,6 @@ def get_recipe_layout():
                 ],
                 className="wrapper",
             ),
-        ]
+        ],
+        className="recipe-page",
     )

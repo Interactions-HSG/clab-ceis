@@ -1,7 +1,10 @@
+from urllib.parse import quote
+
 import requests
 from dash import html, dcc
 
 from ceis_shop import config
+from ceis_shop.layouts.garment import GARMENT_IMAGE_MAP
 
 
 def _fetch_garment_types() -> list[dict]:
@@ -20,7 +23,15 @@ def home_page():
                 children=html.Div(
                     className="product",
                     children=[
+                        html.Div(
+                            _product_image(garment["name"]),
+                            className="product-thumb",
+                        ),
                         html.Div(garment["name"], className="product-label"),
+                        html.Div(
+                            "Configure material, impact, and price",
+                            className="product-meta",
+                        ),
                     ],
                 ),
             )
@@ -38,25 +49,50 @@ def home_page():
         className="wrapper",
         children=[
             html.Header(
-                html.H1(
-                    "Welcome to Our Clothing Order Website", className="header-title"
-                ),
-                className="card",
+                [
+                    html.Div("Circular Lab Shop", className="brand"),
+                    html.Nav(
+                        [
+                            dcc.Link("Garments", href="/"),
+                            dcc.Link("End of life", href="/scenarios"),
+                        ],
+                        className="shop-actions",
+                    ),
+                ],
+                className="shop-topbar",
             ),
-            html.Div(
-                className="card",
+            html.Section(
+                className="shop-hero",
                 children=[
-                    html.H2("Select the Type of Clothing You Want to Order"),
                     html.Div(
-                        className="order-form",
-                        children=product_links,
-                        style={"display": "flex", "gap": "20px", "flex-wrap": "wrap"},
+                        "Made-to-order circular garments", className="shop-kicker"
+                    ),
+                    html.H1(
+                        "Welcome to Our Clothing Order Website",
+                        className="header-title",
+                    ),
+                    html.P(
+                        "Choose a garment, compare material options, and see the recipe, CO2 impact, and circular alternatives before ordering.",
+                        className="shop-intro",
                     ),
                 ],
             ),
-            html.Div(
-                className="card",
+            html.Section(
+                className="panel",
                 children=[
+                    html.Div(
+                        className="order-form",
+                        children=product_links,
+                    ),
+                ],
+            ),
+            html.Section(
+                className="panel-muted",
+                children=[
+                    html.H2("Circular services"),
+                    html.P(
+                        "Explore repair and return routes for garments at the end of use."
+                    ),
                     dcc.Link(
                         "View End of Life Options",
                         href="/scenarios",
@@ -65,4 +101,16 @@ def home_page():
                 ],
             ),
         ],
+    )
+
+
+def _product_image(garment_name: str):
+    file_name = GARMENT_IMAGE_MAP.get(garment_name)
+    if not file_name:
+        return html.Div("Image pending", className="product-image-fallback")
+
+    encoded_name = quote(file_name)
+    return html.Img(
+        src=f"/assets/Garment Photos/{encoded_name}",
+        alt=garment_name,
     )

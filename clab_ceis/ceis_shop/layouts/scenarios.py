@@ -6,11 +6,31 @@ def scenarios_page():
         className="wrapper",
         children=[
             html.Header(
-                html.H1("End of Life Options", className="header-title"),
-                className="card",
+                [
+                    html.Div("Circular Lab Shop", className="brand"),
+                    html.Nav(
+                        [
+                            dcc.Link("Garments", href="/"),
+                            dcc.Link("End of life", href="/scenarios"),
+                        ],
+                        className="shop-actions",
+                    ),
+                ],
+                className="shop-topbar",
             ),
-            html.Div(
-                className="card",
+            html.Section(
+                [
+                    html.Div("Circular services", className="shop-kicker"),
+                    html.H1("End of Life Options", className="header-title"),
+                    html.P(
+                        "Compare practical return, repair, and replacement scenarios for the current garment journey.",
+                        className="shop-intro",
+                    ),
+                ],
+                className="shop-hero",
+            ),
+            html.Section(
+                className="panel",
                 children=[
                     html.P(
                         "Manufacturer: Bucharest, Repair Center: St. Gallen, Consumer: Sigmaringen."

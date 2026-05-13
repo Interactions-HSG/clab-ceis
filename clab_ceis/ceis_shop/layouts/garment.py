@@ -57,7 +57,8 @@ def render_recipe_content(recipe_payload: list[dict]) -> html.Div:
         children=[
             html.H3("Fabric Blocks"),
             html.Ul(fabric_blocks or [html.Li("No fabric blocks found.")]),
-        ]
+        ],
+        className="panel-muted",
     )
 
 
@@ -165,7 +166,8 @@ def render_co2_content(
                 if discounted_price is not None
                 else html.P("Price unavailable.")
             ),
-        ]
+        ],
+        className="panel-muted",
     )
 
 
@@ -174,7 +176,8 @@ def render_waiting_for_material_co2_content() -> html.Div:
         [
             html.H3("CO2 Emissions"),
             html.P("Select a material to view CO2 emissions."),
-        ]
+        ],
+        className="panel-muted",
     )
 
 
@@ -187,7 +190,6 @@ def _image_component(garment_name: str):
     return html.Img(
         src=f"/assets/Garment Photos/{encoded_name}",
         alt=garment_name,
-        style={"width": "100%", "border-radius": "8px"},
     )
 
 
@@ -204,6 +206,7 @@ def garment_page(garment_type_id: int):
         if not materials:
             return html.Div(
                 [
+                    _shop_topbar(),
                     html.H1(garment["name"], className="product-title"),
                     html.P("No materials configured for this garment."),
                     dcc.Link("Back to Home", href="/", className="back-link"),
@@ -237,7 +240,18 @@ def garment_page(garment_type_id: int):
         return html.Div(
             className="product-detail",
             children=[
-                html.H1(garment["name"], className="product-title"),
+                _shop_topbar(),
+                html.Section(
+                    [
+                        html.Div("Garment configurator", className="shop-kicker"),
+                        html.H1(garment["name"], className="product-title"),
+                        html.P(
+                            "Review the material choice, bill of fabric blocks, circular substitutions, and estimated climate impact.",
+                            className="shop-intro",
+                        ),
+                    ],
+                    className="shop-hero",
+                ),
                 dcc.Store(id="garment-type-id-store", data=garment_type_id),
                 dcc.Store(id="garment-materials-store", data=materials),
                 dcc.Store(id="garment-base-price-store", data=garment.get("price_chf")),
@@ -252,7 +266,7 @@ def garment_page(garment_type_id: int):
                             clearable=True,
                         ),
                     ],
-                    className="form-actions",
+                    className="field-panel",
                 ),
                 html.Div(
                     className="product-content",
@@ -265,8 +279,19 @@ def garment_page(garment_type_id: int):
                             className="product-description",
                             children=[
                                 (
-                                    html.P(
-                                        f"Base price: CHF {float(garment['price_chf']):.2f}"
+                                    html.Div(
+                                        [
+                                            html.Div("Base price", className="metric-title"),
+                                            html.Div(
+                                                f"CHF {float(garment['price_chf']):.2f}",
+                                                className="metric-value",
+                                            ),
+                                            html.Div(
+                                                f"Base price: CHF {float(garment['price_chf']):.2f}",
+                                                className="designer-balance-metric-subtitle",
+                                            ),
+                                        ],
+                                        className="metric-card",
                                     )
                                     if garment.get("price_chf") is not None
                                     else html.P("Base price unavailable.")
@@ -293,8 +318,25 @@ def garment_page(garment_type_id: int):
         return html.Div(
             className="product-detail",
             children=[
+                _shop_topbar(),
                 html.H1("Unable to load garment"),
                 html.P(str(exc)),
                 dcc.Link("Back to Home", href="/", className="back-link"),
             ],
         )
+
+
+def _shop_topbar():
+    return html.Header(
+        [
+            html.Div("Circular Lab Shop", className="brand"),
+            html.Nav(
+                [
+                    dcc.Link("Garments", href="/"),
+                    dcc.Link("End of life", href="/scenarios"),
+                ],
+                className="shop-actions",
+            ),
+        ],
+        className="shop-topbar",
+    )

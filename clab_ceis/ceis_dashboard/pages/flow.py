@@ -4,30 +4,18 @@ from dash import dash_table, html
 import dash_cytoscape as cyto
 
 from ceis_data import CeisData
+from pages.ui import app_topbar, page_hero
 
 
 def _metric_card(title: str, value: str, subtitle: str, accent: str):
     return html.Div(
         [
-            html.Div(title, style={"fontSize": "0.9rem", "fontWeight": "600"}),
-            html.Div(
-                value,
-                style={"fontSize": "2rem", "fontWeight": "700", "marginTop": "8px"},
-            ),
-            html.Div(
-                subtitle,
-                style={"fontSize": "0.9rem", "marginTop": "8px", "color": "#334155"},
-            ),
+            html.Div(title, className="metric-title"),
+            html.Div(value, className="metric-value"),
+            html.Div(subtitle, className="designer-balance-metric-subtitle"),
         ],
-        style={
-            "backgroundColor": "#f8fafc",
-            "borderLeft": f"6px solid {accent}",
-            "borderRadius": "10px",
-            "padding": "16px",
-            "boxShadow": "0 1px 3px rgba(15, 23, 42, 0.08)",
-            "minWidth": "220px",
-            "flex": "1 1 220px",
-        },
+        className="metric-card",
+        style={"borderTop": f"5px solid {accent}"},
     )
 
 
@@ -48,7 +36,7 @@ def _build_strategy_progress_section(progress_data: dict):
 
     return html.Div(
         [
-            html.H1("Strategist Progress"),
+            html.H2("Strategist Progress"),
             html.P(
                 (
                     "Review the current progress towards company goals based on sold "
@@ -59,11 +47,7 @@ def _build_strategy_progress_section(progress_data: dict):
                 [
                     html.Div(
                         f"Circularity threshold target: {threshold_pct:.0f}%",
-                        style={
-                            "fontWeight": "600",
-                            "color": "#0f172a",
-                            "marginBottom": "16px",
-                        },
+                        className="panel-muted",
                     )
                 ]
             ),
@@ -97,9 +81,9 @@ def _build_strategy_progress_section(progress_data: dict):
                         "#d97706",
                     ),
                 ],
-                style={"display": "flex", "gap": "16px", "flexWrap": "wrap"},
+                className="shop-summary",
             ),
-            html.H2("Sold Garment Breakdown", style={"marginTop": "24px"}),
+            html.H3("Sold Garment Breakdown"),
             dash_table.DataTable(
                 id="strategy-progress-table",
                 columns=[
@@ -118,7 +102,8 @@ def _build_strategy_progress_section(progress_data: dict):
                 style_cell={"textAlign": "center", "padding": "10px"},
                 style_header={"fontWeight": "bold"},
             ),
-        ]
+        ],
+        className="panel table-panel",
     )
 
 
@@ -127,96 +112,114 @@ def get_dashboard_layout(progress_data: dict | None = None):
     progress_data = progress_data or {}
     return html.Div(
         children=[
-            html.Header([html.Div("Circular Lab Cockpit", className="logo")]),
+            app_topbar(),
+            page_hero(
+                "Strategy",
+                "Lifecycle Strategy Board",
+                "Track product lifecycle loops, resource events, and progress against circularity targets.",
+            ),
             html.Div(
                 [
-                    html.H1("Product Lifecycle"),
-                    cyto.Cytoscape(
-                        id="flow-chart",
-                        layout={"name": "preset"},
-                        style={"height": f"{_chart_height}px"},
-                        autolock=True,
-                        elements=flow_chart_data["elements"],
-                        panningEnabled=False,
-                        zoom=1,
-                        stylesheet=[
-                            {
-                                "selector": "node",
-                                "style": {
-                                    "label": "data(label)",
-                                    "shape": "tag",
-                                    "text-halign": "left",
-                                    "text-valign": "bottom",
-                                    "text-margin-x": "-10%",
-                                    "line-color": "yellow",
-                                    "background-color": "darkblue",
-                                    "text-background-color": "grey",
-                                    "text-background-opacity": 0.7,
-                                },
-                            },
-                            {
-                                "selector": "edge",
-                                "style": {
-                                    "label": "data(label)",
-                                    "target-arrow-shape": "triangle",
-                                    "arrow-scale": 1.5,
-                                    "line-color": "darkblue",
-                                    "text-margin-y": "-15%",
-                                },
-                            },
-                            {
-                                "selector": (
-                                    f"#{CeLoops.Repair.value}, "
-                                    f"#{CeLoops.Recycle.value}, "
-                                    f"#{CeLoops.Remanufacture.value}, "
-                                    f"#{CeLoops.Composting.value}"
-                                ),
-                                "style": {
-                                    "label": "data(label)",
-                                    "curve-style": "unbundled-bezier",
-                                    "control-point-distance": "200",
-                                    "line-color": "orange",
-                                },
-                            },
-                            {
-                                "selector": f"#{CeLoops.Composting.value}",
-                                "style": {
-                                    "label": "data(label)",
-                                    "curve-style": "unbundled-bezier",
-                                    "control-point-distance": "-300",
-                                    "text-margin-y": "15%",
-                                },
-                            },
-                            {
-                                "selector": f"#{CeLoops.Remanufacture.value}",
-                                "style": {
-                                    "label": "data(label)",
-                                    "curve-style": "unbundled-bezier",
-                                    "control-point-distance": "-200",
-                                    "text-margin-y": "15%",
-                                },
-                            },
+                    html.Section(
+                        [
+                            html.H2("Product Lifecycle"),
+                            cyto.Cytoscape(
+                                id="flow-chart",
+                                layout={"name": "preset"},
+                                style={"height": f"{_chart_height}px", "width": "100%"},
+                                autolock=True,
+                                elements=flow_chart_data["elements"],
+                                panningEnabled=False,
+                                zoom=1,
+                                stylesheet=[
+                                    {
+                                        "selector": "node",
+                                        "style": {
+                                            "label": "data(label)",
+                                            "shape": "round-rectangle",
+                                            "width": "92px",
+                                            "height": "42px",
+                                            "background-color": "#2f6f5e",
+                                            "color": "#1d2420",
+                                            "font-weight": "700",
+                                            "text-valign": "bottom",
+                                            "text-margin-y": "8px",
+                                        },
+                                    },
+                                    {
+                                        "selector": "edge",
+                                        "style": {
+                                            "label": "data(label)",
+                                            "target-arrow-shape": "triangle",
+                                            "arrow-scale": 1.3,
+                                            "line-color": "#8f978f",
+                                            "target-arrow-color": "#8f978f",
+                                            "color": "#68716b",
+                                            "font-size": "12px",
+                                            "text-background-color": "#faf8f2",
+                                            "text-background-opacity": 0.92,
+                                        },
+                                    },
+                                    {
+                                        "selector": (
+                                            f"#{CeLoops.Repair.value}, "
+                                            f"#{CeLoops.Recycle.value}, "
+                                            f"#{CeLoops.Remanufacture.value}, "
+                                            f"#{CeLoops.Composting.value}"
+                                        ),
+                                        "style": {
+                                            "curve-style": "unbundled-bezier",
+                                            "control-point-distance": "200",
+                                            "line-color": "#b56a2b",
+                                            "target-arrow-color": "#b56a2b",
+                                        },
+                                    },
+                                    {
+                                        "selector": f"#{CeLoops.Composting.value}",
+                                        "style": {
+                                            "curve-style": "unbundled-bezier",
+                                            "control-point-distance": "-300",
+                                            "text-margin-y": "15%",
+                                        },
+                                    },
+                                    {
+                                        "selector": f"#{CeLoops.Remanufacture.value}",
+                                        "style": {
+                                            "curve-style": "unbundled-bezier",
+                                            "control-point-distance": "-200",
+                                            "text-margin-y": "15%",
+                                        },
+                                    },
+                                ],
+                            ),
+                            html.P(id="cytoscape-output"),
                         ],
+                        className="panel",
                     ),
-                    html.P(id="cytoscape-output"),
-                    html.H1("Resource Event Dashboard"),
-                    html.Button("Update DataTable", id="update-button", n_clicks=0),
-                    dash_table.DataTable(
-                        id="res-dashboard-table",
-                        columns=[
-                            {"name": col, "id": col}
-                            for col in CeisData().get_data().columns
+                    html.Section(
+                        [
+                            html.H2("Resource Event Dashboard"),
+                            html.Button("Update DataTable", id="update-button", n_clicks=0),
+                            dash_table.DataTable(
+                                id="res-dashboard-table",
+                                columns=[
+                                    {"name": col, "id": col}
+                                    for col in CeisData().get_data().columns
+                                ],
+                                data=CeisData().get_data().to_dict("records"),
+                                style_table={"overflowX": "auto"},
+                                style_cell={"textAlign": "center", "padding": "10px"},
+                                style_header={"fontWeight": "bold"},
+                            ),
                         ],
-                        data=CeisData().get_data().to_dict("records"),
-                        style_table={"maxWidth": f"{_chart_height}px"},
-                        style_cell={"textAlign": "center"},
-                        style_header={"fontWeight": "bold"},
+                        className="panel table-panel",
                     ),
                     _build_strategy_progress_section(progress_data),
                 ],
-                className="wrapper",
+                className="dashboard-stack",
             ),
-        ]
+        ],
+        className="wrapper",
     )
 
 
