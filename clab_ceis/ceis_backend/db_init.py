@@ -217,6 +217,16 @@ def create_tables(cursor):
     """
     )
 
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS activity_emission_cache (
+            activity_id INTEGER PRIMARY KEY,
+            emission_per_unit REAL,
+            cached_at REAL NOT NULL
+        )
+    """
+    )
+
     cursor.executescript(
         """
         CREATE TABLE IF NOT EXISTS seed_meta (
