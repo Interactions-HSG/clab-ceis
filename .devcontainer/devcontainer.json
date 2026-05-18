@@ -3,8 +3,10 @@
 	"image": "mcr.microsoft.com/vscode/devcontainers/python:3",
     "postCreateCommand": ".devcontainer/post-create.sh",
 	"forwardPorts": [
+		8050,
 		8051,
-		8052
+		8052,
+		8053
 	],
 	"customizations": {
 		"vscode": {
