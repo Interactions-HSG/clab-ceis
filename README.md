@@ -39,7 +39,7 @@ Then connect to `http://localhost:8050` (shop) and `http://localhost:8051` (dash
 
 ### Running with the Devcontainer
 
-The `.devcontainer/post-create.sh` script installs dependencies for all components on container creation. If the environment variable `CLAB_RUN_CEIS` is set, it also starts the backend, dashboard, and shop in the background automatically.
+The `.devcontainer/post-create.sh` script installs dependencies for all components on container creation. If the environment variable `CLAB_CEIS_RUN` is set, it also starts the backend, dashboard, and shop in the background automatically.
 
 ## How to run tests
 
