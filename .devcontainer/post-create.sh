@@ -3,6 +3,7 @@ pipx install uv
 uv sync --directory /workspaces/clab-ceis/clab_ceis/ceis_dashboard
 uv sync --directory /workspaces/clab-ceis/clab_ceis/ceis_backend
 uv sync --directory /workspaces/clab-ceis/clab_ceis/ceis_shop
+uv sync --directory /workspaces/clab-ceis/clab_ceis/ceis_admin
 
 if [ -n "$CLAB_CEIS_RUN=S" ]; then
     BACKEND_PORT="${BACKEND_PORT:-8052}"
@@ -22,4 +23,5 @@ if [ -n "$CLAB_CEIS_RUN=S" ]; then
     wait_for_backend "$BACKEND_PORT"
     uv run --directory /workspaces/clab-ceis/clab_ceis/ceis_dashboard python main.py &
     uv run --directory /workspaces/clab-ceis/clab_ceis/ceis_shop main.py &
+    uv run --directory /workspaces/clab-ceis/clab_ceis/ceis_admin python main.py &
 fi

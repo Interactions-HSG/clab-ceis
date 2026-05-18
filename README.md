@@ -35,7 +35,26 @@ uv run --directory clab_ceis/ceis_dashboard python main.py
 uv run --directory clab_ceis/ceis_shop main.py
 ```
 
-Then connect to `http://localhost:8050` (shop) and `http://localhost:8051` (dashboard)
+Then connect to `http://localhost:8050` (shop), `http://localhost:8051` (dashboard), and `http://localhost:8053` (admin)
+
+### admin
+
+```bash
+uv run --directory clab_ceis/ceis_admin python main.py
+```
+
+Connect to `http://localhost:8053` to reach the admin API.
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/` | GET | Welcome message and list of managed apps |
+| `/ui` | GET | **Web UI** – status dashboard with restart buttons |
+| `/status` | GET | Health status of all three apps (JSON) |
+| `/status/{app_name}` | GET | Health status of a single app (JSON) |
+| `/restart` | POST | Restart all apps |
+| `/restart/{app_name}` | POST | Restart a single app |
+
+Valid `app_name` values: `ceis_backend`, `ceis_shop`, `ceis_dashboard`.
 
 ### Running with the Devcontainer
 
