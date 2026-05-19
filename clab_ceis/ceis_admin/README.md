@@ -16,8 +16,10 @@ The server starts on `http://localhost:8053` by default.
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/` | Welcome message |
-| GET | `/status` | Status of all three managed apps |
-| GET | `/status/{app_name}` | Status of a single app |
+| GET | `/ui` | **Web UI** – status dashboard with restart buttons |
+| GET | `/status` | Status of all three managed apps (JSON) |
+| GET | `/status/{app_name}` | Status of a single app (JSON) |
+| POST | `/restart` | Restart all apps |
 | POST | `/restart/{app_name}` | Restart a single app |
 
 Valid `app_name` values: `ceis_backend`, `ceis_shop`, `ceis_dashboard`.

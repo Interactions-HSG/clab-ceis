@@ -84,3 +84,21 @@ def test_restart_app(client):
 def test_restart_unknown_app(client):
     response = client.post("/restart/nonexistent")
     assert response.status_code == 404
+
+
+def test_ui_returns_html(client):
+    response = client.get("/ui")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "CEIS Admin" in response.text
+    assert "Restart All" in response.text
+
+
+def test_restart_all_apps(client):
+    response = client.post("/restart")
+    assert response.status_code == 200
+    results = response.json()
+    assert isinstance(results, list)
+    assert len(results) == 3
+    names = {r["name"] for r in results}
+    assert names == {"ceis_backend", "ceis_shop", "ceis_dashboard"}
