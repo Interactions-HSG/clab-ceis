@@ -46,11 +46,9 @@ def _make_app_mock(name: str) -> MagicMock:
 def test_root(client):
     response = client.get("/")
     assert response.status_code == 200
-    data = response.json()
-    assert data["message"] == "CEIS Admin is running"
-    assert "ceis_backend" in data["managed_apps"]
-    assert "ceis_shop" in data["managed_apps"]
-    assert "ceis_dashboard" in data["managed_apps"]
+    assert "text/html" in response.headers["content-type"]
+    assert "CEIS Admin" in response.text
+    assert "Restart All" in response.text
 
 
 def test_get_all_statuses(client):

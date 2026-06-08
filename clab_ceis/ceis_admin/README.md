@@ -15,8 +15,8 @@ The server starts on `http://localhost:8053` by default.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/` | Welcome message |
-| GET | `/ui` | **Web UI** – status dashboard with restart buttons |
+| GET | `/` | **Web UI** – status dashboard with restart buttons |
+| GET | `/ui` | **Web UI alias** (same dashboard) |
 | GET | `/status` | Status of all three managed apps (JSON) |
 | GET | `/status/{app_name}` | Status of a single app (JSON) |
 | POST | `/restart` | Restart all apps |

@@ -47,8 +47,8 @@ Connect to `http://localhost:8053` to reach the admin API.
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/` | GET | Welcome message and list of managed apps |
-| `/ui` | GET | **Web UI** – status dashboard with restart buttons |
+| `/` | GET | **Web UI** – status dashboard with restart buttons |
+| `/ui` | GET | **Web UI alias** (same dashboard) |
 | `/status` | GET | Health status of all three apps (JSON) |
 | `/status/{app_name}` | GET | Health status of a single app (JSON) |
 | `/restart` | POST | Restart all apps |

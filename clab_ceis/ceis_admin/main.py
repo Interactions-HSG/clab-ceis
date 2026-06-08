@@ -2,8 +2,8 @@
 
 Endpoints
 ---------
-GET  /                    – health check / welcome message
-GET  /ui                  – minimal web UI (HTML)
+GET  /                    – minimal web UI (HTML)
+GET  /ui                  – web UI alias (HTML)
 GET  /status              – status of all three managed apps
 GET  /status/{app_name}   – status of a single managed app
 POST /restart             – restart all managed apps
@@ -223,12 +223,13 @@ def _validate_app_name(app_name: str) -> None:
 
 @app.get("/")
 def read_root():
-    return {"message": "CEIS Admin is running", "managed_apps": list(_VALID_APPS)}
+    """Serve the minimal web UI at the root path."""
+    return HTMLResponse(content=_UI_HTML)
 
 
 @app.get("/ui", response_class=HTMLResponse)
 def get_ui():
-    """Serve the minimal web UI."""
+    """Serve the minimal web UI alias for backwards compatibility."""
     return HTMLResponse(content=_UI_HTML)
 
 
