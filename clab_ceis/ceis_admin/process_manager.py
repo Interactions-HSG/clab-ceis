@@ -6,6 +6,8 @@ project README.  The manager tracks the live :class:`subprocess.Popen`
 handle for every app and can stop / restart it on demand.
 """
 
+import os
+import signal
 import subprocess
 import time
 from pathlib import Path
@@ -44,6 +46,7 @@ class ManagedApp:
                 cwd=self.work_dir,
                 stdout=self._log_handle,
                 stderr=subprocess.STDOUT,
+                start_new_session=True,
             )
         except Exception:
             self._log_handle.close()
@@ -55,11 +58,17 @@ class ManagedApp:
         if self._process is None:
             return
         if self._process.poll() is None:
-            self._process.terminate()
+            try:
+                os.killpg(self._process.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
             try:
                 self._process.wait(timeout=10)
             except subprocess.TimeoutExpired:
-                self._process.kill()
+                try:
+                    os.killpg(self._process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
                 self._process.wait()
         self._process = None
         if self._log_handle is not None:

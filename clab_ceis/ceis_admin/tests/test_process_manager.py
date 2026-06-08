@@ -1,5 +1,6 @@
 """Tests for ProcessManager and ManagedApp."""
 
+import signal
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -90,6 +91,7 @@ def test_start_logs_output_to_file(app_mock):
     _, kwargs = mock_popen.call_args
     assert kwargs["stdout"].name == f"/tmp/{app_mock.name}.log"
     assert kwargs["stderr"] == subprocess.STDOUT
+    assert kwargs["start_new_session"] is True
     kwargs["stdout"].close()
 
 
@@ -104,6 +106,38 @@ def test_stop_closes_log_handle(app_mock):
 
     fake_log.close.assert_called_once()
     assert app_mock._log_handle is None
+
+
+def test_stop_terminates_process_group(app_mock):
+    fake_proc = MagicMock()
+    fake_proc.pid = 4321
+    fake_proc.poll.return_value = None
+    app_mock._process = fake_proc
+
+    with patch("ceis_admin.process_manager.os.killpg") as mock_killpg:
+        app_mock.stop()
+
+    mock_killpg.assert_called_once_with(4321, signal.SIGTERM)
+    fake_proc.wait.assert_called_once_with(timeout=10)
+
+
+def test_stop_force_kills_process_group_after_timeout(app_mock):
+    import subprocess
+
+    fake_proc = MagicMock()
+    fake_proc.pid = 4321
+    fake_proc.poll.return_value = None
+    fake_proc.wait.side_effect = [subprocess.TimeoutExpired(cmd="cmd", timeout=10), None]
+    app_mock._process = fake_proc
+
+    with patch("ceis_admin.process_manager.os.killpg") as mock_killpg:
+        app_mock.stop()
+
+    assert mock_killpg.call_args_list == [
+        ((4321, signal.SIGTERM),),
+        ((4321, signal.SIGKILL),),
+    ]
+    assert fake_proc.wait.call_count == 2
 
 
 # ---------------------------------------------------------------------------
