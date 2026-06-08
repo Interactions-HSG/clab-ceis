@@ -176,3 +176,5 @@ cython_debug/
 
 out/*
 .DS_Store
+.specstory
+.devcontainer/codespaces.env

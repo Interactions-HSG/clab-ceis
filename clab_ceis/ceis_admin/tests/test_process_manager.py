@@ -1,5 +1,6 @@
 """Tests for ProcessManager and ManagedApp."""
 
+import signal
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -72,6 +73,73 @@ def test_restart_calls_stop_then_start(app_mock, tmp_path):
         assert mock_popen.call_count == 2
 
 
+def test_start_logs_output_to_file(app_mock):
+    import httpx
+    import subprocess
+
+    with patch("ceis_admin.process_manager.subprocess.Popen") as mock_popen, \
+            patch(
+                "ceis_admin.process_manager.httpx.get",
+                side_effect=httpx.RequestError("conn refused"),
+            ):
+        fake_proc = MagicMock()
+        fake_proc.poll.return_value = None
+        mock_popen.return_value = fake_proc
+
+        app_mock.start()
+
+    _, kwargs = mock_popen.call_args
+    assert kwargs["stdout"].name == f"/tmp/{app_mock.name}.log"
+    assert kwargs["stderr"] == subprocess.STDOUT
+    assert kwargs["start_new_session"] is True
+    kwargs["stdout"].close()
+
+
+def test_stop_closes_log_handle(app_mock):
+    fake_proc = MagicMock()
+    fake_proc.poll.return_value = 0
+    fake_log = MagicMock()
+    app_mock._process = fake_proc
+    app_mock._log_handle = fake_log
+
+    app_mock.stop()
+
+    fake_log.close.assert_called_once()
+    assert app_mock._log_handle is None
+
+
+def test_stop_terminates_process_group(app_mock):
+    fake_proc = MagicMock()
+    fake_proc.pid = 4321
+    fake_proc.poll.return_value = None
+    app_mock._process = fake_proc
+
+    with patch("ceis_admin.process_manager.os.killpg") as mock_killpg:
+        app_mock.stop()
+
+    mock_killpg.assert_called_once_with(4321, signal.SIGTERM)
+    fake_proc.wait.assert_called_once_with(timeout=10)
+
+
+def test_stop_force_kills_process_group_after_timeout(app_mock):
+    import subprocess
+
+    fake_proc = MagicMock()
+    fake_proc.pid = 4321
+    fake_proc.poll.return_value = None
+    fake_proc.wait.side_effect = [subprocess.TimeoutExpired(cmd="cmd", timeout=10), None]
+    app_mock._process = fake_proc
+
+    with patch("ceis_admin.process_manager.os.killpg") as mock_killpg:
+        app_mock.stop()
+
+    assert mock_killpg.call_args_list == [
+        ((4321, signal.SIGTERM),),
+        ((4321, signal.SIGKILL),),
+    ]
+    assert fake_proc.wait.call_count == 2
+
+
 # ---------------------------------------------------------------------------
 # ProcessManager
 # ---------------------------------------------------------------------------
@@ -104,3 +172,37 @@ def test_restart_unknown_raises_key_error():
     manager = ProcessManager()
     with pytest.raises(KeyError):
         manager.restart("nonexistent_app")
+
+
+def test_start_skips_if_externally_healthy(app_mock):
+    """start() must not spawn a process if the app is already responding."""
+    response = MagicMock()
+    response.status_code = 200
+    with patch("ceis_admin.process_manager.subprocess.Popen") as mock_popen, \
+            patch("ceis_admin.process_manager.httpx.get", return_value=response):
+        app_mock.start()
+        mock_popen.assert_not_called()
+
+
+def test_start_all_starts_all_three_apps():
+    manager = ProcessManager()
+    with patch.object(manager._apps["ceis_backend"], "start") as mock_backend, \
+            patch.object(manager._apps["ceis_backend"], "is_healthy", return_value=True), \
+            patch.object(manager._apps["ceis_dashboard"], "start") as mock_dashboard, \
+            patch.object(manager._apps["ceis_shop"], "start") as mock_shop:
+        manager.start_all()
+    mock_backend.assert_called_once()
+    mock_dashboard.assert_called_once()
+    mock_shop.assert_called_once()
+
+
+def test_start_all_starts_backend_before_others():
+    manager = ProcessManager()
+    call_order = []
+    with patch.object(manager._apps["ceis_backend"], "start", side_effect=lambda: call_order.append("backend")), \
+            patch.object(manager._apps["ceis_backend"], "is_healthy", return_value=True), \
+            patch.object(manager._apps["ceis_dashboard"], "start", side_effect=lambda: call_order.append("dashboard")), \
+            patch.object(manager._apps["ceis_shop"], "start", side_effect=lambda: call_order.append("shop")):
+        manager.start_all()
+    assert call_order[0] == "backend"
+    assert set(call_order[1:]) == {"dashboard", "shop"}

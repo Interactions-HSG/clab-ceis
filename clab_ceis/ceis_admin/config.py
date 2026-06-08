@@ -10,6 +10,9 @@ ADMIN_PORT = int(os.getenv("CEIS_ADMIN_PORT", "8053"))
 BACKEND_URL = os.getenv("BACKEND_API_URL", "http://localhost:8052")
 SHOP_URL = os.getenv("CEIS_SHOP_URL", "http://localhost:8050")
 DASHBOARD_URL = os.getenv("CEIS_DASHBOARD_URL", "http://localhost:8051")
+BACKEND_LINK_URL = os.getenv("CEIS_BACKEND_LINK_URL", BACKEND_URL)
+SHOP_LINK_URL = os.getenv("CEIS_SHOP_LINK_URL", SHOP_URL)
+DASHBOARD_LINK_URL = os.getenv("CEIS_DASHBOARD_LINK_URL", DASHBOARD_URL)
 
 # Working directories for each app (resolved relative to this file's location
 # so the admin app works regardless of CWD).

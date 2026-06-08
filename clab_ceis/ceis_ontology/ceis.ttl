@@ -14,43 +14,8 @@
 #    Object Properties
 #################################################################
 
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#hasFabricBlockRequirement
-:hasFabricBlockRequirement rdf:type owl:ObjectProperty ;
-                           rdfs:subPropertyOf :hasRequirement ;
-                           rdfs:domain :Recipe ;
-                           rdfs:range :FabricBlockRequirement .
-
-
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#hasMaterialRequirement
-:hasMaterialRequirement rdf:type owl:ObjectProperty ;
-                        rdfs:subPropertyOf :hasRequirement ;
-                        rdfs:domain :Recipe ;
-                        rdfs:range :MaterialRequirement .
-
-
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#hasProcessRequirement
-:hasProcessRequirement rdf:type owl:ObjectProperty ;
-                       rdfs:subPropertyOf :hasRequirement ;
-                       rdfs:domain :Recipe ;
-                       rdfs:range <http://w3id.org/CEON/ontology/textile/TextileProductionProcess> .
-
-
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#hasRequirement
-:hasRequirement rdf:type owl:ObjectProperty .
-
-
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#requiresFabricBlock
-:requiresFabricBlock rdf:type owl:ObjectProperty ;
-                     rdfs:subPropertyOf :requires ;
-                     rdfs:domain :FabricBlockRequirement ;
-                     rdfs:range :FabricBlock .
-
-
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#requiresMaterial
-:requiresMaterial rdf:type owl:ObjectProperty ;
-                  rdfs:subPropertyOf :requires ;
-                  rdfs:domain :MaterialRequirement ;
-                  rdfs:range <http://w3id.org/CEON/ontology/material/Material> .
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#hasProductionProcess
+:hasProductionProcess rdf:type owl:ObjectProperty .
 
 
 ###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/consumes
@@ -73,6 +38,27 @@
              rdfs:range <http://w3id.org/CEON/ontology/process/CO2Emission> .
 
 
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/hasFabricBlockRequirement
+:hasFabricBlockRequirement rdf:type owl:ObjectProperty ;
+                           rdfs:subPropertyOf :hasRequirement ;
+                           rdfs:domain :Recipe ;
+                           rdfs:range :FabricBlockRequirement .
+
+
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/hasMaterialRequirement
+:hasMaterialRequirement rdf:type owl:ObjectProperty ;
+                        rdfs:subPropertyOf :hasRequirement ;
+                        rdfs:domain :Recipe ;
+                        rdfs:range :MaterialRequirement .
+
+
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/hasProcessRequirement
+:hasProcessRequirement rdf:type owl:ObjectProperty ;
+                       rdfs:subPropertyOf :hasRequirement ;
+                       rdfs:domain :Recipe ;
+                       rdfs:range <http://w3id.org/CEON/ontology/textile/TextileProductionProcess> .
+
+
 ###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/hasRecipe
 :hasRecipe rdf:type owl:ObjectProperty ;
            rdfs:domain :FabricBlock ,
@@ -80,20 +66,31 @@
            rdfs:range :Recipe .
 
 
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/hasRequirement
+:hasRequirement rdf:type owl:ObjectProperty .
+
+
 ###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/requires
 :requires rdf:type owl:ObjectProperty .
+
+
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/requiresFabricBlock
+:requiresFabricBlock rdf:type owl:ObjectProperty ;
+                     rdfs:subPropertyOf :requires ;
+                     rdfs:domain :FabricBlockRequirement ;
+                     rdfs:range :FabricBlock .
+
+
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/requiresMaterial
+:requiresMaterial rdf:type owl:ObjectProperty ;
+                  rdfs:subPropertyOf :requires ;
+                  rdfs:domain :MaterialRequirement ;
+                  rdfs:range <http://w3id.org/CEON/ontology/material/Material> .
 
 
 #################################################################
 #    Data properties
 #################################################################
-
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#requiresQuantity
-:requiresQuantity rdf:type owl:DatatypeProperty ;
-                  rdfs:domain :FabricBlockRequirement ,
-                              :MaterialRequirement ;
-                  rdfs:range xsd:integer .
-
 
 ###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/hasCost
 :hasCost rdf:type owl:DatatypeProperty ;
@@ -109,72 +106,23 @@
           rdfs:range xsd:float .
 
 
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/requiresQuantity
+:requiresQuantity rdf:type owl:DatatypeProperty ;
+                  rdfs:domain :FabricBlockRequirement ,
+                              :MaterialRequirement ;
+                  rdfs:range xsd:integer .
+
+
 #################################################################
 #    Classes
 #################################################################
 
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#FabricBlock100x160
-:FabricBlock100x160 rdf:type owl:Class ;
-                    rdfs:subClassOf :FabricBlock .
-
-
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#FabricBlock14x40
-:FabricBlock14x40 rdf:type owl:Class ;
-                  rdfs:subClassOf :FabricBlock .
-
-
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#FabricBlock64x80
-:FabricBlock64x80 rdf:type owl:Class ;
-                  rdfs:subClassOf :FabricBlock .
-
-
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#FabricBlockRecipe
-:FabricBlockRecipe rdf:type owl:Class ;
-                   rdfs:subClassOf :Recipe .
-
-
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#FabricBlockRequirement
-:FabricBlockRequirement rdf:type owl:Class ;
-                        rdfs:subClassOf :RecipeRequirement .
-
-
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#MaterialRequirement
-:MaterialRequirement rdf:type owl:Class ;
-                     rdfs:subClassOf :RecipeRequirement .
-
-
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#RecipeRequirement
-:RecipeRequirement rdf:type owl:Class .
-
-
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#SewingProcess
-:SewingProcess rdf:type owl:Class ;
-               rdfs:subClassOf <http://w3id.org/CEON/ontology/textile/TextileProductionProcess> .
-
-
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#Skirt
-:Skirt rdf:type owl:Class ;
-       rdfs:subClassOf :Garment .
-
-
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#SkirtRecipe
-:SkirtRecipe rdf:type owl:Class ;
-             rdfs:subClassOf :Recipe .
-
-
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#SteamingProcess
-:SteamingProcess rdf:type owl:Class ;
-                 rdfs:subClassOf <http://w3id.org/CEON/ontology/textile/TextileProductionProcess> .
-
-
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#Top
-:Top rdf:type owl:Class ;
-     rdfs:subClassOf :Garment .
-
-
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#TopRecipe
-:TopRecipe rdf:type owl:Class ;
-           rdfs:subClassOf :Recipe .
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#NewSewingProcess
+:NewSewingProcess rdf:type owl:Class ;
+                  rdfs:subClassOf [ rdf:type owl:Restriction ;
+                                    owl:onProperty :hasProductionProcess ;
+                                    owl:hasValue <http://w3id.org/CEON/ontology/textile/embossing>
+                                  ] .
 
 
 ###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/DigitalProductPassport
@@ -185,74 +133,143 @@
 :FabricBlock rdf:type owl:Class .
 
 
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/FabricBlock100x160
+:FabricBlock100x160 rdf:type owl:Class ;
+                    rdfs:subClassOf :FabricBlock .
+
+
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/FabricBlock14x40
+:FabricBlock14x40 rdf:type owl:Class ;
+                  rdfs:subClassOf :FabricBlock .
+
+
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/FabricBlock64x80
+:FabricBlock64x80 rdf:type owl:Class ;
+                  rdfs:subClassOf :FabricBlock .
+
+
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/FabricBlockRecipe
+:FabricBlockRecipe rdf:type owl:Class ;
+                   rdfs:subClassOf :Recipe .
+
+
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/FabricBlockRequirement
+:FabricBlockRequirement rdf:type owl:Class ;
+                        rdfs:subClassOf :RecipeRequirement .
+
+
 ###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/Garment
 :Garment rdf:type owl:Class ;
          rdfs:subClassOf <http://w3id.org/CEON/ontology/textile/TextileProduct> .
+
+
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/MaterialRequirement
+:MaterialRequirement rdf:type owl:Class ;
+                     rdfs:subClassOf :RecipeRequirement .
 
 
 ###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/Recipe
 :Recipe rdf:type owl:Class .
 
 
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/RecipeRequirement
+:RecipeRequirement rdf:type owl:Class .
+
+
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/SewingProcess
+:SewingProcess rdf:type owl:Class ;
+               rdfs:subClassOf <http://w3id.org/CEON/ontology/textile/TextileProductionProcess> .
+
+
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/Skirt
+:Skirt rdf:type owl:Class ;
+       rdfs:subClassOf :Garment .
+
+
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/SkirtRecipe
+:SkirtRecipe rdf:type owl:Class ;
+             rdfs:subClassOf :Recipe .
+
+
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/SteamingProcess
+:SteamingProcess rdf:type owl:Class ;
+                 rdfs:subClassOf <http://w3id.org/CEON/ontology/textile/TextileProductionProcess> .
+
+
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/Top
+:Top rdf:type owl:Class ;
+     rdfs:subClassOf :Garment .
+
+
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/TopRecipe
+:TopRecipe rdf:type owl:Class ;
+           rdfs:subClassOf :Recipe .
+
+
 #################################################################
 #    Individuals
 #################################################################
 
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#Cotton
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#new_sewing_instance
+:new_sewing_instance rdf:type owl:NamedIndividual ;
+                     :hasProductionProcess <http://w3id.org/CEON/ontology/textile/embossing> .
+
+
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/Cotton
 :Cotton rdf:type owl:NamedIndividual ,
                  <http://w3id.org/CEON/ontology/textile/CottonMaterial> .
 
 
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#FabricBlock100x160
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/FabricBlock100x160
 :FabricBlock100x160 rdf:type owl:NamedIndividual ,
                              :FabricBlock100x160 ;
                     :hasRecipe :FabricBlock100x160Recipe1 .
 
 
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#FabricBlock100x160MaterialRequirement1
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/FabricBlock100x160MaterialRequirement1
 :FabricBlock100x160MaterialRequirement1 rdf:type owl:NamedIndividual ,
                                                  :MaterialRequirement ;
                                         :requiresMaterial :Cotton ;
                                         :requiresQuantity 999.9 .
 
 
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#FabricBlock100x160Recipe1
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/FabricBlock100x160Recipe1
 :FabricBlock100x160Recipe1 rdf:type owl:NamedIndividual ,
                                     :FabricBlockRecipe ;
                            :hasProcessRequirement :FabricBlock100x160SewingProcess1 ,
                                                   :FabricBlock100x160SteamingProcess1 .
 
 
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#FabricBlock100x160SewingProcess1
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/FabricBlock100x160SewingProcess1
 :FabricBlock100x160SewingProcess1 rdf:type owl:NamedIndividual ,
                                            :SewingProcess ;
                                   :requiresQuantity 0.0013 .
 
 
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#FabricBlock100x160SteamingProcess1
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/FabricBlock100x160SteamingProcess1
 :FabricBlock100x160SteamingProcess1 rdf:type owl:NamedIndividual ,
                                              :SteamingProcess ;
                                     :requiresQuantity 0.002 .
 
 
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#FabricBlock14x40
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/FabricBlock14x40
 :FabricBlock14x40 rdf:type owl:NamedIndividual ,
                            :FabricBlock14x40 .
 
 
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#FabricBlock64x80
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/FabricBlock64x80
 :FabricBlock64x80 rdf:type owl:NamedIndividual ,
                            :FabricBlock64x80 .
 
 
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#FabricBlockRequirementSkirt1
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/FabricBlockRequirementSkirt1
 :FabricBlockRequirementSkirt1 rdf:type owl:NamedIndividual ,
                                        :FabricBlockRequirement ;
                               :requiresFabricBlock :FabricBlock100x160 ;
                               :requiresQuantity 2 .
 
 
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#SkirtRecipe1
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/SkirtRecipe1
 :SkirtRecipe1 rdf:type owl:NamedIndividual ,
                        :SkirtRecipe ;
               :hasFabricBlockRequirement :FabricBlockRequirementSkirt1 ;
@@ -260,19 +277,19 @@
                                      :SkirtSteamingProcess1 .
 
 
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#SkirtSewingProcess1
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/SkirtSewingProcess1
 :SkirtSewingProcess1 rdf:type owl:NamedIndividual ,
                               :SewingProcess ;
                      :requiresQuantity 0.0009 .
 
 
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#SkirtSteamingProcess1
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/SkirtSteamingProcess1
 :SkirtSteamingProcess1 rdf:type owl:NamedIndividual ,
                                 :SteamingProcess ;
                        :requiresQuantity 0.005 .
 
 
-###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3#TopRecipe1
+###  http://www.semanticweb.org/simeonpilz/ontologies/2025/9/untitled-ontology-3/TopRecipe1
 :TopRecipe1 rdf:type owl:NamedIndividual ,
                      :TopRecipe .
 
