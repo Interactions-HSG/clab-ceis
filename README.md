@@ -60,6 +60,8 @@ Valid `app_name` values: `ceis_backend`, `ceis_shop`, `ceis_dashboard`.
 
 The `.devcontainer/post-create.sh` script installs dependencies for all components on container creation. In GitHub Codespaces it also prepares the admin UI hyperlinks to use Codespaces port-forwarding URLs instead of `localhost`. If the environment variable `CLAB_CEIS_RUN` is set, it also starts the backend, dashboard, and shop in the background automatically.
 
+When the admin tool starts or restarts CEIS services, it writes their output to `/tmp/ceis_backend.log`, `/tmp/ceis_dashboard.log`, and `/tmp/ceis_shop.log`. The admin service itself logs to `/tmp/ceis_admin.log`.
+
 ## How to run tests
 
 ### backend

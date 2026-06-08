@@ -72,6 +72,40 @@ def test_restart_calls_stop_then_start(app_mock, tmp_path):
         assert mock_popen.call_count == 2
 
 
+def test_start_logs_output_to_file(app_mock):
+    import httpx
+    import subprocess
+
+    with patch("ceis_admin.process_manager.subprocess.Popen") as mock_popen, \
+            patch(
+                "ceis_admin.process_manager.httpx.get",
+                side_effect=httpx.RequestError("conn refused"),
+            ):
+        fake_proc = MagicMock()
+        fake_proc.poll.return_value = None
+        mock_popen.return_value = fake_proc
+
+        app_mock.start()
+
+    _, kwargs = mock_popen.call_args
+    assert kwargs["stdout"].name == f"/tmp/{app_mock.name}.log"
+    assert kwargs["stderr"] == subprocess.STDOUT
+    kwargs["stdout"].close()
+
+
+def test_stop_closes_log_handle(app_mock):
+    fake_proc = MagicMock()
+    fake_proc.poll.return_value = 0
+    fake_log = MagicMock()
+    app_mock._process = fake_proc
+    app_mock._log_handle = fake_log
+
+    app_mock.stop()
+
+    fake_log.close.assert_called_once()
+    assert app_mock._log_handle is None
+
+
 # ---------------------------------------------------------------------------
 # ProcessManager
 # ---------------------------------------------------------------------------

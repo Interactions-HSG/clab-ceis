@@ -11,6 +11,8 @@ uv run --directory clab_ceis/ceis_admin python main.py
 
 The server starts on `http://localhost:8053` by default.
 
+When the admin tool launches managed services, it appends their output to `/tmp/ceis_backend.log`, `/tmp/ceis_dashboard.log`, and `/tmp/ceis_shop.log`.
+
 ## API
 
 | Method | Path | Description |

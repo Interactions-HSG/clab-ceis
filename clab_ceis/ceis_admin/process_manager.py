@@ -24,6 +24,8 @@ class ManagedApp:
         self.work_dir = work_dir
         self.health_url = health_url
         self._process: Optional[subprocess.Popen] = None
+        self._log_path = Path("/tmp") / f"{name}.log"
+        self._log_handle = None
 
     # ------------------------------------------------------------------
     # Process control
@@ -35,10 +37,18 @@ class ManagedApp:
             return  # already tracked and running
         if self.is_healthy():
             return  # already responding (started externally)
-        self._process = subprocess.Popen(
-            [config.UV_BIN, "run", "python", "main.py"],
-            cwd=self.work_dir,
-        )
+        self._log_handle = self._log_path.open("a", encoding="utf-8")
+        try:
+            self._process = subprocess.Popen(
+                [config.UV_BIN, "run", "python", "main.py"],
+                cwd=self.work_dir,
+                stdout=self._log_handle,
+                stderr=subprocess.STDOUT,
+            )
+        except Exception:
+            self._log_handle.close()
+            self._log_handle = None
+            raise
 
     def stop(self) -> None:
         """Terminate the app and wait for it to exit."""
@@ -52,6 +62,9 @@ class ManagedApp:
                 self._process.kill()
                 self._process.wait()
         self._process = None
+        if self._log_handle is not None:
+            self._log_handle.close()
+            self._log_handle = None
 
     def restart(self) -> None:
         """Stop the app and start it again."""
