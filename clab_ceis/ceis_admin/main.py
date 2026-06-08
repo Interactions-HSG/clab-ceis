@@ -10,6 +10,7 @@ POST /restart             – restart all managed apps
 POST /restart/{app_name}  – restart a single managed app
 """
 
+import asyncio
 from contextlib import asynccontextmanager
 
 import uvicorn
@@ -192,9 +193,11 @@ _UI_HTML = """<!DOCTYPE html>
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Attach a shared ProcessManager and clean up on shutdown."""
+    """Attach a shared ProcessManager, start managed apps, and clean up on shutdown."""
     manager = ProcessManager()
     app.state.manager = manager
+    # Start managed apps in a background thread so the admin API responds immediately.
+    asyncio.get_event_loop().run_in_executor(None, manager.start_all)
     yield
     manager.stop_all()
 

@@ -30,9 +30,11 @@ class ManagedApp:
     # ------------------------------------------------------------------
 
     def start(self) -> None:
-        """Start the app if it is not already running."""
+        """Start the app if it is not already running or healthy."""
         if self._process is not None and self._process.poll() is None:
-            return  # already running
+            return  # already tracked and running
+        if self.is_healthy():
+            return  # already responding (started externally)
         self._process = subprocess.Popen(
             [config.UV_BIN, "run", "python", "main.py"],
             cwd=self.work_dir,
@@ -131,6 +133,17 @@ class ProcessManager:
             time.sleep(1)
 
         return app.status()
+
+    def start_all(self, backend_timeout: int = 60) -> None:
+        """Start all managed apps, waiting for the backend before the rest."""
+        self._apps["ceis_backend"].start()
+        deadline = time.monotonic() + backend_timeout
+        while not self._apps["ceis_backend"].is_healthy():
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(1)
+        self._apps["ceis_dashboard"].start()
+        self._apps["ceis_shop"].start()
 
     def stop_all(self) -> None:
         for app in self._apps.values():

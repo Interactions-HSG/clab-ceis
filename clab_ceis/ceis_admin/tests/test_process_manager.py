@@ -104,3 +104,37 @@ def test_restart_unknown_raises_key_error():
     manager = ProcessManager()
     with pytest.raises(KeyError):
         manager.restart("nonexistent_app")
+
+
+def test_start_skips_if_externally_healthy(app_mock):
+    """start() must not spawn a process if the app is already responding."""
+    response = MagicMock()
+    response.status_code = 200
+    with patch("ceis_admin.process_manager.subprocess.Popen") as mock_popen, \
+            patch("ceis_admin.process_manager.httpx.get", return_value=response):
+        app_mock.start()
+        mock_popen.assert_not_called()
+
+
+def test_start_all_starts_all_three_apps():
+    manager = ProcessManager()
+    with patch.object(manager._apps["ceis_backend"], "start") as mock_backend, \
+            patch.object(manager._apps["ceis_backend"], "is_healthy", return_value=True), \
+            patch.object(manager._apps["ceis_dashboard"], "start") as mock_dashboard, \
+            patch.object(manager._apps["ceis_shop"], "start") as mock_shop:
+        manager.start_all()
+    mock_backend.assert_called_once()
+    mock_dashboard.assert_called_once()
+    mock_shop.assert_called_once()
+
+
+def test_start_all_starts_backend_before_others():
+    manager = ProcessManager()
+    call_order = []
+    with patch.object(manager._apps["ceis_backend"], "start", side_effect=lambda: call_order.append("backend")), \
+            patch.object(manager._apps["ceis_backend"], "is_healthy", return_value=True), \
+            patch.object(manager._apps["ceis_dashboard"], "start", side_effect=lambda: call_order.append("dashboard")), \
+            patch.object(manager._apps["ceis_shop"], "start", side_effect=lambda: call_order.append("shop")):
+        manager.start_all()
+    assert call_order[0] == "backend"
+    assert set(call_order[1:]) == {"dashboard", "shop"}

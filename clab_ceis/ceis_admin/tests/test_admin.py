@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from ceis_admin.main import app
+from ceis_admin.process_manager import ProcessManager
 
 
 @pytest.fixture()
@@ -25,9 +26,10 @@ def client():
         "pid": 99,
     }
 
-    with TestClient(app) as c:
-        app.state.manager = manager
-        yield c
+    with patch.object(ProcessManager, "start_all"):
+        with TestClient(app) as c:
+            app.state.manager = manager
+            yield c
 
 
 def _make_app_mock(name: str) -> MagicMock:
