@@ -93,6 +93,8 @@ _UI_HTML = """<!DOCTYPE html>
     .status-row { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
     .refresh-note { margin-top: 1.5rem; font-size: .75rem; color: #999; }
     #last-updated { font-size: .75rem; color: #888; margin-bottom: 1.25rem; }
+    .card-title a { margin-left: auto; font-size: .9rem; color: #3b82f6; text-decoration: none; }
+    .card-title a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -105,11 +107,23 @@ _UI_HTML = """<!DOCTYPE html>
 
   <script>
     const APPS = ["ceis_backend", "ceis_shop", "ceis_dashboard"];
+    const APP_URLS = {
+      ceis_backend:  "http://localhost:8052",
+      ceis_shop:     "http://localhost:8050",
+      ceis_dashboard: "http://localhost:8051",
+    };
 
     function badgeHtml(status) {
       if (status.healthy) return '<span class="badge badge-up">up</span>';
       if (status.process_running) return '<span class="badge badge-wait">starting</span>';
       return '<span class="badge badge-down">down</span>';
+    }
+
+    function linkHtml(name, healthy) {
+      const url = APP_URLS[name];
+      if (!url) return "";
+      const cls = healthy ? "" : ' style="opacity:.45;pointer-events:none"';
+      return `<a href="${url}" target="_blank" rel="noopener"${cls} title="Open ${name}">↗</a>`;
     }
 
     function renderCards(statuses) {
@@ -123,6 +137,7 @@ _UI_HTML = """<!DOCTYPE html>
           <div class="card-title">
             ${badgeHtml(s)}
             <span>${s.name}</span>
+            ${linkHtml(s.name, s.healthy)}
           </div>
           <div class="status-row meta">
             <span>Process: ${s.process_running ? "running (PID " + s.pid + ")" : "not running"}</span>
