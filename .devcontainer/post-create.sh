@@ -1,4 +1,17 @@
 #!/bin/bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="${SCRIPT_DIR}/codespaces.env"
+
+if [ -n "$CODESPACES" ]; then
+    cat > "$ENV_FILE" <<EOF
+export CEIS_BACKEND_LINK_URL="https://${CODESPACE_NAME}-8052.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}/"
+export CEIS_SHOP_LINK_URL="https://${CODESPACE_NAME}-8050.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}/"
+export CEIS_DASHBOARD_LINK_URL="https://${CODESPACE_NAME}-8051.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}/"
+EOF
+else
+    rm -f "$ENV_FILE"
+fi
+
 pipx install uv
 uv sync --directory ../clab-ceis/clab_ceis/ceis_dashboard
 uv sync --directory ../clab-ceis/clab_ceis/ceis_backend

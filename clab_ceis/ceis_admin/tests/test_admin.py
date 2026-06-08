@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+from ceis_admin import config
 from ceis_admin.main import app
 from ceis_admin.process_manager import ProcessManager
 
@@ -92,6 +93,20 @@ def test_ui_returns_html(client):
     assert "text/html" in response.headers["content-type"]
     assert "CEIS Admin" in response.text
     assert "Restart All" in response.text
+    assert config.BACKEND_LINK_URL in response.text
+
+
+def test_ui_uses_configured_link_urls(client, monkeypatch):
+    monkeypatch.setattr(config, "BACKEND_LINK_URL", "codespace-backend-link")
+    monkeypatch.setattr(config, "SHOP_LINK_URL", "codespace-shop-link")
+    monkeypatch.setattr(config, "DASHBOARD_LINK_URL", "codespace-dashboard-link")
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "codespace-backend-link" in response.text
+    assert "codespace-shop-link" in response.text
+    assert "codespace-dashboard-link" in response.text
 
 
 def test_restart_all_apps(client):

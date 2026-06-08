@@ -58,7 +58,7 @@ Valid `app_name` values: `ceis_backend`, `ceis_shop`, `ceis_dashboard`.
 
 ### Running with the Devcontainer
 
-The `.devcontainer/post-create.sh` script installs dependencies for all components on container creation. If the environment variable `CLAB_CEIS_RUN` is set, it also starts the backend, dashboard, and shop in the background automatically.
+The `.devcontainer/post-create.sh` script installs dependencies for all components on container creation. In GitHub Codespaces it also prepares the admin UI hyperlinks to use Codespaces port-forwarding URLs instead of `localhost`. If the environment variable `CLAB_CEIS_RUN` is set, it also starts the backend, dashboard, and shop in the background automatically.
 
 ## How to run tests
 

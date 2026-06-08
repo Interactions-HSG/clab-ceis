@@ -1,7 +1,13 @@
 #!/bin/bash
-ADMIN_PORT="${CEIS_ADMIN_PORT:-8053}"
-
 WORKSPACE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ENV_FILE="${WORKSPACE_DIR}/.devcontainer/codespaces.env"
+
+if [ -f "$ENV_FILE" ]; then
+    # shellcheck disable=SC1090
+    . "$ENV_FILE"
+fi
+
+ADMIN_PORT="${CEIS_ADMIN_PORT:-8053}"
 
 start_if_not_running() {
     local name="$1"

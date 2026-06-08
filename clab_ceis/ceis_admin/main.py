@@ -109,9 +109,9 @@ _UI_HTML = """<!DOCTYPE html>
   <script>
     const APPS = ["ceis_backend", "ceis_shop", "ceis_dashboard"];
     const APP_URLS = {
-      ceis_backend:  "http://localhost:8052",
-      ceis_shop:     "http://localhost:8050",
-      ceis_dashboard: "http://localhost:8051",
+      ceis_backend:  "__BACKEND_LINK_URL__",
+      ceis_shop:     "__SHOP_LINK_URL__",
+      ceis_dashboard: "__DASHBOARD_LINK_URL__",
     };
 
     function badgeHtml(status) {
@@ -191,6 +191,14 @@ _UI_HTML = """<!DOCTYPE html>
 </html>"""
 
 
+def _render_ui_html() -> str:
+    return (
+        _UI_HTML.replace("__BACKEND_LINK_URL__", config.BACKEND_LINK_URL)
+        .replace("__SHOP_LINK_URL__", config.SHOP_LINK_URL)
+        .replace("__DASHBOARD_LINK_URL__", config.DASHBOARD_LINK_URL)
+    )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Attach a shared ProcessManager, start managed apps, and clean up on shutdown."""
@@ -224,13 +232,13 @@ def _validate_app_name(app_name: str) -> None:
 @app.get("/")
 def read_root():
     """Serve the minimal web UI at the root path."""
-    return HTMLResponse(content=_UI_HTML)
+    return HTMLResponse(content=_render_ui_html())
 
 
 @app.get("/ui", response_class=HTMLResponse)
 def get_ui():
     """Serve the minimal web UI alias for backwards compatibility."""
-    return HTMLResponse(content=_UI_HTML)
+    return HTMLResponse(content=_render_ui_html())
 
 
 @app.get("/status")
