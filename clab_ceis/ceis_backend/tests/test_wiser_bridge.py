@@ -26,7 +26,8 @@ def _activity_response(status_code: int, emissions: float | None = None) -> Magi
     return response
 
 
-def test_reuses_cached_access_token_for_multiple_requests():
+def test_reuses_cached_access_token_for_multiple_requests(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
     client = WiserClient(
         auth_url="https://auth.example", api_base_url="https://api.example"
     )
@@ -50,7 +51,8 @@ def test_reuses_cached_access_token_for_multiple_requests():
     assert second_headers["Authorization"] == "Bearer cached-token"
 
 
-def test_refreshes_token_once_after_unauthorized_response():
+def test_refreshes_token_once_after_unauthorized_response(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
     client = WiserClient(
         auth_url="https://auth.example", api_base_url="https://api.example"
     )
