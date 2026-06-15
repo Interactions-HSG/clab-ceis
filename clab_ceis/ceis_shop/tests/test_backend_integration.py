@@ -77,8 +77,8 @@ def _start_backend(db_path: Path, backend_port: int, wiser_port: int) -> subproc
     env = os.environ.copy()
     env["CEIS_DB_PATH"] = str(db_path)
     env["CEIS_DISABLE_DISTANCE_SYNC"] = "1"
-    env["WISER_AUTH_URL"] = f"http://127.0.0.1:{wiser_port}/auth/token"
-    env["WISER_API_BASE_URL"] = f"http://127.0.0.1:{wiser_port}/api"
+    env["CEIS_WISER_AUTH_URL"] = f"http://127.0.0.1:{wiser_port}/auth/token"
+    env["CEIS_WISER_API_BASE_URL"] = f"http://127.0.0.1:{wiser_port}/api"
 
     return subprocess.Popen(
         [

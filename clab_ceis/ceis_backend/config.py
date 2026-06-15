@@ -15,17 +15,17 @@ load_dotenv(BASE_DIR / ".env.secrets", override=True)
 DB_PATH = os.getenv("CEIS_DB_PATH", "ceis_backend.db")
 
 # Backend server configuration
-BACKEND_HOST = os.getenv("BACKEND_HOST", "0.0.0.0")
-BACKEND_PORT = int(os.getenv("BACKEND_PORT", "8052"))
+BACKEND_HOST = os.getenv("CEIS_BACKEND_HOST", "0.0.0.0")
+BACKEND_PORT = int(os.getenv("CEIS_BACKEND_PORT", "8052"))
 
 # WISER API configuration
-WISER_SP3_API_USER = os.getenv("WISER_SP3_API_USER", "")
-WISER_SP3_API_KEY = os.getenv("WISER_SP3_API_KEY", "")
+WISER_SP3_API_USER = os.getenv("CEIS_WISER_SP3_API_USER", "")
+WISER_SP3_API_KEY = os.getenv("CEIS_WISER_SP3_API_KEY", "")
 WISER_AUTH_URL = os.getenv(
-    "WISER_AUTH_URL",
+    "CEIS_WISER_AUTH_URL",
     "https://auth.wiser.ehealth.hevs.ch/realms/wiser/protocol/openid-connect/token",
 )
 WISER_API_BASE_URL = os.getenv(
-    "WISER_API_BASE_URL",
+    "CEIS_WISER_API_BASE_URL",
     "https://api.wiser.ehealth.hevs.ch/ecoinvent/3.12-cutoff",
 )

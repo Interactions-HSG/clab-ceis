@@ -19,7 +19,7 @@ uv sync --directory ../clab-ceis/clab_ceis/ceis_shop
 uv sync --directory ../clab-ceis/clab_ceis/ceis_admin
 
 if [ "$CLAB_CEIS_RUN" = "S" ]; then
-    BACKEND_PORT="${BACKEND_PORT:-8052}"
+    BACKEND_PORT="${CEIS_BACKEND_PORT:-8052}"
 
     wait_for_backend() {
         local port="$1"
