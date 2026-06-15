@@ -1,10 +1,18 @@
 # clab-prototype
 
-Repository dedicated to prototypes for the Circular Lab. Currently it consits of two _mocks_:
-
-- CEIS: the Circular Economy Information System
-- A dashboard: it interacts with the CEIS to provide relevant information to the manufacturer
-- A webshop: it interacts with the CEIS to get quote and register its orders
+The Circular Economy (CE) is an economic principle that relies on
+[closed-loop](https://www.ellenmacarthurfoundation.org/the-circular-economy-in-detail-deep-dive)
+instead of open loop models with the goal to enable a more sustainable and
+[competitive economy](https://eur-lex.europa.eu/eli/reg/2024/1781/oj). In the shadow of finding new
+business models and opportunities in a circular economy, a new challenge for information processing
+arises. The key to the data that unlocks the full potential of CE does not solely lie in the hands
+of producers anymore, but it is held by participants along the whole value chain, including
+consumers. Therefore, the data is highly heterogeneous and fragmented. The Circular Economy
+Information Systems (CEIS) is our research platform to exploring the future of CE and to finding
+solutions to these challenges through hands-on digital innovation. Current CEIS demonstrators
+integrate CO2 footprint assessments and end-of-life scenario calculations across regional repair
+networks, enabling stakeholders to compare environmental impacts of repair, recirculation, and new
+production — bridging fragmented value-chain data into actionable circular decisions.
 
 ## Architecture
 
