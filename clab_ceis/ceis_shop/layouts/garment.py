@@ -331,6 +331,13 @@ def garment_page(garment_type_id: int):
                                         children=initial_co2_content,
                                     ),
                                 ),
+                                html.Button(
+                                    "Place order",
+                                    id="garment-order-button",
+                                    n_clicks=0,
+                                    className="primary-button",
+                                ),
+                                html.Div(id="garment-order-result"),
                             ],
                         ),
                     ],

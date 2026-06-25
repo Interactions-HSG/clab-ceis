@@ -27,6 +27,9 @@ from ceis_backend.queries import (
     db_get_strategy_progress,
     db_get_materials_for_garment,
     db_get_recipe_fabric_blocks,
+    db_get_resource_events,
+    db_get_supply_chain_graph,
+    db_create_order,
     db_upsert_material,
     db_delete_garment_recipe,
     db_create_fabric_block_type,
@@ -53,6 +56,7 @@ from ceis_backend.models import (
     GarmentTypeCreate,
     MaterialCreate,
     ProcessTypeCreate,
+    OrderCreate,
 )
 
 
@@ -106,6 +110,37 @@ def get_strategy_progress(
 ):
     refresh_sold_garment_co2_values(wiser_client)
     return db_get_strategy_progress()
+
+
+@app.get("/supply-chain")
+def get_supply_chain():
+    return db_get_supply_chain_graph()
+
+
+@app.get("/resource-events")
+def get_resource_events(
+    manufacturer_id: int | None = None,
+    manufacturer_distance_id: int | None = None,
+    material_id: int | None = None,
+    material_manufacturer_distance_id: int | None = None,
+    lifecycle_node: str | None = None,
+    lifecycle_edge: str | None = None,
+    supply_chain_only: bool = False,
+):
+    return db_get_resource_events(
+        manufacturer_id=manufacturer_id,
+        manufacturer_distance_id=manufacturer_distance_id,
+        material_id=material_id,
+        material_manufacturer_distance_id=material_manufacturer_distance_id,
+        lifecycle_node=lifecycle_node,
+        lifecycle_edge=lifecycle_edge,
+        supply_chain_only=supply_chain_only,
+    )
+
+
+@app.post("/orders", status_code=201)
+def create_order(payload: OrderCreate):
+    return db_create_order(payload.garment_type_id, payload.material_id)
 
 
 @app.get("/garment-types/{garment_type_id}/materials")

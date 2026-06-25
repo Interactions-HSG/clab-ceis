@@ -1172,6 +1172,300 @@ def db_get_manufacturers(role_group: str | None = None) -> list[dict]:
         conn.close()
 
 
+def db_get_supply_chain_graph() -> dict:
+    """Return the complete manufacturer network already stored in the database."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT id, company, role, role_group, location
+            FROM manufacturers
+            ORDER BY role_group, company
+            """
+        )
+        nodes = [
+            {
+                "id": row[0],
+                "company": row[1],
+                "role": row[2],
+                "role_group": row[3],
+                "location": row[4],
+            }
+            for row in cursor.fetchall()
+        ]
+        company_ids = {node["company"]: node["id"] for node in nodes}
+        cursor.execute(
+            """
+            SELECT id, source_company, destination_company, distance_km
+            FROM manufacturer_distances
+            ORDER BY id
+            """
+        )
+        edges = [
+            {
+                "id": row[0],
+                "source_manufacturer_id": company_ids.get(row[1]),
+                "destination_manufacturer_id": company_ids.get(row[2]),
+                "source_company": row[1],
+                "destination_company": row[2],
+                "distance_km": float(row[3]),
+            }
+            for row in cursor.fetchall()
+            if company_ids.get(row[1]) is not None
+            and company_ids.get(row[2]) is not None
+        ]
+        cursor.execute(
+            """
+            SELECT DISTINCT m.id, m.name
+            FROM material_manufacturer_distances mmd
+            JOIN materials m ON m.id = mmd.material_id
+            ORDER BY m.name
+            """
+        )
+        material_nodes = [
+            {"id": row[0], "name": row[1]} for row in cursor.fetchall()
+        ]
+        cursor.execute(
+            """
+            SELECT mmd.id, mmd.material_id, mmd.destination_manufacturer_id,
+                   m.name, mf.company, mmd.distance_km
+            FROM material_manufacturer_distances mmd
+            JOIN materials m ON m.id = mmd.material_id
+            JOIN manufacturers mf ON mf.id = mmd.destination_manufacturer_id
+            ORDER BY mmd.id
+            """
+        )
+        material_edges = [
+            {
+                "id": row[0],
+                "material_id": row[1],
+                "destination_manufacturer_id": row[2],
+                "material": row[3],
+                "destination_company": row[4],
+                "distance_km": float(row[5]),
+            }
+            for row in cursor.fetchall()
+        ]
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "material_nodes": material_nodes,
+            "material_edges": material_edges,
+        }
+    finally:
+        conn.close()
+
+
+def db_get_resource_events(
+    manufacturer_id: int | None = None,
+    manufacturer_distance_id: int | None = None,
+    material_id: int | None = None,
+    material_manufacturer_distance_id: int | None = None,
+    lifecycle_node: str | None = None,
+    lifecycle_edge: str | None = None,
+    supply_chain_only: bool = False,
+) -> list[dict]:
+    filters = []
+    parameters: list = []
+    for column, value in (
+        ("re.manufacturer_id", manufacturer_id),
+        ("re.manufacturer_distance_id", manufacturer_distance_id),
+        ("re.material_id", material_id),
+        (
+            "re.material_manufacturer_distance_id",
+            material_manufacturer_distance_id,
+        ),
+        ("re.lifecycle_node", lifecycle_node),
+        ("re.lifecycle_edge", lifecycle_edge),
+    ):
+        if value is not None:
+            filters.append(f"{column} = ?")
+            parameters.append(value)
+    where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
+    if supply_chain_only:
+        supply_filter = """(
+            re.manufacturer_id IS NOT NULL OR
+            re.manufacturer_distance_id IS NOT NULL OR
+            re.material_id IS NOT NULL OR
+            re.material_manufacturer_distance_id IS NOT NULL
+        )"""
+        where_clause = (
+            f"{where_clause} AND {supply_filter}"
+            if where_clause
+            else f"WHERE {supply_filter}"
+        )
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            f"""
+            SELECT re.id, re.event_trigger, re.timestamp, re.request_type,
+                   re.resource_type, re.co2eq, re.status, re.order_id,
+                   m.company,
+                   md.source_company, md.destination_company, md.distance_km,
+                   material.name, source_material.name,
+                   destination.company, mmd.distance_km
+            FROM resource_events re
+            LEFT JOIN manufacturers m ON m.id = re.manufacturer_id
+            LEFT JOIN manufacturer_distances md
+                   ON md.id = re.manufacturer_distance_id
+            LEFT JOIN materials material ON material.id = re.material_id
+            LEFT JOIN material_manufacturer_distances mmd
+                   ON mmd.id = re.material_manufacturer_distance_id
+            LEFT JOIN materials source_material ON source_material.id = mmd.material_id
+            LEFT JOIN manufacturers destination
+                   ON destination.id = mmd.destination_manufacturer_id
+            {where_clause}
+            ORDER BY re.timestamp DESC, re.id DESC
+            """,
+            parameters,
+        )
+        return [
+            {
+                "event_id": row[0],
+                "event_trigger": row[1],
+                "timestamp": row[2],
+                "request_type": row[3],
+                "resource_type": row[4],
+                "co2eq": row[5],
+                "from": row[8] or row[9] or row[12] or row[13],
+                "to": row[8] or row[10] or row[12] or row[14],
+                "status": row[6],
+                "order_id": row[7],
+                "distance_km": row[11] or row[15],
+            }
+            for row in cursor.fetchall()
+        ]
+    finally:
+        conn.close()
+
+
+def db_create_order(garment_type_id: int, material_id: int | None = None) -> dict:
+    """Create an order, atomically reserving stock when one unit is available."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")
+    cursor = conn.cursor()
+    try:
+        cursor.execute("BEGIN IMMEDIATE")
+        cursor.execute(
+            "SELECT name FROM garment_types WHERE id = ?", (garment_type_id,)
+        )
+        garment = cursor.fetchone()
+        if garment is None:
+            raise HTTPException(status_code=404, detail="Garment type not found")
+        if material_id is not None:
+            cursor.execute(
+                """
+                SELECT 1 FROM garment_recipe_materials
+                WHERE garment_type = ? AND material_id = ?
+                """,
+                (garment_type_id, material_id),
+            )
+            if cursor.fetchone() is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Material is not available for this garment",
+                )
+
+        cursor.execute(
+            """
+            SELECT id, co2eq FROM garments_inventory
+            WHERE type_id = ? AND sold = 0
+            ORDER BY id LIMIT 1
+            """,
+            (garment_type_id,),
+        )
+        stock = cursor.fetchone()
+        fulfillment_type = "stock" if stock else "production"
+        status = "Delivering" if stock else "Production requested"
+        inventory_id = stock[0] if stock else None
+        co2eq = stock[1] if stock else None
+        if stock:
+            cursor.execute(
+                "UPDATE garments_inventory SET sold = 1 WHERE id = ? AND sold = 0",
+                (inventory_id,),
+            )
+
+        cursor.execute(
+            """
+            INSERT INTO orders (
+                garment_type_id, material_id, garment_inventory_id,
+                fulfillment_type, status
+            ) VALUES (?, ?, ?, ?, ?)
+            """,
+            (garment_type_id, material_id, inventory_id, fulfillment_type, status),
+        )
+        order_id = cursor.lastrowid
+
+        manufacturer_id = None
+        distance_id = None
+        lifecycle_node = None
+        lifecycle_edge = None
+        if stock:
+            cursor.execute(
+                """
+                SELECT id FROM manufacturer_distances
+                WHERE source_role_group = 'garment'
+                ORDER BY id LIMIT 1
+                """
+            )
+            distance = cursor.fetchone()
+            distance_id = distance[0] if distance else None
+            lifecycle_edge = "Deliver"
+            event_trigger = "Deliver"
+            event_status = "In Progress"
+        else:
+            cursor.execute(
+                """
+                SELECT id FROM manufacturers
+                WHERE role_group = 'garment'
+                ORDER BY id LIMIT 1
+                """
+            )
+            manufacturer = cursor.fetchone()
+            manufacturer_id = manufacturer[0] if manufacturer else None
+            lifecycle_node = "Production"
+            event_trigger = "Production"
+            event_status = "Requested"
+
+        cursor.execute(
+            """
+            INSERT INTO resource_events (
+                event_trigger, request_type, resource_type, co2eq, status,
+                lifecycle_node, lifecycle_edge, manufacturer_id,
+                manufacturer_distance_id, order_id
+            ) VALUES (?, 'Order', ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                event_trigger,
+                garment[0],
+                co2eq,
+                event_status,
+                lifecycle_node,
+                lifecycle_edge,
+                manufacturer_id,
+                distance_id,
+                order_id,
+            ),
+        )
+        conn.commit()
+        return {
+            "id": order_id,
+            "garment_type_id": garment_type_id,
+            "garment": garment[0],
+            "fulfillment_type": fulfillment_type,
+            "status": status,
+            "event_trigger": event_trigger,
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 def get_used_fabric_block(
     fabric_block_name: str,
     already_used_ids: list[int],

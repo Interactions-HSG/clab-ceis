@@ -5,6 +5,11 @@ from ceis_backend.config import DB_PATH
 from ceis_backend.manufacturer_distance_sync import (
     sync_manufacturer_distances_if_changed,
 )
+from ceis_backend.data.location_details import (
+    COTTON_DISTANCE_TO_MANUFACTURER_KM,
+    HEMP_DISTANCE_TO_MANUFACTURER_KM,
+    SILK_DISTANCE_TO_MANUFACTURER_KM,
+)
 
 
 def create_tables(cursor):
@@ -200,6 +205,69 @@ def create_tables(cursor):
 
     cursor.execute(
         """
+        CREATE TABLE IF NOT EXISTS orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            garment_type_id INTEGER NOT NULL,
+            material_id INTEGER,
+            garment_inventory_id INTEGER,
+            fulfillment_type TEXT NOT NULL CHECK (fulfillment_type IN ('stock', 'production')),
+            status TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (garment_type_id) REFERENCES garment_types(id),
+            FOREIGN KEY (material_id) REFERENCES materials(id),
+            FOREIGN KEY (garment_inventory_id) REFERENCES garments_inventory(id)
+        )
+    """
+    )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS material_manufacturer_distances (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            material_id INTEGER NOT NULL,
+            destination_manufacturer_id INTEGER NOT NULL,
+            distance_km REAL NOT NULL,
+            FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE,
+            FOREIGN KEY (destination_manufacturer_id) REFERENCES manufacturers(id) ON DELETE CASCADE,
+            UNIQUE(material_id, destination_manufacturer_id)
+        )
+    """
+    )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS resource_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_trigger TEXT NOT NULL,
+            timestamp TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            request_type TEXT NOT NULL,
+            resource_type TEXT NOT NULL,
+            co2eq REAL,
+            status TEXT NOT NULL,
+            lifecycle_node TEXT,
+            lifecycle_edge TEXT,
+            manufacturer_id INTEGER,
+            manufacturer_distance_id INTEGER,
+            material_id INTEGER,
+            material_manufacturer_distance_id INTEGER,
+            order_id INTEGER,
+            FOREIGN KEY (manufacturer_id) REFERENCES manufacturers(id) ON DELETE CASCADE,
+            FOREIGN KEY (manufacturer_distance_id) REFERENCES manufacturer_distances(id) ON DELETE CASCADE,
+            FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE,
+            FOREIGN KEY (material_manufacturer_distance_id) REFERENCES material_manufacturer_distances(id) ON DELETE CASCADE,
+            FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+            CHECK (
+                (manufacturer_id IS NOT NULL) +
+                (manufacturer_distance_id IS NOT NULL) +
+                (material_id IS NOT NULL) +
+                (material_manufacturer_distance_id IS NOT NULL) <= 1
+            )
+        )
+    """
+    )
+
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS sync_state (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
@@ -236,6 +304,21 @@ def create_tables(cursor):
         INSERT OR IGNORE INTO seed_meta (id, seeded) VALUES (1, 0);
     """
     )
+
+    # Keep development databases created by an earlier revision forward-compatible.
+    cursor.execute("PRAGMA table_info(resource_events)")
+    resource_event_columns = {row[1] for row in cursor.fetchall()}
+    for column, definition in (
+        ("material_id", "INTEGER REFERENCES materials(id) ON DELETE CASCADE"),
+        (
+            "material_manufacturer_distance_id",
+            "INTEGER REFERENCES material_manufacturer_distances(id) ON DELETE CASCADE",
+        ),
+    ):
+        if column not in resource_event_columns:
+            cursor.execute(
+                f"ALTER TABLE resource_events ADD COLUMN {column} {definition}"
+            )
 
 
 def seed_data(cursor):
@@ -502,6 +585,147 @@ def seed_demo_sales_data(cursor):
     )
 
 
+def seed_material_supply_chain(cursor):
+    distances = {
+        "hemp": HEMP_DISTANCE_TO_MANUFACTURER_KM,
+        "cotton": COTTON_DISTANCE_TO_MANUFACTURER_KM,
+        "silk": SILK_DISTANCE_TO_MANUFACTURER_KM,
+    }
+    for material_name, distance_km in distances.items():
+        cursor.execute(
+            """
+            INSERT OR IGNORE INTO material_manufacturer_distances (
+                material_id, destination_manufacturer_id, distance_km
+            )
+            SELECT materials.id, manufacturers.id, ?
+            FROM materials CROSS JOIN manufacturers
+            WHERE materials.name = ? AND manufacturers.role_group = 'fabric'
+            """,
+            (distance_km, material_name),
+        )
+
+
+def seed_resource_events(cursor):
+    """Seed graph coverage without relying on the legacy dashboard CSV."""
+    cursor.execute(
+        """
+        INSERT INTO resource_events (
+            event_trigger, timestamp, request_type, resource_type, co2eq, status,
+            lifecycle_node, manufacturer_id
+        )
+        SELECT
+            CASE role_group
+                WHEN 'fabric' THEN 'Supply'
+                WHEN 'garment' THEN 'Production'
+                ELSE 'Finishing'
+            END,
+            datetime('now', printf('-%d minutes', id)),
+            'Seed', role, NULL, 'Done',
+            CASE role_group
+                WHEN 'fabric' THEN 'Extraction'
+                ELSE 'Production'
+            END,
+            id
+        FROM manufacturers
+        WHERE NOT EXISTS (
+            SELECT 1 FROM resource_events re WHERE re.manufacturer_id = manufacturers.id
+        )
+        ORDER BY id
+        """
+    )
+    for lifecycle_node in ("Extraction", "Production", "Use", "Waste"):
+        cursor.execute(
+            """
+            INSERT INTO resource_events (
+                event_trigger, timestamp, request_type, resource_type, status,
+                lifecycle_node
+            )
+            SELECT ?, datetime('now'), 'Seed', 'Lifecycle stage', 'Done', ?
+            WHERE NOT EXISTS (
+                SELECT 1 FROM resource_events WHERE lifecycle_node = ?
+            )
+            """,
+            (lifecycle_node, lifecycle_node, lifecycle_node),
+        )
+    for lifecycle_edge in (
+        "Supply",
+        "Deliver",
+        "Release",
+        "Repair",
+        "Remanufacture",
+        "Recycle",
+        "Composting",
+    ):
+        cursor.execute(
+            """
+            INSERT INTO resource_events (
+                event_trigger, timestamp, request_type, resource_type, status,
+                lifecycle_edge
+            )
+            SELECT ?, datetime('now'), 'Seed', 'Lifecycle transition', 'Done', ?
+            WHERE NOT EXISTS (
+                SELECT 1 FROM resource_events WHERE lifecycle_edge = ?
+            )
+            """,
+            (lifecycle_edge, lifecycle_edge, lifecycle_edge),
+        )
+    cursor.execute(
+        """
+        INSERT INTO resource_events (
+            event_trigger, timestamp, request_type, resource_type, co2eq, status,
+            lifecycle_node, material_id
+        )
+        SELECT 'Extraction', datetime('now', printf('-%d minutes', 200 + id)),
+               'Seed', name, NULL, 'Done', 'Extraction', id
+        FROM materials
+        WHERE name IN ('hemp', 'cotton', 'silk')
+          AND NOT EXISTS (
+              SELECT 1 FROM resource_events re WHERE re.material_id = materials.id
+          )
+        ORDER BY id
+        """
+    )
+    cursor.execute(
+        """
+        INSERT INTO resource_events (
+            event_trigger, timestamp, request_type, resource_type, co2eq, status,
+            lifecycle_edge, material_manufacturer_distance_id
+        )
+        SELECT 'Supply', datetime('now', printf('-%d minutes', 300 + mmd.id)),
+               'Seed', 'Material transport', NULL, 'Done', 'Supply', mmd.id
+        FROM material_manufacturer_distances mmd
+        WHERE NOT EXISTS (
+            SELECT 1 FROM resource_events re
+            WHERE re.material_manufacturer_distance_id = mmd.id
+        )
+        ORDER BY mmd.id
+        """
+    )
+    cursor.execute(
+        """
+        INSERT INTO resource_events (
+            event_trigger, timestamp, request_type, resource_type, co2eq, status,
+            lifecycle_edge, manufacturer_distance_id
+        )
+        SELECT
+            'Transport',
+            datetime('now', printf('-%d minutes', 100 + id)),
+            'Seed', 'Transport leg', NULL, 'Done',
+            CASE
+                WHEN source_role_group = 'fabric' THEN 'Supply'
+                ELSE 'Deliver'
+            END,
+            id
+        FROM manufacturer_distances
+        WHERE NOT EXISTS (
+            SELECT 1 FROM resource_events re
+            WHERE re.manufacturer_distance_id = manufacturer_distances.id
+        )
+        ORDER BY id
+        """
+    )
+
+
 def init_sqlite_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -509,6 +733,8 @@ def init_sqlite_db():
     create_tables(cursor)
     seed_data(cursor)
     seed_demo_sales_data(cursor)
+    seed_material_supply_chain(cursor)
+    seed_resource_events(cursor)
 
     conn.commit()
     conn.close()
@@ -527,3 +753,11 @@ def init_sqlite_db():
         # Distance sync is best-effort and must not block DB startup.
         print("Manufacturer distance sync failed unexpectedly.")
         return
+
+    # A fresh database receives manufacturers during sync, so seed graph events after it.
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    seed_material_supply_chain(cursor)
+    seed_resource_events(cursor)
+    conn.commit()
+    conn.close()

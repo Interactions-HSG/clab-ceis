@@ -84,6 +84,8 @@ def test_garment_page_contains_recipe_and_co2_sections():
     assert "Select a material to view recipe details." not in text
     assert "Select a material to view CO2 emissions." in text
     assert "garment-material-dropdown" in text
+    assert "garment-order-button" in text
+    assert "garment-order-result" in text
     assert "page-home-link" in text
     assert "shop-home-button" in text
     assert "Button" in text

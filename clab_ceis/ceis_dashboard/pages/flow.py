@@ -3,8 +3,96 @@ from enum import Enum
 from dash import dash_table, html
 import dash_cytoscape as cyto
 
-from ceis_data import CeisData
 from pages.ui import app_topbar, page_hero
+
+
+EVENT_COLUMNS = [
+    {"name": "Event ID", "id": "event_id"},
+    {"name": "Event Trigger", "id": "event_trigger"},
+    {"name": "Timestamp", "id": "timestamp"},
+    {"name": "Request Type", "id": "request_type"},
+    {"name": "Resource Type", "id": "resource_type"},
+    {"name": "CO2eq", "id": "co2eq"},
+    {"name": "From", "id": "from"},
+    {"name": "To", "id": "to"},
+    {"name": "Status", "id": "status"},
+    {"name": "Order ID", "id": "order_id"},
+    {"name": "Distance (km)", "id": "distance_km"},
+]
+
+
+def _event_table(table_id: str, events: list[dict]):
+    return dash_table.DataTable(
+        id=table_id,
+        columns=EVENT_COLUMNS,
+        data=events,
+        page_size=12,
+        style_table={"overflowX": "auto"},
+        style_cell={"textAlign": "center", "padding": "10px"},
+        style_header={"fontWeight": "bold"},
+    )
+
+
+def get_supply_chain_elements(supply_chain: dict) -> list[dict]:
+    material_distances = {
+        edge["material_id"]: edge["distance_km"]
+        for edge in supply_chain.get("material_edges", [])
+    }
+    elements = [
+        {
+            "data": {
+                "id": f"manufacturer-{node['id']}",
+                "manufacturer_id": node["id"],
+                "label": node["company"],
+                "role": node["role"],
+                "role_group": node["role_group"],
+                "location": node["location"],
+            }
+        }
+        for node in supply_chain.get("nodes", [])
+    ]
+    elements.extend(
+        {
+            "data": {
+                "id": f"distance-{edge['id']}",
+                "manufacturer_distance_id": edge["id"],
+                "source": f"manufacturer-{edge['source_manufacturer_id']}",
+                "target": f"manufacturer-{edge['destination_manufacturer_id']}",
+                "label": f"{edge['distance_km']:.1f} km",
+            }
+        }
+        for edge in supply_chain.get("edges", [])
+    )
+    elements.extend(
+        {
+            "data": {
+                "id": f"material-{node['id']}",
+                "material_id": node["id"],
+                "label": (
+                    f"{node['name'].title()}\n"
+                    f"{material_distances.get(node['id'], 0):,.0f} km upstream"
+                ),
+                "role": "Raw material",
+                "role_group": "material",
+            }
+        }
+        for node in supply_chain.get("material_nodes", [])
+    )
+    elements.extend(
+        {
+            "data": {
+                "id": f"material-distance-{edge['id']}",
+                "material_manufacturer_distance_id": edge["id"],
+                "source": f"material-{edge['material_id']}",
+                "target": f"manufacturer-{edge['destination_manufacturer_id']}",
+                "label": "",
+                "distance_km": edge["distance_km"],
+            },
+            "classes": "material-leg",
+        }
+        for edge in supply_chain.get("material_edges", [])
+    )
+    return elements
 
 
 def _metric_card(title: str, value: str, subtitle: str, accent: str):
@@ -107,9 +195,17 @@ def _build_strategy_progress_section(progress_data: dict):
     )
 
 
-def get_dashboard_layout(progress_data: dict | None = None):
+def get_dashboard_layout(
+    progress_data: dict | None = None,
+    supply_chain: dict | None = None,
+    resource_events: list[dict] | None = None,
+    supply_events: list[dict] | None = None,
+):
     flow_chart_data = get_flow_chart_data()
     progress_data = progress_data or {}
+    supply_chain = supply_chain or {"nodes": [], "edges": []}
+    resource_events = resource_events or []
+    supply_events = supply_events or []
     return html.Div(
         children=[
             app_topbar(),
@@ -193,25 +289,76 @@ def get_dashboard_layout(progress_data: dict | None = None):
                                     },
                                 ],
                             ),
-                            html.P(id="cytoscape-output"),
+                            html.Div(
+                                [
+                                    html.Button(
+                                        "Show all lifecycle events",
+                                        id="lifecycle-events-reset",
+                                        n_clicks=0,
+                                    ),
+                                    _event_table(
+                                        "lifecycle-events-table", resource_events
+                                    ),
+                                ],
+                                className="table-panel",
+                            ),
                         ],
                         className="panel",
                     ),
                     html.Section(
                         [
-                            html.H2("Resource Event Dashboard"),
-                            html.Button("Update DataTable", id="update-button", n_clicks=0),
-                            dash_table.DataTable(
-                                id="res-dashboard-table",
-                                columns=[
-                                    {"name": col, "id": col}
-                                    for col in CeisData().get_data().columns
-                                ],
-                                data=CeisData().get_data().to_dict("records"),
-                                style_table={"overflowX": "auto"},
-                                style_cell={"textAlign": "center", "padding": "10px"},
-                                style_header={"fontWeight": "bold"},
+                            html.H2("Supply Chain Events"),
+                            html.P(
+                                "Select a manufacturer or transport leg to inspect its events."
                             ),
+                            cyto.Cytoscape(
+                                id="supply-chain-chart",
+                                layout={
+                                    "name": "breadthfirst",
+                                    "directed": True,
+                                    "padding": 40,
+                                    "spacingFactor": 1.2,
+                                },
+                                elements=get_supply_chain_elements(supply_chain),
+                                style={"height": "520px", "width": "100%"},
+                                minZoom=0.35,
+                                maxZoom=2,
+                                stylesheet=[
+                                    {
+                                        "selector": "node",
+                                        "style": {
+                                            "label": "data(label)",
+                                            "shape": "round-rectangle",
+                                            "background-color": "#0b5f56",
+                                            "color": "#f0fdfa",
+                                            "text-wrap": "wrap",
+                                            "text-max-width": 150,
+                                            "text-valign": "center",
+                                            "font-weight": 700,
+                                            "width": 175,
+                                            "height": 72,
+                                        },
+                                    },
+                                    {
+                                        "selector": "edge",
+                                        "style": {
+                                            "label": "data(label)",
+                                            "target-arrow-shape": "triangle",
+                                            "curve-style": "bezier",
+                                            "line-color": "#0e7490",
+                                            "target-arrow-color": "#0e7490",
+                                            "text-background-color": "#cffafe",
+                                            "text-background-opacity": 1,
+                                        },
+                                    },
+                                ],
+                            ),
+                            html.Button(
+                                "Show all supply-chain events",
+                                id="supply-events-reset",
+                                n_clicks=0,
+                            ),
+                            _event_table("supply-events-table", supply_events),
                         ],
                         className="panel table-panel",
                     ),

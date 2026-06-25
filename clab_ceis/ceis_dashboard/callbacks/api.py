@@ -76,6 +76,31 @@ def fetch_strategy_progress() -> dict:
         return {}
 
 
+def fetch_supply_chain() -> dict:
+    try:
+        resp = requests.get(f"{config.BACKEND_API_URL}/supply-chain", timeout=30)
+        if resp.status_code != 200:
+            return {"nodes": [], "edges": []}
+        return resp.json()
+    except Exception:
+        return {"nodes": [], "edges": []}
+
+
+def fetch_resource_events(**filters) -> list[dict]:
+    try:
+        params = {key: value for key, value in filters.items() if value is not None}
+        resp = requests.get(
+            f"{config.BACKEND_API_URL}/resource-events",
+            params=params,
+            timeout=30,
+        )
+        if resp.status_code != 200:
+            return []
+        return resp.json()
+    except Exception:
+        return []
+
+
 def fetch_designer_balance_options() -> dict:
     try:
         resp = requests.get(f"{config.BACKEND_API_URL}/designer-balance/options")

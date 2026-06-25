@@ -120,3 +120,8 @@ class GarmentRecipeCreate(BaseModel):
 
 class ActivitySearchRequest(BaseModel):
     query: str
+
+
+class OrderCreate(BaseModel):
+    garment_type_id: int
+    material_id: Optional[int] = None
