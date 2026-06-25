@@ -108,7 +108,12 @@ def get_materials():
 def get_strategy_progress(
     wiser_client: WiserClient = Depends(get_wiser_client),
 ):
-    refresh_sold_garment_co2_values(wiser_client)
+    try:
+        refresh_sold_garment_co2_values(wiser_client)
+    except WiserClientError:
+        # Strategy progress should remain available from stored DB values even
+        # when Wiser is offline or credentials/network are unavailable.
+        pass
     return db_get_strategy_progress()
 
 

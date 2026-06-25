@@ -179,10 +179,11 @@ def create_tables(cursor):
         """
         CREATE TABLE IF NOT EXISTS manufacturers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            company TEXT NOT NULL UNIQUE,
+            company TEXT NOT NULL,
             role TEXT NOT NULL,
             role_group TEXT NOT NULL,
-            location TEXT NOT NULL
+            location TEXT NOT NULL,
+            UNIQUE(company, role_group)
         )
     """
     )
@@ -609,21 +610,38 @@ def seed_resource_events(cursor):
     """Seed graph coverage without relying on the legacy dashboard CSV."""
     cursor.execute(
         """
+        DELETE FROM resource_events
+        WHERE request_type = 'Seed'
+          AND manufacturer_distance_id IN (
+              SELECT id
+              FROM manufacturer_distances
+              WHERE source_company = destination_company
+          )
+        """
+    )
+    cursor.execute(
+        """
         INSERT INTO resource_events (
             event_trigger, timestamp, request_type, resource_type, co2eq, status,
-            lifecycle_node, manufacturer_id
+            lifecycle_node, lifecycle_edge, manufacturer_id
         )
         SELECT
             CASE role_group
                 WHEN 'fabric' THEN 'Supply'
                 WHEN 'garment' THEN 'Production'
+                WHEN 'repair' THEN 'Repair'
                 ELSE 'Finishing'
             END,
             datetime('now', printf('-%d minutes', id)),
             'Seed', role, NULL, 'Done',
             CASE role_group
                 WHEN 'fabric' THEN 'Extraction'
+                WHEN 'repair' THEN NULL
                 ELSE 'Production'
+            END,
+            CASE role_group
+                WHEN 'repair' THEN 'Repair'
+                ELSE NULL
             END,
             id
         FROM manufacturers
@@ -717,7 +735,8 @@ def seed_resource_events(cursor):
             END,
             id
         FROM manufacturer_distances
-        WHERE NOT EXISTS (
+        WHERE source_company <> destination_company
+          AND NOT EXISTS (
             SELECT 1 FROM resource_events re
             WHERE re.manufacturer_distance_id = manufacturer_distances.id
         )

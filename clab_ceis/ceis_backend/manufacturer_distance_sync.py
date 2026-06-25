@@ -60,6 +60,8 @@ def _normalize_role(role: str) -> str | None:
         return "garment"
     if "finishing" in role_lower:
         return "finishing"
+    if "repair" in role_lower:
+        return "repair"
     return None
 
 

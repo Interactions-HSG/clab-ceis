@@ -1194,26 +1194,30 @@ def db_get_supply_chain_graph() -> dict:
             }
             for row in cursor.fetchall()
         ]
-        company_ids = {node["company"]: node["id"] for node in nodes}
+        manufacturer_ids = {
+            (node["company"], node["role_group"]): node["id"] for node in nodes
+        }
         cursor.execute(
             """
-            SELECT id, source_company, destination_company, distance_km
+            SELECT id, source_company, source_role_group,
+                   destination_company, destination_role_group, distance_km
             FROM manufacturer_distances
+            WHERE source_company <> destination_company
             ORDER BY id
             """
         )
         edges = [
             {
                 "id": row[0],
-                "source_manufacturer_id": company_ids.get(row[1]),
-                "destination_manufacturer_id": company_ids.get(row[2]),
+                "source_manufacturer_id": manufacturer_ids.get((row[1], row[2])),
+                "destination_manufacturer_id": manufacturer_ids.get((row[3], row[4])),
                 "source_company": row[1],
-                "destination_company": row[2],
-                "distance_km": float(row[3]),
+                "destination_company": row[3],
+                "distance_km": float(row[5]),
             }
             for row in cursor.fetchall()
-            if company_ids.get(row[1]) is not None
-            and company_ids.get(row[2]) is not None
+            if manufacturer_ids.get((row[1], row[2])) is not None
+            and manufacturer_ids.get((row[3], row[4])) is not None
         ]
         cursor.execute(
             """
@@ -1268,8 +1272,40 @@ def db_get_resource_events(
 ) -> list[dict]:
     filters = []
     parameters: list = []
+    if manufacturer_id is not None:
+        filters.append(
+            """(
+                re.manufacturer_id = ?
+                OR (
+                    md.source_company = (
+                        SELECT company FROM manufacturers WHERE id = ?
+                    )
+                    AND md.source_role_group = (
+                        SELECT role_group FROM manufacturers WHERE id = ?
+                    )
+                )
+                OR (
+                    md.destination_company = (
+                        SELECT company FROM manufacturers WHERE id = ?
+                    )
+                    AND md.destination_role_group = (
+                        SELECT role_group FROM manufacturers WHERE id = ?
+                    )
+                )
+                OR mmd.destination_manufacturer_id = ?
+            )"""
+        )
+        parameters.extend(
+            [
+                manufacturer_id,
+                manufacturer_id,
+                manufacturer_id,
+                manufacturer_id,
+                manufacturer_id,
+                manufacturer_id,
+            ]
+        )
     for column, value in (
-        ("re.manufacturer_id", manufacturer_id),
         ("re.manufacturer_distance_id", manufacturer_distance_id),
         ("re.material_id", material_id),
         (
@@ -1303,6 +1339,9 @@ def db_get_resource_events(
             f"""
             SELECT re.id, re.event_trigger, re.timestamp, re.request_type,
                    re.resource_type, re.co2eq, re.status, re.order_id,
+                   re.lifecycle_node, re.lifecycle_edge,
+                   re.manufacturer_id, re.manufacturer_distance_id,
+                   re.material_id, re.material_manufacturer_distance_id,
                    m.company,
                    md.source_company, md.destination_company, md.distance_km,
                    material.name, source_material.name,
@@ -1322,22 +1361,45 @@ def db_get_resource_events(
             """,
             parameters,
         )
-        return [
-            {
-                "event_id": row[0],
-                "event_trigger": row[1],
-                "timestamp": row[2],
-                "request_type": row[3],
-                "resource_type": row[4],
-                "co2eq": row[5],
-                "from": row[8] or row[9] or row[12] or row[13],
-                "to": row[8] or row[10] or row[12] or row[14],
-                "status": row[6],
-                "order_id": row[7],
-                "distance_km": row[11] or row[15],
-            }
-            for row in cursor.fetchall()
-        ]
+        events = []
+        for row in cursor.fetchall():
+            timestamp = row[2] or ""
+            timestamp_parts = timestamp.replace("T", " ").split(" ", 1)
+            event_date = timestamp_parts[0] if timestamp_parts else None
+            event_time = timestamp_parts[1] if len(timestamp_parts) > 1 else None
+            if row[15] or row[19]:
+                event_at = None
+                source = row[15] or row[19]
+                destination = row[16] or row[20]
+            else:
+                event_at = row[14] or row[18]
+                source = None
+                destination = None
+            events.append(
+                {
+                    "event_id": row[0],
+                    "event_trigger": row[1],
+                    "timestamp": row[2],
+                    "date": event_date,
+                    "time": event_time,
+                    "request_type": row[3],
+                    "resource_type": row[4],
+                    "co2eq": row[5],
+                    "lifecycle_node": row[8],
+                    "lifecycle_edge": row[9],
+                    "manufacturer_id": row[10],
+                    "manufacturer_distance_id": row[11],
+                    "material_id": row[12],
+                    "material_manufacturer_distance_id": row[13],
+                    "at": event_at,
+                    "from": source,
+                    "to": destination,
+                    "status": row[6],
+                    "order_id": row[7],
+                    "distance_km": row[17] or row[21],
+                }
+            )
+        return events
     finally:
         conn.close()
 
@@ -1408,6 +1470,7 @@ def db_create_order(garment_type_id: int, material_id: int | None = None) -> dic
                 """
                 SELECT id FROM manufacturer_distances
                 WHERE source_role_group = 'garment'
+                  AND source_company <> destination_company
                 ORDER BY id LIMIT 1
                 """
             )

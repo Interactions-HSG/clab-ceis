@@ -64,6 +64,70 @@ def test_sync_populates_distances_when_csv_changed(tmp_path, monkeypatch):
     conn.close()
 
 
+def test_sync_imports_repair_shops_and_duplicate_company_roles(tmp_path, monkeypatch):
+    db_path = tmp_path / "ceis_backend.db"
+    csv_path = tmp_path / "manufacturers.csv"
+    csv_path.write_text(
+        (
+            "COMPANY,ROLE,LOCATION,WEBSITE,NOTES,CERTIFICATIONS & DPP\n"
+            "Fabric A,fabric manufacturer,\"A Street 1, City A\",,,\n"
+            "Takli Textil,garment manufacturer,\"B Street 1, City B\",,,\n"
+            "Takli Textil,repair,\"B Street 1, City B\",,,\n"
+            "Die Manufaktur GmbH,repair,\"C Street 1, City C\",,,\n"
+            "Finish A,finishing,\"D Street 1, City D\",,,\n"
+        ),
+        encoding="utf-8",
+    )
+
+    _init_db(str(db_path))
+
+    monkeypatch.setattr(sync, "DB_PATH", str(db_path))
+    monkeypatch.setattr(sync, "CSV_PATH", csv_path)
+
+    def mock_get(url, params=None, headers=None, timeout=None):
+        response = MagicMock()
+        response.status_code = 200
+        response.raise_for_status = MagicMock()
+        if "nominatim" in url:
+            query = params.get("q", "")
+            if "City A" in query:
+                response.json.return_value = [{"lat": "47.0", "lon": "9.0"}]
+            elif "City B" in query:
+                response.json.return_value = [{"lat": "47.1", "lon": "9.1"}]
+            elif "City C" in query:
+                response.json.return_value = [{"lat": "47.2", "lon": "9.2"}]
+            else:
+                response.json.return_value = [{"lat": "47.3", "lon": "9.3"}]
+            return response
+
+        response.json.return_value = {"routes": [{"distance": 12345.0}]}
+        return response
+
+    with patch("ceis_backend.manufacturer_distance_sync.requests.get", side_effect=mock_get):
+        result = sync.sync_manufacturer_distances_if_changed()
+
+    assert result["updated"] is True
+    assert result["manufacturers"] == 5
+    assert result["distances"] == 2
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT company, role_group
+        FROM manufacturers
+        WHERE company IN ('Takli Textil', 'Die Manufaktur GmbH')
+        ORDER BY company, role_group
+        """
+    )
+    assert cursor.fetchall() == [
+        ("Die Manufaktur GmbH", "repair"),
+        ("Takli Textil", "garment"),
+        ("Takli Textil", "repair"),
+    ]
+    conn.close()
+
+
 def test_sync_skips_when_csv_unchanged(tmp_path, monkeypatch):
     db_path = tmp_path / "ceis_backend.db"
     csv_path = tmp_path / "manufacturers.csv"

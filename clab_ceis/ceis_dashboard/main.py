@@ -66,7 +66,6 @@ class CeisMonitor:
                     fetch_strategy_progress(),
                     fetch_supply_chain(),
                     fetch_resource_events(),
-                    fetch_resource_events(supply_chain_only=True),
                 )
             elif pathname == "/add-recipe":
                 return self._add_recipe_layout

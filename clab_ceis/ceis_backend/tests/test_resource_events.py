@@ -54,13 +54,22 @@ def test_seeded_events_cover_every_supply_chain_node_and_edge(clean_db):
                   'Garment Co', 'garment', 'Garment town', 12.5)
         """
     )
+    cursor.execute(
+        """
+        INSERT INTO manufacturer_distances (
+            source_company, source_role_group, source_location,
+            destination_company, destination_role_group, destination_location,
+            distance_km
+        ) VALUES ('Fabric Co', 'fabric', 'Fabric town',
+                  'Fabric Co', 'fabric', 'Fabric town', 0)
+        """
+    )
     seed_material_supply_chain(cursor)
     seed_resource_events(cursor)
     conn.commit()
 
     for target_column, source_table in (
         ("manufacturer_id", "manufacturers"),
-        ("manufacturer_distance_id", "manufacturer_distances"),
         ("material_id", "materials"),
         ("material_manufacturer_distance_id", "material_manufacturer_distances"),
     ):
@@ -72,12 +81,170 @@ def test_seeded_events_cover_every_supply_chain_node_and_edge(clean_db):
         )
         assert cursor.fetchone()[0] == source_count
 
+    cursor.execute(
+        """
+        SELECT COUNT(*) FROM manufacturer_distances
+        WHERE source_company <> destination_company
+        """
+    )
+    non_self_distance_count = cursor.fetchone()[0]
+    cursor.execute(
+        """
+        SELECT COUNT(DISTINCT manufacturer_distance_id)
+        FROM resource_events
+        WHERE manufacturer_distance_id IS NOT NULL
+        """
+    )
+    assert cursor.fetchone()[0] == non_self_distance_count
+    cursor.execute(
+        """
+        SELECT COUNT(*)
+        FROM resource_events re
+        JOIN manufacturer_distances md ON md.id = re.manufacturer_distance_id
+        WHERE md.source_company = md.destination_company
+        """
+    )
+    assert cursor.fetchone()[0] == 0
+
     graph = db_get_supply_chain_graph()
     assert len(graph["nodes"]) == 2
     assert len(graph["edges"]) == 1
     assert len(graph["material_nodes"]) == 3
     assert len(graph["material_edges"]) == 3
     conn.close()
+
+
+def test_supplier_filter_returns_events_to_and_from_supplier(clean_db):
+    conn = _connect()
+    cursor = conn.cursor()
+    cursor.executemany(
+        """
+        INSERT INTO manufacturers (company, role, role_group, location)
+        VALUES (?, ?, ?, ?)
+        """,
+        [
+            ("Fabric Co", "fabric manufacturer", "fabric", "Fabric town"),
+            ("Garment Co", "garment manufacturer", "garment", "Garment town"),
+            ("Finisher Co", "finishing", "finishing", "Finish town"),
+        ],
+    )
+    cursor.execute("SELECT id FROM manufacturers WHERE company = 'Garment Co'")
+    garment_supplier_id = cursor.fetchone()[0]
+    cursor.executemany(
+        """
+        INSERT INTO manufacturer_distances (
+            source_company, source_role_group, source_location,
+            destination_company, destination_role_group, destination_location,
+            distance_km
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        [
+            (
+                "Fabric Co",
+                "fabric",
+                "Fabric town",
+                "Garment Co",
+                "garment",
+                "Garment town",
+                12.5,
+            ),
+            (
+                "Garment Co",
+                "garment",
+                "Garment town",
+                "Finisher Co",
+                "finishing",
+                "Finish town",
+                20,
+            ),
+        ],
+    )
+    seed_resource_events(cursor)
+    conn.commit()
+    conn.close()
+
+    events = db_get_resource_events(manufacturer_id=garment_supplier_id)
+    event_pairs = {(event["from"], event["to"]) for event in events}
+
+    assert all("date" in event and "time" in event for event in events)
+    assert ("Fabric Co", "Garment Co") in event_pairs
+    assert ("Garment Co", "Finisher Co") in event_pairs
+    assert any(
+        event["at"] == "Garment Co"
+        and event["from"] is None
+        and event["to"] is None
+        for event in events
+    )
+    assert ("Fabric Co", "Finisher Co") not in event_pairs
+
+
+def test_repair_shop_seeds_repair_lifecycle_event(clean_db):
+    conn = _connect()
+    cursor = conn.cursor()
+    cursor.executemany(
+        """
+        INSERT INTO manufacturers (company, role, role_group, location)
+        VALUES (?, ?, ?, ?)
+        """,
+        [
+            ("Takli Textil", "garment manufacturer / repair", "garment", "A"),
+            ("Takli Textil", "repair", "repair", "A"),
+            ("Die Manufaktur GmbH", "repair", "repair", "B"),
+        ],
+    )
+    seed_resource_events(cursor)
+    conn.commit()
+    conn.close()
+
+    events = db_get_resource_events(lifecycle_edge="Repair")
+    repair_locations = {event["at"] for event in events}
+
+    assert "Die Manufaktur GmbH" in repair_locations
+    assert "Takli Textil" in repair_locations
+
+
+def test_supply_chain_graph_uses_company_and_role_for_duplicate_suppliers(clean_db):
+    conn = _connect()
+    cursor = conn.cursor()
+    cursor.executemany(
+        """
+        INSERT INTO manufacturers (company, role, role_group, location)
+        VALUES (?, ?, ?, ?)
+        """,
+        [
+            ("Takli Textil", "garment manufacturer / repair", "garment", "A"),
+            ("Takli Textil", "repair", "repair", "A"),
+            ("Finisher Co", "finishing", "finishing", "B"),
+        ],
+    )
+    cursor.execute(
+        "SELECT id FROM manufacturers WHERE company = 'Takli Textil' AND role_group = 'garment'"
+    )
+    garment_takli_id = cursor.fetchone()[0]
+    cursor.execute(
+        "SELECT id FROM manufacturers WHERE company = 'Takli Textil' AND role_group = 'repair'"
+    )
+    repair_takli_id = cursor.fetchone()[0]
+    cursor.execute(
+        """
+        INSERT INTO manufacturer_distances (
+            source_company, source_role_group, source_location,
+            destination_company, destination_role_group, destination_location,
+            distance_km
+        ) VALUES ('Takli Textil', 'garment', 'A',
+                  'Finisher Co', 'finishing', 'B', 20)
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    graph = db_get_supply_chain_graph()
+    takli_edges = [
+        edge for edge in graph["edges"] if edge["source_company"] == "Takli Textil"
+    ]
+
+    assert takli_edges[0]["source_manufacturer_id"] == garment_takli_id
+    assert takli_edges[0]["source_manufacturer_id"] != repair_takli_id
 
 
 def test_order_delivers_stock_then_requests_production(clean_db):

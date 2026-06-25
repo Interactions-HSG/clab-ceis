@@ -6,17 +6,21 @@ import dash_cytoscape as cyto
 from pages.ui import app_topbar, page_hero
 
 
+GRAPH_EDGE_COLOR = "#8f978f"
+GRAPH_HIGHLIGHT_COLOR = "#d97706"
+
+
 EVENT_COLUMNS = [
     {"name": "Event ID", "id": "event_id"},
-    {"name": "Event Trigger", "id": "event_trigger"},
-    {"name": "Timestamp", "id": "timestamp"},
-    {"name": "Request Type", "id": "request_type"},
+    {"name": "Event", "id": "event_trigger"},
+    {"name": "Date", "id": "date"},
+    {"name": "Time", "id": "time"},
     {"name": "Resource Type", "id": "resource_type"},
     {"name": "CO2eq", "id": "co2eq"},
+    {"name": "At", "id": "at"},
     {"name": "From", "id": "from"},
     {"name": "To", "id": "to"},
     {"name": "Status", "id": "status"},
-    {"name": "Order ID", "id": "order_id"},
     {"name": "Distance (km)", "id": "distance_km"},
 ]
 
@@ -33,11 +37,258 @@ def _event_table(table_id: str, events: list[dict]):
     )
 
 
+LIFECYCLE_EDGE_IDS = {
+    "Supply": "lifecycle-edge-supply",
+    "Deliver": "lifecycle-edge-deliver",
+    "Release": "lifecycle-edge-release",
+}
+
+
+def _id_selector(element_ids: set[str]) -> str:
+    return ", ".join(f'[id = "{element_id}"]' for element_id in sorted(element_ids))
+
+
+def _lifecycle_node_ids(labels: set[str]) -> set[str]:
+    return {
+        str(CeStages[label].value)
+        for label in labels
+        if label in CeStages.__members__
+    }
+
+
+def _lifecycle_edge_ids(labels: set[str]) -> set[str]:
+    edge_ids = {
+        LIFECYCLE_EDGE_IDS[label]
+        for label in labels
+        if label in LIFECYCLE_EDGE_IDS
+    }
+    edge_ids.update(
+        str(CeLoops[label].value)
+        for label in labels
+        if label in CeLoops.__members__
+    )
+    return edge_ids
+
+
+def get_flow_chart_stylesheet(
+    highlighted_node_labels: set[str] | None = None,
+    highlighted_edge_labels: set[str] | None = None,
+) -> list[dict]:
+    highlighted_node_ids = _lifecycle_node_ids(highlighted_node_labels or set())
+    highlighted_edge_ids = _lifecycle_edge_ids(highlighted_edge_labels or set())
+    stylesheet = [
+        {
+            "selector": "node",
+            "style": {
+                "label": "data(label)",
+                "shape": "round-rectangle",
+                "width": "78px",
+                "height": "42px",
+                "background-color": "#2f6f5e",
+                "color": "#1d2420",
+                "font-weight": "700",
+                "font-size": "11px",
+                "text-valign": "bottom",
+                "text-margin-y": "8px",
+            },
+        },
+        {
+            "selector": "edge",
+            "style": {
+                "label": "data(label)",
+                "target-arrow-shape": "triangle",
+                "arrow-scale": 1.3,
+                "line-color": GRAPH_EDGE_COLOR,
+                "target-arrow-color": GRAPH_EDGE_COLOR,
+                "color": "#68716b",
+                "font-size": "10px",
+                "text-background-color": "#faf8f2",
+                "text-background-opacity": 0.92,
+            },
+        },
+        {
+            "selector": (
+                f"#{CeLoops.Repair.value}, "
+                f"#{CeLoops.Recycle.value}, "
+                f"#{CeLoops.Remanufacture.value}, "
+                f"#{CeLoops.Composting.value}"
+            ),
+            "style": {
+                "curve-style": "unbundled-bezier",
+                "control-point-distance": "90",
+                "line-color": GRAPH_EDGE_COLOR,
+                "target-arrow-color": GRAPH_EDGE_COLOR,
+            },
+        },
+        {
+            "selector": f"#{CeLoops.Composting.value}",
+            "style": {
+                "curve-style": "unbundled-bezier",
+                "control-point-distance": "-110",
+                "text-margin-y": "15%",
+            },
+        },
+        {
+            "selector": f"#{CeLoops.Remanufacture.value}",
+            "style": {
+                "curve-style": "unbundled-bezier",
+                "control-point-distance": "-85",
+                "text-margin-y": "15%",
+            },
+        },
+    ]
+    if highlighted_node_ids:
+        stylesheet.append(
+            {
+                "selector": _id_selector(highlighted_node_ids),
+                "style": {
+                    "border-color": GRAPH_HIGHLIGHT_COLOR,
+                    "border-width": 3,
+                    "z-index": 999,
+                },
+            }
+        )
+    if highlighted_edge_ids:
+        stylesheet.append(
+            {
+                "selector": _id_selector(highlighted_edge_ids),
+                "style": {
+                    "line-color": GRAPH_HIGHLIGHT_COLOR,
+                    "target-arrow-color": GRAPH_HIGHLIGHT_COLOR,
+                    "width": 3,
+                    "z-index": 999,
+                },
+            }
+        )
+    return stylesheet
+
+
+def get_supply_chain_stylesheet(
+    highlighted_node_ids: set[str] | None = None,
+    highlighted_edge_ids: set[str] | None = None,
+) -> list[dict]:
+    highlighted_node_ids = highlighted_node_ids or set()
+    highlighted_edge_ids = highlighted_edge_ids or set()
+    stylesheet = [
+        {
+            "selector": "node",
+            "style": {
+                "label": "data(label)",
+                "shape": "round-rectangle",
+                "background-color": "#0b5f56",
+                "color": "#f0fdfa",
+                "text-wrap": "wrap",
+                "text-max-width": 140,
+                "text-valign": "center",
+                "font-weight": 700,
+                "font-size": "9px",
+                "width": 108,
+                "height": 48,
+            },
+        },
+        {
+            "selector": "edge",
+            "style": {
+                "label": "data(label)",
+                "target-arrow-shape": "triangle",
+                "curve-style": "bezier",
+                "line-color": GRAPH_EDGE_COLOR,
+                "target-arrow-color": GRAPH_EDGE_COLOR,
+                "font-size": "10px",
+                "text-background-color": "#cffafe",
+                "text-background-opacity": 1,
+            },
+        },
+    ]
+    if highlighted_node_ids:
+        stylesheet.append(
+            {
+                "selector": _id_selector(highlighted_node_ids),
+                "style": {
+                    "border-color": GRAPH_HIGHLIGHT_COLOR,
+                    "border-width": 3,
+                    "z-index": 999,
+                },
+            }
+        )
+    if highlighted_edge_ids:
+        stylesheet.append(
+            {
+                "selector": _id_selector(highlighted_edge_ids),
+                "style": {
+                    "line-color": GRAPH_HIGHLIGHT_COLOR,
+                    "target-arrow-color": GRAPH_HIGHLIGHT_COLOR,
+                    "width": 3,
+                    "z-index": 999,
+                },
+            }
+        )
+    return stylesheet
+
+
+def _supply_chain_node_positions(supply_chain: dict) -> dict[str, dict[str, int]]:
+    nodes_by_role: dict[str, list[dict]] = {
+        "material": supply_chain.get("material_nodes", []),
+        "fabric": [],
+        "garment": [],
+        "finishing": [],
+        "repair": [],
+    }
+    for node in supply_chain.get("nodes", []):
+        nodes_by_role.setdefault(node.get("role_group"), []).append(node)
+
+    role_y = {
+        "material": 30,
+        "fabric": 135,
+        "garment": 285,
+        "finishing": 395,
+        "repair": 495,
+    }
+
+    def horizontal_positions(
+        nodes: list[dict],
+        *,
+        start_x: int,
+        max_x: int,
+    ) -> list[int]:
+        if not nodes:
+            return []
+        if len(nodes) == 1:
+            return [round((start_x + max_x) / 2)]
+        step = (max_x - start_x) / (len(nodes) - 1)
+        return [round(start_x + index * step) for index in range(len(nodes))]
+
+    positions: dict[str, dict[str, int]] = {}
+    for role_group, bounds in (
+        ("material", (45, 475)),
+        ("fabric", (20, 500)),
+        ("garment", (260, 260)),
+        ("finishing", (35, 485)),
+        ("repair", (155, 365)),
+    ):
+        role_nodes = nodes_by_role.get(role_group, [])
+        x_positions = horizontal_positions(
+            role_nodes,
+            start_x=bounds[0],
+            max_x=bounds[1],
+        )
+        for node, x_position in zip(role_nodes, x_positions):
+            node_id = (
+                f"material-{node['id']}"
+                if role_group == "material"
+                else f"manufacturer-{node['id']}"
+            )
+            positions[node_id] = {"x": x_position, "y": role_y[role_group]}
+
+    return positions
+
+
 def get_supply_chain_elements(supply_chain: dict) -> list[dict]:
     material_distances = {
         edge["material_id"]: edge["distance_km"]
         for edge in supply_chain.get("material_edges", [])
     }
+    positions = _supply_chain_node_positions(supply_chain)
     elements = [
         {
             "data": {
@@ -47,7 +298,8 @@ def get_supply_chain_elements(supply_chain: dict) -> list[dict]:
                 "role": node["role"],
                 "role_group": node["role_group"],
                 "location": node["location"],
-            }
+            },
+            "position": positions.get(f"manufacturer-{node['id']}"),
         }
         for node in supply_chain.get("nodes", [])
     ]
@@ -74,7 +326,8 @@ def get_supply_chain_elements(supply_chain: dict) -> list[dict]:
                 ),
                 "role": "Raw material",
                 "role_group": "material",
-            }
+            },
+            "position": positions.get(f"material-{node['id']}"),
         }
         for node in supply_chain.get("material_nodes", [])
     )
@@ -166,7 +419,7 @@ def _build_strategy_progress_section(progress_data: dict):
                             f"{int(aggregates.get('second_life_fabric_blocks_sold', 0))} "
                             "second-life blocks linked to sold garments"
                         ),
-                        "#d97706",
+                        GRAPH_HIGHLIGHT_COLOR,
                     ),
                 ],
                 className="shop-summary",
@@ -191,7 +444,7 @@ def _build_strategy_progress_section(progress_data: dict):
                 style_header={"fontWeight": "bold"},
             ),
         ],
-        className="panel table-panel",
+        className="panel",
     )
 
 
@@ -199,13 +452,11 @@ def get_dashboard_layout(
     progress_data: dict | None = None,
     supply_chain: dict | None = None,
     resource_events: list[dict] | None = None,
-    supply_events: list[dict] | None = None,
 ):
     flow_chart_data = get_flow_chart_data()
     progress_data = progress_data or {}
     supply_chain = supply_chain or {"nodes": [], "edges": []}
     resource_events = resource_events or []
-    supply_events = supply_events or []
     return html.Div(
         children=[
             app_topbar(),
@@ -217,152 +468,80 @@ def get_dashboard_layout(
             ),
             html.Div(
                 [
-                    html.Section(
+                    _build_strategy_progress_section(progress_data),
+                    html.Div(
                         [
-                            html.H2("Product Lifecycle"),
-                            cyto.Cytoscape(
-                                id="flow-chart",
-                                layout={"name": "preset"},
-                                style={"height": f"{_chart_height}px", "width": "100%"},
-                                autolock=True,
-                                elements=flow_chart_data["elements"],
-                                panningEnabled=False,
-                                zoom=1,
-                                stylesheet=[
-                                    {
-                                        "selector": "node",
-                                        "style": {
-                                            "label": "data(label)",
-                                            "shape": "round-rectangle",
-                                            "width": "92px",
-                                            "height": "42px",
-                                            "background-color": "#2f6f5e",
-                                            "color": "#1d2420",
-                                            "font-weight": "700",
-                                            "text-valign": "bottom",
-                                            "text-margin-y": "8px",
-                                        },
-                                    },
-                                    {
-                                        "selector": "edge",
-                                        "style": {
-                                            "label": "data(label)",
-                                            "target-arrow-shape": "triangle",
-                                            "arrow-scale": 1.3,
-                                            "line-color": "#8f978f",
-                                            "target-arrow-color": "#8f978f",
-                                            "color": "#68716b",
-                                            "font-size": "12px",
-                                            "text-background-color": "#faf8f2",
-                                            "text-background-opacity": 0.92,
-                                        },
-                                    },
-                                    {
-                                        "selector": (
-                                            f"#{CeLoops.Repair.value}, "
-                                            f"#{CeLoops.Recycle.value}, "
-                                            f"#{CeLoops.Remanufacture.value}, "
-                                            f"#{CeLoops.Composting.value}"
-                                        ),
-                                        "style": {
-                                            "curve-style": "unbundled-bezier",
-                                            "control-point-distance": "200",
-                                            "line-color": "#b56a2b",
-                                            "target-arrow-color": "#b56a2b",
-                                        },
-                                    },
-                                    {
-                                        "selector": f"#{CeLoops.Composting.value}",
-                                        "style": {
-                                            "curve-style": "unbundled-bezier",
-                                            "control-point-distance": "-300",
-                                            "text-margin-y": "15%",
-                                        },
-                                    },
-                                    {
-                                        "selector": f"#{CeLoops.Remanufacture.value}",
-                                        "style": {
-                                            "curve-style": "unbundled-bezier",
-                                            "control-point-distance": "-200",
-                                            "text-margin-y": "15%",
-                                        },
-                                    },
-                                ],
-                            ),
-                            html.Div(
+                            html.Section(
                                 [
-                                    html.Button(
-                                        "Show all lifecycle events",
-                                        id="lifecycle-events-reset",
-                                        n_clicks=0,
+                                    html.H2("Product Lifecycle"),
+                                    html.P(
+                                        "Select a lifecycle stage or loop to inspect its events."
                                     ),
-                                    _event_table(
-                                        "lifecycle-events-table", resource_events
+                                    cyto.Cytoscape(
+                                        id="flow-chart",
+                                        layout={
+                                            "name": "preset",
+                                            "fit": True,
+                                            "padding": 20,
+                                        },
+                                        style={
+                                            "height": "520px",
+                                            "width": "100%",
+                                        },
+                                        autolock=True,
+                                        elements=flow_chart_data["elements"],
+                                        panningEnabled=False,
+                                        minZoom=0.25,
+                                        maxZoom=2,
+                                        stylesheet=get_flow_chart_stylesheet(),
                                     ),
                                 ],
-                                className="table-panel",
+                                className="panel",
+                                style={"minWidth": 0},
+                            ),
+                            html.Section(
+                                [
+                                    html.H2("Supply Chain"),
+                                    html.P(
+                                        "Select a manufacturer, material, or transport leg to inspect its events."
+                                    ),
+                                    cyto.Cytoscape(
+                                        id="supply-chain-chart",
+                                        layout={
+                                            "name": "preset",
+                                            "fit": True,
+                                            "padding": 25,
+                                        },
+                                        elements=get_supply_chain_elements(
+                                            supply_chain
+                                        ),
+                                        style={"height": "520px", "width": "100%"},
+                                        minZoom=0.35,
+                                        maxZoom=2,
+                                        stylesheet=get_supply_chain_stylesheet(),
+                                    ),
+                                ],
+                                className="panel",
+                                style={"minWidth": 0},
                             ),
                         ],
-                        className="panel",
+                        className="dashboard-graph-grid",
                     ),
                     html.Section(
                         [
-                            html.H2("Supply Chain Events"),
+                            html.H2("Resource Events"),
                             html.P(
-                                "Select a manufacturer or transport leg to inspect its events."
-                            ),
-                            cyto.Cytoscape(
-                                id="supply-chain-chart",
-                                layout={
-                                    "name": "breadthfirst",
-                                    "directed": True,
-                                    "padding": 40,
-                                    "spacingFactor": 1.2,
-                                },
-                                elements=get_supply_chain_elements(supply_chain),
-                                style={"height": "520px", "width": "100%"},
-                                minZoom=0.35,
-                                maxZoom=2,
-                                stylesheet=[
-                                    {
-                                        "selector": "node",
-                                        "style": {
-                                            "label": "data(label)",
-                                            "shape": "round-rectangle",
-                                            "background-color": "#0b5f56",
-                                            "color": "#f0fdfa",
-                                            "text-wrap": "wrap",
-                                            "text-max-width": 150,
-                                            "text-valign": "center",
-                                            "font-weight": 700,
-                                            "width": 175,
-                                            "height": 72,
-                                        },
-                                    },
-                                    {
-                                        "selector": "edge",
-                                        "style": {
-                                            "label": "data(label)",
-                                            "target-arrow-shape": "triangle",
-                                            "curve-style": "bezier",
-                                            "line-color": "#0e7490",
-                                            "target-arrow-color": "#0e7490",
-                                            "text-background-color": "#cffafe",
-                                            "text-background-opacity": 1,
-                                        },
-                                    },
-                                ],
+                                "This table updates from either graph. Click any lifecycle or supply-chain node/edge above, or reset to see everything."
                             ),
                             html.Button(
-                                "Show all supply-chain events",
-                                id="supply-events-reset",
+                                "Show all events",
+                                id="resource-events-reset",
                                 n_clicks=0,
                             ),
-                            _event_table("supply-events-table", supply_events),
+                            _event_table("resource-events-table", resource_events),
                         ],
                         className="panel table-panel",
                     ),
-                    _build_strategy_progress_section(progress_data),
                 ],
                 className="dashboard-stack",
             ),
@@ -372,6 +551,7 @@ def get_dashboard_layout(
 
 
 def get_flow_chart_data() -> dict:
+    lifecycle_y = 0.5 * _chart_height
     return {
         "elements": [
             {
@@ -379,31 +559,32 @@ def get_flow_chart_data() -> dict:
                     "id": f"{CeStages.Extraction.value}",
                     "label": f"{CeStages.Extraction.name}",
                 },
-                "position": {"x": 100, "y": 0.5 * _chart_height},
+                "position": {"x": 45, "y": lifecycle_y},
             },
             {
                 "data": {
                     "id": f"{CeStages.Production.value}",
                     "label": f"{CeStages.Production.name}",
                 },
-                "position": {"x": 300, "y": 0.5 * _chart_height},
+                "position": {"x": 190, "y": lifecycle_y},
             },
             {
                 "data": {
                     "id": f"{CeStages.Use.value}",
                     "label": f"{CeStages.Use.name}",
                 },
-                "position": {"x": 500, "y": 0.5 * _chart_height},
+                "position": {"x": 335, "y": lifecycle_y},
             },
             {
                 "data": {
                     "id": f"{CeStages.Waste.value}",
                     "label": f"{CeStages.Waste.name}",
                 },
-                "position": {"x": 700, "y": 0.5 * _chart_height},
+                "position": {"x": 480, "y": lifecycle_y},
             },
             {
                 "data": {
+                    "id": LIFECYCLE_EDGE_IDS["Supply"],
                     "source": f"{CeStages.Extraction.value}",
                     "target": f"{CeStages.Production.value}",
                     "label": "Supply",
@@ -411,6 +592,7 @@ def get_flow_chart_data() -> dict:
             },
             {
                 "data": {
+                    "id": LIFECYCLE_EDGE_IDS["Deliver"],
                     "source": f"{CeStages.Production.value}",
                     "target": f"{CeStages.Use.value}",
                     "label": "Deliver",
@@ -418,6 +600,7 @@ def get_flow_chart_data() -> dict:
             },
             {
                 "data": {
+                    "id": LIFECYCLE_EDGE_IDS["Release"],
                     "source": f"{CeStages.Use.value}",
                     "target": f"{CeStages.Waste.value}",
                     "label": "Release",
@@ -473,4 +656,4 @@ class CeLoops(Enum):
     Composting = 14
 
 
-_chart_height = 400
+_chart_height = 520
