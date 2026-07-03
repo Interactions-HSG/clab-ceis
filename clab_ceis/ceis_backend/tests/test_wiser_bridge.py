@@ -104,7 +104,9 @@ def test_reuses_fresh_database_emission_cache(tmp_path, monkeypatch):
     mocked_request.assert_not_called()
 
 
-def test_refreshes_stale_database_emission_cache(tmp_path, monkeypatch):
+def test_reuses_old_database_emission_cache_when_cache_does_not_expire(
+    tmp_path, monkeypatch
+):
     monkeypatch.chdir(tmp_path)
     now = 1_000_000
     eight_days_ago = now - (8 * 24 * 60 * 60)
@@ -127,17 +129,12 @@ def test_refreshes_stale_database_emission_cache(tmp_path, monkeypatch):
         auth_url="https://auth.example", api_base_url="https://api.example"
     )
 
-    with patch(
-        "ceis_backend.wiser_bridge.requests.post",
-        return_value=_auth_response("fresh-token"),
-    ):
-        with patch(
-            "ceis_backend.wiser_bridge.requests.request",
-            return_value=_activity_response(200, 3.5),
-        ) as mocked_request:
-            assert client.get_emission_per_unit(4001) == 3.5
+    with patch("ceis_backend.wiser_bridge.requests.post") as mocked_post:
+        with patch("ceis_backend.wiser_bridge.requests.request") as mocked_request:
+            assert client.get_emission_per_unit(4001) == 1.25
 
-    assert mocked_request.call_count == 1
+    mocked_post.assert_not_called()
+    mocked_request.assert_not_called()
 
     conn = sqlite3.connect("ceis_backend.db")
     row = conn.execute(
@@ -150,4 +147,4 @@ def test_refreshes_stale_database_emission_cache(tmp_path, monkeypatch):
     ).fetchone()
     conn.close()
 
-    assert row == (3.5, now)
+    assert row == (1.25, eight_days_ago)
