@@ -17,7 +17,7 @@ from ceis_backend.config import (
 )
 
 
-EMISSION_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
+EMISSION_CACHE_TTL_SECONDS: int | None = None
 
 
 class WiserClientError(RuntimeError):
@@ -38,7 +38,7 @@ class WiserClient:
         password: str = WISER_SP3_API_KEY,
         timeout_seconds: float = 30.0,
         token_refresh_margin_seconds: int = 30,
-        emission_cache_ttl_seconds: int = EMISSION_CACHE_TTL_SECONDS,
+        emission_cache_ttl_seconds: int | None = EMISSION_CACHE_TTL_SECONDS,
     ) -> None:
         self.auth_url = auth_url
         self.api_base_url = api_base_url.rstrip("/")
@@ -114,6 +114,9 @@ class WiserClient:
             return False, None
 
         emission_per_unit, cached_at = row
+        if self.emission_cache_ttl_seconds is None:
+            return True, emission_per_unit
+
         try:
             cache_age_seconds = time() - float(cached_at)
         except (TypeError, ValueError):
