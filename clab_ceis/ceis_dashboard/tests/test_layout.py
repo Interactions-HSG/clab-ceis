@@ -3,7 +3,7 @@ from unittest.mock import patch
 from dash import Dash
 
 from main import CeisMonitor
-from pages.flow import get_supply_chain_elements
+from pages.flow import CeStages, get_flow_chart_data, get_supply_chain_elements
 from pages.ui import page_hero
 
 
@@ -29,7 +29,29 @@ def test_page_hero_home_link_is_opt_in_for_subpages():
     assert "page-hero-with-action" in str(subpage_hero)
 
 
-def test_supply_chain_places_repair_shops_below_finishing_actors():
+def test_product_lifecycle_uses_top_to_bottom_flow():
+    elements = get_flow_chart_data()["elements"]
+    node_positions = {
+        element["data"]["label"]: element["position"]
+        for element in elements
+        if "position" in element
+    }
+
+    assert (
+        node_positions[CeStages.Extraction.name]["y"]
+        < node_positions[CeStages.Production.name]["y"]
+    )
+    assert (
+        node_positions[CeStages.Production.name]["y"]
+        < node_positions[CeStages.Use.name]["y"]
+    )
+    assert (
+        node_positions[CeStages.Use.name]["y"]
+        < node_positions[CeStages.Waste.name]["y"]
+    )
+
+
+def test_value_chain_folds_repair_shops_into_garment_manufacturer_step():
     elements = get_supply_chain_elements(
         {
             "nodes": [
@@ -67,25 +89,43 @@ def test_supply_chain_places_repair_shops_below_finishing_actors():
             "material_edges": [],
         }
     )
-    node_positions = {
-        element["data"]["label"]: element["position"]
+    nodes_by_id = {
+        element["data"]["id"]: element
         for element in elements
         if "position" in element
     }
+    edges_by_id = {
+        element["data"]["id"]: element
+        for element in elements
+        if "source" in element.get("data", {})
+    }
 
-    finishing_y = [
-        node_positions["Finisher A"]["y"],
-        node_positions["Finisher B"]["y"],
-    ]
-    repair_y = [
-        node_positions["Repair A"]["y"],
-        node_positions["Repair B"]["y"],
-    ]
+    assert "value-chain-repair" not in nodes_by_id
+    assert "2 repair partners" in nodes_by_id["value-chain-garment"]["data"]["label"]
+    assert edges_by_id["value-chain-customer-to-service"]["data"]["target"] == (
+        "value-chain-service"
+    )
+    assert edges_by_id["value-chain-customer-to-garment"]["data"]["target"] == (
+        "value-chain-garment"
+    )
+    assert edges_by_id["value-chain-customer-to-service"]["data"]["label"] == "repair"
+    assert edges_by_id["value-chain-customer-to-garment"]["data"]["label"] == (
+        "repair / remanufacture"
+    )
+    assert edges_by_id["value-chain-customer-self-repair"]["data"]["source"] == (
+        "value-chain-customer"
+    )
+    assert edges_by_id["value-chain-customer-self-repair"]["data"]["target"] == (
+        "value-chain-customer"
+    )
+    assert (
+        edges_by_id["value-chain-customer-self-repair"]["data"]["label"]
+        == "self-repair"
+    )
+    assert nodes_by_id["value-chain-garment"]["data"]["manufacturer_ids"] == [3, 4]
 
-    assert min(repair_y) > max(finishing_y)
 
-
-def test_supply_chain_uses_top_to_bottom_role_flow():
+def test_value_chain_uses_butterfly_role_flow():
     elements = get_supply_chain_elements(
         {
             "nodes": [
@@ -124,12 +164,90 @@ def test_supply_chain_uses_top_to_bottom_role_flow():
         }
     )
     node_positions = {
-        element["data"]["label"]: element["position"]
+        element["data"]["id"]: element["position"]
         for element in elements
         if "position" in element
     }
+    nodes_by_id = {
+        element["data"]["id"]: element
+        for element in elements
+        if "position" in element
+    }
+    edges_by_id = {
+        element["data"]["id"]: element
+        for element in elements
+        if "source" in element.get("data", {})
+    }
 
-    assert node_positions["Cotton\n0 km upstream"]["y"] < node_positions["Fabric A"]["y"]
-    assert node_positions["Fabric A"]["y"] < node_positions["Garment A"]["y"]
-    assert node_positions["Garment A"]["y"] < node_positions["Finisher A"]["y"]
-    assert node_positions["Finisher A"]["y"] < node_positions["Repair A"]["y"]
+    assert (
+        node_positions["value-chain-materials"]["y"]
+        < node_positions["value-chain-fabric"]["y"]
+    )
+    assert (
+        node_positions["value-chain-fabric"]["y"]
+        < node_positions["value-chain-garment"]["y"]
+    )
+    assert (
+        node_positions["value-chain-garment"]["y"]
+        < node_positions["value-chain-service"]["y"]
+    )
+    assert (
+        node_positions["value-chain-service"]["y"]
+        < node_positions["value-chain-customer"]["y"]
+    )
+    assert (
+        edges_by_id["value-chain-service-to-customer"]["data"]["target"]
+        == "value-chain-customer"
+    )
+    assert nodes_by_id["value-chain-customer"]["data"]["label"] == "Customer"
+    assert (
+        node_positions["deliver-label"]["x"]
+        > node_positions["value-chain-service"]["x"]
+    )
+    assert (
+        edges_by_id["value-chain-fabric-to-garment"]["data"]["label"]
+        == "raw fabrics"
+    )
+    assert (
+        edges_by_id["value-chain-garment-to-service"]["data"]["label"]
+        == "raw garments"
+    )
+    assert edges_by_id["value-chain-service-to-customer"]["data"]["label"] == "deliver"
+    assert edges_by_id["value-chain-material-to-fabric"]["classes"] == "feedstock-leg"
+    assert edges_by_id["value-chain-material-to-fabric"]["data"][
+        "material_manufacturer_distance_ids"
+    ] == []
+    assert edges_by_id["value-chain-customer-to-material"]["data"]["target"] == (
+        "value-chain-materials"
+    )
+    assert edges_by_id["value-chain-customer-to-fabric"]["data"]["target"] == (
+        "value-chain-fabric"
+    )
+    assert edges_by_id["value-chain-customer-to-garment"]["data"]["target"] == (
+        "value-chain-garment"
+    )
+    assert edges_by_id["value-chain-customer-to-service"]["data"]["target"] == (
+        "value-chain-service"
+    )
+    assert edges_by_id["value-chain-customer-to-service"]["data"]["label"] == "repair"
+    assert edges_by_id["value-chain-customer-to-garment"]["data"]["label"] == (
+        "repair / remanufacture"
+    )
+    assert (
+        edges_by_id["value-chain-customer-self-repair"]["data"]["label"]
+        == "self-repair"
+    )
+
+    step_node_ids = {
+        element["data"]["id"]
+        for element in elements
+        if "position" in element
+        and element["data"]["id"].startswith("value-chain")
+    }
+    assert step_node_ids == {
+        "value-chain-materials",
+        "value-chain-fabric",
+        "value-chain-garment",
+        "value-chain-service",
+        "value-chain-customer",
+    }

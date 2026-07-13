@@ -8,6 +8,13 @@ from pages.ui import app_topbar, page_hero
 
 GRAPH_EDGE_COLOR = "#8f978f"
 GRAPH_HIGHLIGHT_COLOR = "#d97706"
+VALUE_CHAIN_CUSTOMER_ID = "value-chain-customer"
+VALUE_CHAIN_STEP_IDS = {
+    "material": "value-chain-materials",
+    "fabric": "value-chain-fabric",
+    "garment": "value-chain-garment",
+    "finishing": "value-chain-service",
+}
 
 
 EVENT_COLUMNS = [
@@ -116,25 +123,40 @@ def get_flow_chart_stylesheet(
             ),
             "style": {
                 "curve-style": "unbundled-bezier",
-                "control-point-distance": "90",
+                "control-point-distance": "105",
                 "line-color": GRAPH_EDGE_COLOR,
                 "target-arrow-color": GRAPH_EDGE_COLOR,
+            },
+        },
+        {
+            "selector": f"#{CeLoops.Repair.value}",
+            "style": {
+                "control-point-distance": "-70",
+                "text-margin-x": "-12%",
+                "text-margin-y": "-5%",
+            },
+        },
+        {
+            "selector": f"#{CeLoops.Recycle.value}",
+            "style": {
+                "control-point-distance": "165",
+                "text-margin-x": "12%",
             },
         },
         {
             "selector": f"#{CeLoops.Composting.value}",
             "style": {
                 "curve-style": "unbundled-bezier",
-                "control-point-distance": "-110",
-                "text-margin-y": "15%",
+                "control-point-distance": "-215",
+                "text-margin-x": "-18%",
             },
         },
         {
             "selector": f"#{CeLoops.Remanufacture.value}",
             "style": {
                 "curve-style": "unbundled-bezier",
-                "control-point-distance": "-85",
-                "text-margin-y": "15%",
+                "control-point-distance": "90",
+                "text-margin-x": "12%",
             },
         },
     ]
@@ -175,16 +197,71 @@ def get_supply_chain_stylesheet(
             "selector": "node",
             "style": {
                 "label": "data(label)",
-                "shape": "round-rectangle",
-                "background-color": "#0b5f56",
-                "color": "#f0fdfa",
+                "shape": "ellipse",
+                "background-color": "#2f6f5e",
+                "border-color": "#dfeee8",
+                "border-width": 3,
+                "color": "#ffffff",
                 "text-wrap": "wrap",
-                "text-max-width": 140,
+                "text-max-width": 118,
                 "text-valign": "center",
+                "text-halign": "center",
                 "font-weight": 700,
-                "font-size": "9px",
+                "font-size": "10px",
+                "width": 96,
+                "height": 96,
+            },
+        },
+        {
+            "selector": ".producer-node",
+            "style": {
+                "shape": "round-rectangle",
+                "background-color": "#f7f4ec",
+                "border-color": "#c8c1b3",
+                "color": "#1d2420",
+                "width": 128,
+                "height": 54,
+                "text-max-width": 116,
+            },
+        },
+        {
+            "selector": ".material-node",
+            "style": {
+                "background-color": "#6f8c4f",
+                "border-color": "#dce8c8",
+            },
+        },
+        {
+            "selector": ".customer-node",
+            "style": {
+                "background-color": "#2f6f5e",
+                "border-color": "#99f6e4",
+                "font-size": "11px",
                 "width": 108,
-                "height": 48,
+                "height": 108,
+            },
+        },
+        {
+            "selector": ".edge-label-node",
+            "style": {
+                "label": "data(label)",
+                "background-opacity": 0,
+                "border-width": 0,
+                "color": "#155e75",
+                "font-size": "10px",
+                "font-weight": 700,
+                "height": 1,
+                "text-background-color": "#faf8f2",
+                "text-background-opacity": 0.95,
+                "text-background-padding": 4,
+                "width": 1,
+            },
+        },
+        {
+            "selector": ".repair-node",
+            "style": {
+                "background-color": "#2878a8",
+                "border-color": "#d8eef8",
             },
         },
         {
@@ -192,12 +269,114 @@ def get_supply_chain_stylesheet(
             "style": {
                 "label": "data(label)",
                 "target-arrow-shape": "triangle",
-                "curve-style": "bezier",
+                "curve-style": "straight",
                 "line-color": GRAPH_EDGE_COLOR,
                 "target-arrow-color": GRAPH_EDGE_COLOR,
                 "font-size": "10px",
-                "text-background-color": "#cffafe",
+                "text-background-color": "#faf8f2",
+                "text-background-opacity": 0.95,
+                "text-background-padding": 4,
+                "width": 2.5,
+            },
+        },
+        {
+            "selector": ".biological-loop",
+            "style": {
+                "curve-style": "unbundled-bezier",
+                "control-point-distance": -120,
+                "line-color": "#6f8c4f",
+                "target-arrow-color": "#6f8c4f",
+            },
+        },
+        {
+            "selector": ".feedstock-leg",
+            "style": {
+                "curve-style": "straight",
+                "line-color": "#6f8c4f",
+                "target-arrow-color": "#6f8c4f",
+                "color": "#4b6b36",
+            },
+        },
+        {
+            "selector": ".technical-loop",
+            "style": {
+                "curve-style": "unbundled-bezier",
+                "control-point-distance": 130,
+                "line-color": "#2878a8",
+                "target-arrow-color": "#2878a8",
+                "color": "#155e75",
+            },
+        },
+        {
+            "selector": ".customer-leg",
+            "style": {
+                "curve-style": "bezier",
+                "line-color": "#2878a8",
+                "target-arrow-color": "#2878a8",
+                "z-index": 5,
+            },
+        },
+        {
+            "selector": ".deliver-leg",
+            "style": {
+                "label": "",
+                "control-point-distance": -70,
+                "control-point-weight": 0.38,
+                "text-margin-x": -12,
+                "text-margin-y": -42,
+            },
+        },
+        {
+            "selector": ".customer-return-service",
+            "style": {
+                "control-point-distance": 75,
+                "control-point-weight": 0.48,
+            },
+        },
+        {
+            "selector": ".customer-return-garment",
+            "style": {
+                "control-point-distance": 125,
+                "control-point-weight": 0.52,
+                "text-margin-x": 8,
+            },
+        },
+        {
+            "selector": ".customer-return-fabric",
+            "style": {
+                "control-point-distance": 175,
+                "control-point-weight": 0.56,
+                "text-margin-x": 16,
+            },
+        },
+        {
+            "selector": ".customer-return-material",
+            "style": {
+                "control-point-distance": 225,
+                "control-point-weight": 0.6,
+                "text-margin-x": 24,
+            },
+        },
+        {
+            "selector": ".customer-self-repair",
+            "style": {
+                "curve-style": "bezier",
+                "loop-direction": "180deg",
+                "loop-sweep": "125deg",
+                "control-point-step-size": 115,
+                "line-color": "#0b6ea8",
+                "target-arrow-color": "#0b6ea8",
+                "arrow-scale": 1.3,
+                "color": "#0f4f6f",
+                "font-weight": "700",
+                "text-background-color": "#eef8fc",
                 "text-background-opacity": 1,
+                "text-background-padding": 5,
+                "text-margin-x": -112,
+                "text-margin-y": -36,
+                "width": 2.5,
+                "z-index": 20,
+                "z-index-compare": "manual",
             },
         },
     ]
@@ -228,123 +407,249 @@ def get_supply_chain_stylesheet(
 
 
 def _supply_chain_node_positions(supply_chain: dict) -> dict[str, dict[str, int]]:
-    nodes_by_role: dict[str, list[dict]] = {
-        "material": supply_chain.get("material_nodes", []),
-        "fabric": [],
-        "garment": [],
-        "finishing": [],
-        "repair": [],
-    }
-    for node in supply_chain.get("nodes", []):
-        nodes_by_role.setdefault(node.get("role_group"), []).append(node)
-
-    role_y = {
-        "material": 30,
-        "fabric": 135,
-        "garment": 285,
-        "finishing": 395,
-        "repair": 495,
+    return {
+        VALUE_CHAIN_STEP_IDS["material"]: {"x": 190, "y": 70},
+        VALUE_CHAIN_STEP_IDS["fabric"]: {"x": 190, "y": 220},
+        VALUE_CHAIN_STEP_IDS["garment"]: {"x": 190, "y": 360},
+        VALUE_CHAIN_STEP_IDS["finishing"]: {"x": 190, "y": 500},
+        VALUE_CHAIN_CUSTOMER_ID: {"x": 370, "y": 620},
     }
 
-    def horizontal_positions(
-        nodes: list[dict],
-        *,
-        start_x: int,
-        max_x: int,
-    ) -> list[int]:
-        if not nodes:
-            return []
-        if len(nodes) == 1:
-            return [round((start_x + max_x) / 2)]
-        step = (max_x - start_x) / (len(nodes) - 1)
-        return [round(start_x + index * step) for index in range(len(nodes))]
 
-    positions: dict[str, dict[str, int]] = {}
-    for role_group, bounds in (
-        ("material", (45, 475)),
-        ("fabric", (20, 500)),
-        ("garment", (260, 260)),
-        ("finishing", (35, 485)),
-        ("repair", (155, 365)),
-    ):
-        role_nodes = nodes_by_role.get(role_group, [])
-        x_positions = horizontal_positions(
-            role_nodes,
-            start_x=bounds[0],
-            max_x=bounds[1],
-        )
-        for node, x_position in zip(role_nodes, x_positions):
-            node_id = (
-                f"material-{node['id']}"
-                if role_group == "material"
-                else f"manufacturer-{node['id']}"
-            )
-            positions[node_id] = {"x": x_position, "y": role_y[role_group]}
+def _value_chain_role_nodes(supply_chain: dict, role_group: str) -> list[dict]:
+    if role_group == "material":
+        return supply_chain.get("material_nodes", [])
+    return [
+        node
+        for node in supply_chain.get("nodes", [])
+        if node.get("role_group") == role_group
+    ]
 
-    return positions
+
+def _value_chain_count_label(singular: str, plural: str, count: int) -> str:
+    unit = singular if count == 1 else plural
+    return f"{count} {unit}" if count else "No linked data"
+
+
+def _garment_step_detail(garment_count: int, repair_count: int) -> str:
+    supplier_text = _value_chain_count_label("supplier", "suppliers", garment_count)
+    if not repair_count:
+        return supplier_text
+    partner = "repair partner" if repair_count == 1 else "repair partners"
+    return f"{supplier_text}\n{repair_count} {partner}"
+
+
+def _value_chain_step_node(
+    role_group: str,
+    label: str,
+    detail: str,
+    positions: dict[str, dict[str, int]],
+    *,
+    classes: str = "producer-node",
+    manufacturer_ids: list[int] | None = None,
+    material_ids: list[int] | None = None,
+) -> dict:
+    node_id = VALUE_CHAIN_STEP_IDS[role_group]
+    return {
+        "data": {
+            "id": node_id,
+            "label": f"{label}\n{detail}",
+            "role": label,
+            "role_group": role_group,
+            "manufacturer_ids": manufacturer_ids or [],
+            "material_ids": material_ids or [],
+        },
+        "classes": classes,
+        "position": positions[node_id],
+    }
 
 
 def get_supply_chain_elements(supply_chain: dict) -> list[dict]:
-    material_distances = {
-        edge["material_id"]: edge["distance_km"]
-        for edge in supply_chain.get("material_edges", [])
-    }
     positions = _supply_chain_node_positions(supply_chain)
-    elements = [
-        {
-            "data": {
-                "id": f"manufacturer-{node['id']}",
-                "manufacturer_id": node["id"],
-                "label": node["company"],
-                "role": node["role"],
-                "role_group": node["role_group"],
-                "location": node["location"],
-            },
-            "position": positions.get(f"manufacturer-{node['id']}"),
-        }
+    material_nodes = _value_chain_role_nodes(supply_chain, "material")
+    fabric_nodes = _value_chain_role_nodes(supply_chain, "fabric")
+    garment_nodes = _value_chain_role_nodes(supply_chain, "garment")
+    finishing_nodes = _value_chain_role_nodes(supply_chain, "finishing")
+    repair_nodes = _value_chain_role_nodes(supply_chain, "repair")
+    manufacturer_role_by_id = {
+        node["id"]: node.get("role_group")
         for node in supply_chain.get("nodes", [])
+        if node.get("id") is not None
+    }
+    has_value_chain_data = any(
+        [material_nodes, fabric_nodes, garment_nodes, finishing_nodes, repair_nodes]
+    )
+    if not has_value_chain_data:
+        return []
+
+    elements = [
+        _value_chain_step_node(
+            "material",
+            "Raw materials",
+            _value_chain_count_label("input", "inputs", len(material_nodes)),
+            positions,
+            classes="material-node",
+            material_ids=[node["id"] for node in material_nodes],
+        ),
+        _value_chain_step_node(
+            "fabric",
+            "Fabric manufacturer",
+            _value_chain_count_label("supplier", "suppliers", len(fabric_nodes)),
+            positions,
+            manufacturer_ids=[node["id"] for node in fabric_nodes],
+        ),
+        _value_chain_step_node(
+            "garment",
+            "Garment manufacturer",
+            _garment_step_detail(len(garment_nodes), len(repair_nodes)),
+            positions,
+            manufacturer_ids=[
+                node["id"] for node in [*garment_nodes, *repair_nodes]
+            ],
+        ),
+        _value_chain_step_node(
+            "finishing",
+            "Service provider",
+            _value_chain_count_label("finisher", "finishers", len(finishing_nodes)),
+            positions,
+            manufacturer_ids=[node["id"] for node in finishing_nodes],
+        ),
     ]
-    elements.extend(
+    elements.append(
         {
             "data": {
-                "id": f"distance-{edge['id']}",
-                "manufacturer_distance_id": edge["id"],
-                "source": f"manufacturer-{edge['source_manufacturer_id']}",
-                "target": f"manufacturer-{edge['destination_manufacturer_id']}",
-                "label": f"{edge['distance_km']:.1f} km",
-            }
+                "id": VALUE_CHAIN_CUSTOMER_ID,
+                "label": "Customer",
+                "role": "Customer",
+                "role_group": "customer",
+            },
+            "classes": "customer-node",
+            "position": positions[VALUE_CHAIN_CUSTOMER_ID],
         }
-        for edge in supply_chain.get("edges", [])
+    )
+    elements.append(
+        {
+            "data": {
+                "id": "deliver-label",
+                "label": "deliver",
+            },
+            "classes": "edge-label-node",
+            "position": {"x": 285, "y": 590},
+        }
     )
     elements.extend(
         {
             "data": {
-                "id": f"material-{node['id']}",
-                "material_id": node["id"],
-                "label": (
-                    f"{node['name'].title()}\n"
-                    f"{material_distances.get(node['id'], 0):,.0f} km upstream"
-                ),
-                "role": "Raw material",
-                "role_group": "material",
+                "id": edge_id,
+                "source": source,
+                "target": target,
+                "label": label,
+                "manufacturer_distance_ids": manufacturer_distance_ids,
+                "material_manufacturer_distance_ids": material_distance_ids,
             },
-            "position": positions.get(f"material-{node['id']}"),
+            "classes": classes,
         }
-        for node in supply_chain.get("material_nodes", [])
-    )
-    elements.extend(
-        {
-            "data": {
-                "id": f"material-distance-{edge['id']}",
-                "material_manufacturer_distance_id": edge["id"],
-                "source": f"material-{edge['material_id']}",
-                "target": f"manufacturer-{edge['destination_manufacturer_id']}",
-                "label": "",
-                "distance_km": edge["distance_km"],
-            },
-            "classes": "material-leg",
-        }
-        for edge in supply_chain.get("material_edges", [])
+        for edge_id, source, target, label, classes, manufacturer_distance_ids, material_distance_ids in [
+            (
+                "value-chain-material-to-fabric",
+                VALUE_CHAIN_STEP_IDS["material"],
+                VALUE_CHAIN_STEP_IDS["fabric"],
+                "feedstock",
+                "feedstock-leg",
+                [],
+                [edge["id"] for edge in supply_chain.get("material_edges", [])],
+            ),
+            (
+                "value-chain-fabric-to-garment",
+                VALUE_CHAIN_STEP_IDS["fabric"],
+                VALUE_CHAIN_STEP_IDS["garment"],
+                "raw fabrics",
+                "value-chain-leg",
+                [
+                    edge["id"]
+                    for edge in supply_chain.get("edges", [])
+                    if manufacturer_role_by_id.get(edge.get("source_manufacturer_id"))
+                    == "fabric"
+                    and manufacturer_role_by_id.get(
+                        edge.get("destination_manufacturer_id")
+                    )
+                    == "garment"
+                ],
+                [],
+            ),
+            (
+                "value-chain-garment-to-service",
+                VALUE_CHAIN_STEP_IDS["garment"],
+                VALUE_CHAIN_STEP_IDS["finishing"],
+                "raw garments",
+                "value-chain-leg",
+                [
+                    edge["id"]
+                    for edge in supply_chain.get("edges", [])
+                    if manufacturer_role_by_id.get(edge.get("source_manufacturer_id"))
+                    == "garment"
+                    and manufacturer_role_by_id.get(
+                        edge.get("destination_manufacturer_id")
+                    )
+                    == "finishing"
+                ],
+                [],
+            ),
+            (
+                "value-chain-service-to-customer",
+                VALUE_CHAIN_STEP_IDS["finishing"],
+                VALUE_CHAIN_CUSTOMER_ID,
+                "deliver",
+                "customer-leg deliver-leg",
+                [],
+                [],
+            ),
+            (
+                "value-chain-customer-to-service",
+                VALUE_CHAIN_CUSTOMER_ID,
+                VALUE_CHAIN_STEP_IDS["finishing"],
+                "repair",
+                "technical-loop customer-return-service",
+                [],
+                [],
+            ),
+            (
+                "value-chain-customer-to-garment",
+                VALUE_CHAIN_CUSTOMER_ID,
+                VALUE_CHAIN_STEP_IDS["garment"],
+                "repair / remanufacture",
+                "technical-loop customer-return-garment",
+                [],
+                [],
+            ),
+            (
+                "value-chain-customer-self-repair",
+                VALUE_CHAIN_CUSTOMER_ID,
+                VALUE_CHAIN_CUSTOMER_ID,
+                "self-repair",
+                "customer-self-repair",
+                [],
+                [],
+            ),
+            (
+                "value-chain-customer-to-fabric",
+                VALUE_CHAIN_CUSTOMER_ID,
+                VALUE_CHAIN_STEP_IDS["fabric"],
+                "reuse",
+                "technical-loop customer-return-fabric",
+                [],
+                [],
+            ),
+            (
+                "value-chain-customer-to-material",
+                VALUE_CHAIN_CUSTOMER_ID,
+                VALUE_CHAIN_STEP_IDS["material"],
+                "recycle",
+                "technical-loop customer-return-material",
+                [],
+                [],
+            ),
+        ]
     )
     return elements
 
@@ -486,7 +791,7 @@ def get_dashboard_layout(
                                             "padding": 20,
                                         },
                                         style={
-                                            "height": "520px",
+                                            "height": "760px",
                                             "width": "100%",
                                         },
                                         autolock=True,
@@ -502,9 +807,9 @@ def get_dashboard_layout(
                             ),
                             html.Section(
                                 [
-                                    html.H2("Supply Chain"),
+                                    html.H2("Value Chain"),
                                     html.P(
-                                        "Select a manufacturer, material, or transport leg to inspect its events."
+                                        "Select a material, producer, customer, transport leg, or circular loop to inspect its events."
                                     ),
                                     cyto.Cytoscape(
                                         id="supply-chain-chart",
@@ -516,7 +821,7 @@ def get_dashboard_layout(
                                         elements=get_supply_chain_elements(
                                             supply_chain
                                         ),
-                                        style={"height": "520px", "width": "100%"},
+                                        style={"height": "800px", "width": "100%"},
                                         minZoom=0.35,
                                         maxZoom=2,
                                         stylesheet=get_supply_chain_stylesheet(),
@@ -532,7 +837,7 @@ def get_dashboard_layout(
                         [
                             html.H2("Resource Events"),
                             html.P(
-                                "This table updates from either graph. Click any lifecycle or supply-chain node/edge above, or reset to see everything."
+                                "This table updates from either graph. Click any lifecycle or value-chain node/edge above, or reset to see everything."
                             ),
                             html.Button(
                                 "Show all events",
@@ -552,7 +857,7 @@ def get_dashboard_layout(
 
 
 def get_flow_chart_data() -> dict:
-    lifecycle_y = 0.5 * _chart_height
+    lifecycle_x = 260
     return {
         "elements": [
             {
@@ -560,28 +865,28 @@ def get_flow_chart_data() -> dict:
                     "id": f"{CeStages.Extraction.value}",
                     "label": f"{CeStages.Extraction.name}",
                 },
-                "position": {"x": 45, "y": lifecycle_y},
+                "position": {"x": lifecycle_x, "y": 70},
             },
             {
                 "data": {
                     "id": f"{CeStages.Production.value}",
                     "label": f"{CeStages.Production.name}",
                 },
-                "position": {"x": 190, "y": lifecycle_y},
+                "position": {"x": lifecycle_x, "y": 270},
             },
             {
                 "data": {
                     "id": f"{CeStages.Use.value}",
                     "label": f"{CeStages.Use.name}",
                 },
-                "position": {"x": 335, "y": lifecycle_y},
+                "position": {"x": lifecycle_x, "y": 470},
             },
             {
                 "data": {
                     "id": f"{CeStages.Waste.value}",
                     "label": f"{CeStages.Waste.name}",
                 },
-                "position": {"x": 480, "y": lifecycle_y},
+                "position": {"x": lifecycle_x, "y": 670},
             },
             {
                 "data": {
@@ -657,4 +962,4 @@ class CeLoops(Enum):
     Composting = 14
 
 
-_chart_height = 520
+_chart_height = 760

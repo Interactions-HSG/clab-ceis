@@ -18,48 +18,29 @@ from ceis_backend.utils import (
 from ceis_backend.wiser_bridge import WiserClient, WiserClientError
 
 
-DEMO_EMISSION_FACTORS = {
-    276186: 8.0,
-    6756: 6.0,
-    20936: 10.0,
-    6566: 1.0,
-    21893: 2.0,
-    7309: 0.2,
-    17901: 0.1,
-}
-
-
 class _ResourceEventEmissionClient:
     def __init__(self, wiser_client: WiserClient) -> None:
         self._wiser_client = wiser_client
         self._cache: dict[int, float | None] = {}
-        self._demo_activity_ids: set[int] = set()
-        self.used_demo_factors = False
+        self.has_missing_factors = False
 
     def reset_calculation_scope(self) -> None:
-        self.used_demo_factors = False
+        self.has_missing_factors = False
 
     def get_emission_per_unit(self, activity_id: int) -> float | None:
         if activity_id in self._cache:
-            if activity_id in self._demo_activity_ids:
-                self.used_demo_factors = True
-            return self._cache[activity_id]
+            emission_per_unit = self._cache[activity_id]
+            if emission_per_unit is None:
+                self.has_missing_factors = True
+            return emission_per_unit
 
-        used_demo_factor = False
-        emission_per_unit = None
         try:
             emission_per_unit = self._wiser_client.get_emission_per_unit(activity_id)
         except WiserClientError:
-            emission_per_unit = DEMO_EMISSION_FACTORS.get(activity_id)
-            used_demo_factor = emission_per_unit is not None
+            emission_per_unit = None
 
-        if emission_per_unit is None and activity_id in DEMO_EMISSION_FACTORS:
-            emission_per_unit = DEMO_EMISSION_FACTORS[activity_id]
-            used_demo_factor = True
-
-        if used_demo_factor:
-            self.used_demo_factors = True
-            self._demo_activity_ids.add(activity_id)
+        if emission_per_unit is None:
+            self.has_missing_factors = True
 
         self._cache[activity_id] = emission_per_unit
         return emission_per_unit
@@ -199,12 +180,18 @@ def _calculate_order_event_co2(
                 "co2eq_calculation_status": "missing_inputs",
                 "co2eq_calculation_note": str(error.detail),
             }
+        if emission_client.has_missing_factors:
+            return {
+                "co2eq_calculation_status": "missing_factor",
+                "co2eq_calculation_note": (
+                    "One or more WISER emission factors are unavailable."
+                ),
+            }
         total_co2 = _total_garment_co2(emission_details)
-        if _calculation_status(emission_client) == "calculated":
-            db_update_garment_inventory_co2(int(garment_inventory_id), total_co2)
+        db_update_garment_inventory_co2(int(garment_inventory_id), total_co2)
         return {
             "co2eq": round(total_co2, 6),
-            "co2eq_calculation_status": _calculation_status(emission_client),
+            "co2eq_calculation_status": "calculated",
             "co2eq_calculation_note": "Calculated from linked garment inventory.",
         }
 
@@ -228,9 +215,16 @@ def _calculate_order_event_co2(
             "co2eq_calculation_status": "missing_inputs",
             "co2eq_calculation_note": str(error.detail),
         }
+    if emission_client.has_missing_factors:
+        return {
+            "co2eq_calculation_status": "missing_factor",
+            "co2eq_calculation_note": (
+                "One or more WISER emission factors are unavailable."
+            ),
+        }
     return {
         "co2eq": round(_total_garment_co2(emission_details), 6),
-        "co2eq_calculation_status": _calculation_status(emission_client),
+        "co2eq_calculation_status": "calculated",
         "co2eq_calculation_note": "Calculated from garment recipe and material.",
     }
 
@@ -258,7 +252,7 @@ def _calculate_material_event_co2(
 
     return {
         "co2eq": round(emission_per_unit * float(material["kg_per_sqm"]), 6),
-        "co2eq_calculation_status": _calculation_status(emission_client),
+        "co2eq_calculation_status": "calculated",
         "co2eq_calculation_note": "Calculated per square meter of material.",
     }
 
@@ -293,7 +287,7 @@ def _calculate_material_transport_event_co2(
     )
     return {
         "co2eq": round(float(co2eq or 0), 6),
-        "co2eq_calculation_status": _calculation_status(emission_client),
+        "co2eq_calculation_status": "calculated",
         "co2eq_calculation_note": (
             "Calculated per square meter of material transported."
         ),
@@ -304,10 +298,6 @@ def _total_garment_co2(emission_details: Any) -> float:
     return float(emission_details.fabric_blocks.total_emission) + float(
         emission_details.processes.total_emission
     )
-
-
-def _calculation_status(emission_client: _ResourceEventEmissionClient) -> str:
-    return "estimated" if emission_client.used_demo_factors else "calculated"
 
 
 def _get_order_details(order_ids: set[int]) -> dict[int, dict[str, Any]]:

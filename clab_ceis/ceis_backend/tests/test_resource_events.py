@@ -368,7 +368,7 @@ def test_resource_event_emissions_calculate_material_and_material_transport(
     assert transport_event["co2eq_calculation_status"] == "calculated"
 
 
-def test_resource_event_emissions_use_demo_factors_when_wiser_is_unavailable(
+def test_resource_event_emissions_require_wiser_factor_when_wiser_is_unavailable(
     clean_db,
 ):
     conn = _connect()
@@ -392,8 +392,8 @@ def test_resource_event_emissions_use_demo_factors_when_wiser_is_unavailable(
         event for event in events if event["material_id"] == material_id
     )
 
-    assert material_event["co2eq"] == 1.68
-    assert material_event["co2eq_calculation_status"] == "estimated"
+    assert material_event["co2eq"] is None
+    assert material_event["co2eq_calculation_status"] == "missing_factor"
 
     conn = _connect()
     cursor = conn.cursor()
