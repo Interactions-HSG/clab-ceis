@@ -13,6 +13,7 @@ from ceis_backend.utils import (
     calculate_replacement_fabric_blocks_emissions,
     refresh_sold_garment_co2_values,
 )
+from ceis_backend.resource_event_emissions import enrich_resource_events_with_co2
 from ceis_backend.designer_balance import (
     get_designer_garment_reference_data,
     get_designer_balance_options,
@@ -131,8 +132,9 @@ def get_resource_events(
     lifecycle_node: str | None = None,
     lifecycle_edge: str | None = None,
     supply_chain_only: bool = False,
+    wiser_client: WiserClient = Depends(get_wiser_client),
 ):
-    return db_get_resource_events(
+    events = db_get_resource_events(
         manufacturer_id=manufacturer_id,
         manufacturer_distance_id=manufacturer_distance_id,
         material_id=material_id,
@@ -141,6 +143,10 @@ def get_resource_events(
         lifecycle_edge=lifecycle_edge,
         supply_chain_only=supply_chain_only,
     )
+    try:
+        return enrich_resource_events_with_co2(events, wiser_client)
+    except WiserClientError:
+        return events
 
 
 @app.post("/orders", status_code=201)

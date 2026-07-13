@@ -1,4 +1,5 @@
 import sqlite3
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -12,10 +13,24 @@ from ceis_backend.queries import (
     db_get_resource_events,
     db_get_supply_chain_graph,
 )
+from ceis_backend.resource_event_emissions import enrich_resource_events_with_co2
+from ceis_backend.wiser_bridge import WiserClientError
 
 
 def _connect():
     return sqlite3.connect("ceis_backend.db")
+
+
+def _build_mock_wiser_client(emissions_by_activity: dict[int, float | None]):
+    wiser_client = MagicMock()
+    wiser_client.get_emission_per_unit.side_effect = emissions_by_activity.get
+    return wiser_client
+
+
+def _build_failing_wiser_client():
+    wiser_client = MagicMock()
+    wiser_client.get_emission_per_unit.side_effect = WiserClientError("offline")
+    return wiser_client
 
 
 @pytest.fixture
@@ -302,3 +317,150 @@ def test_order_delivers_stock_then_requests_production(clean_db):
         "Deliver",
         "Production",
     }
+
+
+def test_resource_event_emissions_calculate_material_and_material_transport(
+    clean_db,
+):
+    conn = _connect()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO materials (name, kg_per_sqm, activity_id) VALUES ('hemp', 2, 101)"
+    )
+    material_id = cursor.lastrowid
+    cursor.execute(
+        """
+        INSERT INTO manufacturers (company, role, role_group, location)
+        VALUES ('Fabric Co', 'fabric manufacturer', 'fabric', 'Fabric town')
+        """
+    )
+    manufacturer_id = cursor.lastrowid
+    cursor.execute(
+        """
+        INSERT INTO material_manufacturer_distances (
+            material_id, destination_manufacturer_id, distance_km
+        ) VALUES (?, ?, 50)
+        """,
+        (material_id, manufacturer_id),
+    )
+    material_distance_id = cursor.lastrowid
+    seed_resource_events(cursor)
+    conn.commit()
+    conn.close()
+
+    events = enrich_resource_events_with_co2(
+        db_get_resource_events(),
+        _build_mock_wiser_client({101: 3.0, 17901: 0.5}),
+    )
+
+    material_event = next(
+        event for event in events if event["material_id"] == material_id
+    )
+    transport_event = next(
+        event
+        for event in events
+        if event["material_manufacturer_distance_id"] == material_distance_id
+    )
+
+    assert material_event["co2eq"] == 6.0
+    assert material_event["co2eq_calculation_status"] == "calculated"
+    assert transport_event["co2eq"] == 0.05
+    assert transport_event["co2eq_calculation_status"] == "calculated"
+
+
+def test_resource_event_emissions_use_demo_factors_when_wiser_is_unavailable(
+    clean_db,
+):
+    conn = _connect()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO materials (name, kg_per_sqm, activity_id)
+        VALUES ('hemp', 0.21, 276186)
+        """
+    )
+    material_id = cursor.lastrowid
+    seed_resource_events(cursor)
+    conn.commit()
+    conn.close()
+
+    events = enrich_resource_events_with_co2(
+        db_get_resource_events(),
+        _build_failing_wiser_client(),
+    )
+    material_event = next(
+        event for event in events if event["material_id"] == material_id
+    )
+
+    assert material_event["co2eq"] == 1.68
+    assert material_event["co2eq_calculation_status"] == "estimated"
+
+    conn = _connect()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT co2eq FROM resource_events WHERE material_id = ?",
+        (material_id,),
+    )
+    assert cursor.fetchone()[0] is None
+    conn.close()
+
+
+def test_resource_event_emissions_calculate_production_order_from_recipe(clean_db):
+    conn = _connect()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO garment_types (name, price_chf) VALUES ('Test shirt', 100)"
+    )
+    garment_type_id = cursor.lastrowid
+    cursor.execute(
+        "INSERT INTO materials (name, kg_per_sqm, activity_id) VALUES ('hemp', 0.5, 101)"
+    )
+    material_id = cursor.lastrowid
+    cursor.execute("INSERT INTO fabric_block_types (name, sqm) VALUES ('block', 2)")
+    fabric_block_type_id = cursor.lastrowid
+    cursor.execute(
+        "INSERT INTO process_types (name, unit, activity_id) VALUES ('sewing', 'kWh', 102)"
+    )
+    process_id = cursor.lastrowid
+    cursor.execute(
+        """
+        INSERT INTO garment_recipe_fabric_blocks
+            (garment_type, fabric_block_id, amount)
+        VALUES (?, ?, 1)
+        """,
+        (garment_type_id, fabric_block_type_id),
+    )
+    cursor.execute(
+        """
+        INSERT INTO garment_recipe_materials (garment_type, material_id)
+        VALUES (?, ?)
+        """,
+        (garment_type_id, material_id),
+    )
+    cursor.execute(
+        """
+        INSERT INTO garment_recipe_processes (garment_type, process_id, amount)
+        VALUES (?, ?, 2)
+        """,
+        (garment_type_id, process_id),
+    )
+    cursor.execute(
+        """
+        INSERT INTO manufacturers (company, role, role_group, location)
+        VALUES ('Maker', 'garment manufacturer', 'garment', 'A')
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    db_create_order(garment_type_id, material_id)
+
+    events = enrich_resource_events_with_co2(
+        db_get_resource_events(),
+        _build_mock_wiser_client({101: 10.0, 102: 1.0, 17901: 0.0}),
+    )
+    order_event = next(event for event in events if event["order_id"] is not None)
+
+    assert order_event["event_trigger"] == "Production"
+    assert order_event["co2eq"] == 12.0
+    assert order_event["co2eq_calculation_status"] == "calculated"

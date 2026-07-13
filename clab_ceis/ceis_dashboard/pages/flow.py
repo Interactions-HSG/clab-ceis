@@ -17,6 +17,7 @@ EVENT_COLUMNS = [
     {"name": "Time", "id": "time"},
     {"name": "Resource Type", "id": "resource_type"},
     {"name": "CO2eq", "id": "co2eq"},
+    {"name": "CO2 Status", "id": "co2eq_calculation_status"},
     {"name": "At", "id": "at"},
     {"name": "From", "id": "from"},
     {"name": "To", "id": "to"},
