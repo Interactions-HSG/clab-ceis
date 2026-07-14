@@ -28,9 +28,6 @@
         },
         "transport": {
             "cost_per_ton_km_chf": 0.42
-        },
-        "default": {
-            "cost_per_unit_chf": 10.0
         }
     },
     "delay_model": {

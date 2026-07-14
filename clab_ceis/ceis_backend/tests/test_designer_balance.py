@@ -1,9 +1,11 @@
 import sqlite3
 from unittest.mock import MagicMock
 
+import pytest
 from fastapi.testclient import TestClient
 
 from ceis_backend.db_init import init_sqlite_db
+from ceis_backend.designer_balance import _process_cost, load_designer_balance_mock_data
 from ceis_backend.main import app
 
 
@@ -144,6 +146,16 @@ def test_designer_balance_endpoint_returns_balanced_scenario(tmp_path, monkeypat
     assert payload["material"]["cost_per_sqm_chf"] == 5.04
     for row in payload["bill_of_materials"]:
         assert row["economic_cost_chf"] == round(row["total_sqm"] * 5.04, 2)
+    material_transport_rows = [
+        row
+        for row in payload["bill_of_processes"]
+        if row["process"] == "material transport to manufacturer"
+    ]
+    assert material_transport_rows
+    assert sum(
+        row["economic_cost_chf"] for row in material_transport_rows
+    ) == pytest.approx(0.76)
+    assert all(row["economic_cost_chf"] < 1 for row in material_transport_rows)
     assert any(row["process_type"] == "transport" for row in payload["process_table"])
 
 
@@ -259,6 +271,19 @@ def test_designer_garment_reference_endpoint_returns_design_inputs(
     assert hemp_block["sqm"] == 0.512
     assert hemp_block["weight_kg"] == 0.108
     assert hemp_block["material_cost_chf"] == 2.58
-    assert hemp_block["block_process_cost_chf"] == 0.09
+    assert hemp_block["block_process_cost_chf"] == 0.3
+    transport_process = next(
+        process
+        for process in hemp_block["processes"]
+        if process["process"] == "material transport to manufacturer"
+    )
+    assert transport_process["economic_cost_chf"] == 0.21
     assert hemp_block["co2eq_kg"] == 0.929
     assert hemp_block["processes"]
+
+
+def test_unknown_process_cost_has_no_default():
+    with pytest.raises(KeyError, match="No economic cost configured"):
+        _process_cost(
+            "unconfigured process", 1, load_designer_balance_mock_data()
+        )
