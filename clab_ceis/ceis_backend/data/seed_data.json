@@ -1,0 +1,254 @@
+{
+  "materials": [
+    {"name": "cotton", "kg_per_sqm": 0.14, "cost_per_sqm_chf": 2.52, "activity_id": 6756},
+    {"name": "hemp", "kg_per_sqm": 0.21, "cost_per_sqm_chf": 5.04, "activity_id": 276186},
+    {"name": "silk", "kg_per_sqm": 0.082, "cost_per_sqm_chf": 3.444, "activity_id": 20936},
+    {"name": "mikado silk", "kg_per_sqm": 0.13, "cost_per_sqm_chf": 6.37, "activity_id": 20936}
+  ],
+  "locations": [
+    {"name": "St. Gallen"},
+    {"name": "Sigmaringen"},
+    {"name": "Dornbirn"},
+    {"name": "Ravensburg"}
+  ],
+  "fabric_block_types": [
+    {"name": "80x64", "sqm": 0.512},
+    {"name": "40x14", "sqm": 0.056},
+    {"name": "20x15", "sqm": 0.03},
+    {"name": "64x40", "sqm": 0.256},
+    {"name": "100x64", "sqm": 0.64},
+    {"name": "100x80", "sqm": 0.8},
+    {"name": "140x14", "sqm": 0.196},
+    {"name": "140x28", "sqm": 0.392},
+    {"name": "160x100", "sqm": 1.6},
+    {"name": "4x48", "sqm": 0.0192}
+  ],
+  "process_types": [
+    {"name": "sewing", "unit": "kWh", "activity_id": 6566},
+    {"name": "steaming", "unit": "kWh", "activity_id": 6566},
+    {"name": "washing", "unit": "kWh", "activity_id": 6566},
+    {"name": "dyeing", "unit": "kg", "activity_id": 21893},
+    {"name": "transport", "unit": "tkm", "activity_id": 17901}
+  ],
+  "garment_types": [
+    {
+      "name": "Basic Trousers",
+      "price_chf": 246.7,
+      "materials": ["hemp", "cotton"],
+      "fabric_blocks": {"100x64": 2, "64x40": 2, "20x15": 4}
+    },
+    {
+      "name": "Full Trousers",
+      "price_chf": 263.5,
+      "materials": ["hemp", "cotton"],
+      "fabric_blocks": {"100x64": 2, "64x40": 4, "20x15": 4}
+    },
+    {
+      "name": "Basic Jumpsuit short sleeves",
+      "price_chf": 282.2,
+      "materials": ["hemp", "cotton"],
+      "fabric_blocks": {"80x64": 1, "100x64": 2, "140x14": 1, "40x14": 4}
+    },
+    {
+      "name": "Basic Jumpsuit long sleeves",
+      "price_chf": 299.0,
+      "materials": ["hemp", "cotton"],
+      "fabric_blocks": {"80x64": 1, "100x64": 2, "140x14": 1, "40x14": 4, "64x40": 2}
+    },
+    {
+      "name": "Elegant cowl neck top",
+      "price_chf": 124.0,
+      "materials": ["silk"],
+      "fabric_blocks": {"64x40": 2, "4x48": 2}
+    },
+    {
+      "name": "Elegant cowl neck dress",
+      "price_chf": 146.4,
+      "materials": ["silk"],
+      "fabric_blocks": {"64x40": 4, "4x48": 2}
+    },
+    {
+      "name": "Wrap Skirt",
+      "price_chf": 136.6,
+      "materials": ["hemp"],
+      "fabric_blocks": {"100x80": 1, "40x14": 2, "140x14": 1}
+    },
+    {
+      "name": "Daily dress with pocket",
+      "price_chf": 168.4,
+      "materials": ["hemp", "cotton"],
+      "fabric_blocks": {"140x28": 4, "140x14": 2, "40x14": 2}
+    },
+    {
+      "name": "Cocktail fitted dress",
+      "price_chf": 339.2,
+      "materials": ["silk"],
+      "fabric_blocks": {"100x80": 2, "140x28": 4}
+    },
+    {
+      "name": "Long tabard",
+      "price_chf": 128.8,
+      "materials": ["hemp"],
+      "fabric_blocks": {"140x28": 4, "40x14": 1}
+    },
+    {
+      "name": "Cocoon jacket",
+      "price_chf": 240.6,
+      "materials": ["hemp"],
+      "fabric_blocks": {"100x80": 3, "40x14": 6}
+    },
+    {
+      "name": "Orka jacket",
+      "price_chf": 101.6,
+      "materials": ["cotton"],
+      "fabric_blocks": {"100x80": 1}
+    },
+    {
+      "name": "Nordlys Dress",
+      "price_chf": 279.6,
+      "materials": ["cotton"],
+      "fabric_blocks": {"160x100": 1, "100x80": 1}
+    },
+    {
+      "name": "Mangata Dress",
+      "price_chf": 280.2,
+      "materials": ["cotton"],
+      "fabric_blocks": {"160x100": 1, "100x80": 1, "4x48": 1}
+    },
+    {
+      "name": "Måne top",
+      "price_chf": 127.8,
+      "materials": [],
+      "fabric_blocks": {"100x80": 1, "4x48": 2}
+    },
+    {
+      "name": "Sommar Skirt",
+      "price_chf": 183.2,
+      "materials": [],
+      "fabric_blocks": {"160x100": 1}
+    },
+    {
+      "name": "Basic Unisex Shirt with pocket",
+      "price_chf": 131.0,
+      "materials": [],
+      "fabric_blocks": {"80x64": 1, "64x40": 4, "40x14": 3}
+    },
+    {
+      "name": "Basic Crop Top",
+      "price_chf": 97.4,
+      "materials": ["hemp"],
+      "fabric_blocks": {"80x64": 1, "40x14": 3}
+    }
+  ],
+  "default_garment_processes": [
+    {"process": "sewing", "amount": 0.042},
+    {"process": "steaming", "amount": 0.22}
+  ],
+  "fabric_block_processes": [
+    {"fabric_block": "80x64", "process": "dyeing", "amount": 0.01},
+    {"fabric_block": "40x14", "process": "dyeing", "amount": 0.01},
+    {"fabric_block": "20x15", "process": "dyeing", "amount": 0.01},
+    {"fabric_block": "64x40", "process": "dyeing", "amount": 0.01},
+    {"fabric_block": "100x64", "process": "dyeing", "amount": 0.01},
+    {"fabric_block": "100x80", "process": "dyeing", "amount": 0.01},
+    {"fabric_block": "140x14", "process": "dyeing", "amount": 0.01},
+    {"fabric_block": "140x28", "process": "dyeing", "amount": 0.01},
+    {"fabric_block": "160x100", "process": "dyeing", "amount": 0.01},
+    {"fabric_block": "4x48", "process": "dyeing", "amount": 0.01}
+  ],
+  "demo_garments": [
+    {
+      "garment_type": "Basic Crop Top",
+      "co2eq": null,
+      "price": 100,
+      "sold": 1,
+      "fabric_blocks": [
+        {"type": "80x64", "location": "St. Gallen", "material": "hemp", "quality": 87, "second_life": 1},
+        {"type": "40x14", "location": "Dornbirn", "material": "hemp", "quality": 93, "second_life": 1},
+        {"type": "40x14", "location": "St. Gallen", "material": "hemp", "quality": 100, "second_life": 0},
+        {"type": "40x14", "location": "Sigmaringen", "material": "hemp", "quality": 100, "second_life": 0}
+      ]
+    },
+    {
+      "garment_type": "Wrap Skirt",
+      "co2eq": null,
+      "price": 100,
+      "sold": 1,
+      "fabric_blocks": [
+        {"type": "100x80", "location": "St. Gallen", "material": "hemp", "quality": 89, "second_life": 1},
+        {"type": "40x14", "location": "Ravensburg", "material": "hemp", "quality": 100, "second_life": 0},
+        {"type": "40x14", "location": "Dornbirn", "material": "hemp", "quality": 100, "second_life": 0},
+        {"type": "140x14", "location": "Ravensburg", "material": "hemp", "quality": 100, "second_life": 0}
+      ]
+    },
+    {
+      "garment_type": "Basic Trousers",
+      "co2eq": null,
+      "price": 100,
+      "sold": 1,
+      "fabric_blocks": [
+        {"type": "100x64", "location": "Sigmaringen", "material": "cotton", "quality": 88, "second_life": 1},
+        {"type": "100x64", "location": "St. Gallen", "material": "cotton", "quality": 100, "second_life": 0},
+        {"type": "64x40", "location": "St. Gallen", "material": "cotton", "quality": 100, "second_life": 0},
+        {"type": "64x40", "location": "Dornbirn", "material": "cotton", "quality": 100, "second_life": 0},
+        {"type": "20x15", "location": "St. Gallen", "material": "cotton", "quality": 100, "second_life": 0},
+        {"type": "20x15", "location": "Sigmaringen", "material": "cotton", "quality": 100, "second_life": 0},
+        {"type": "20x15", "location": "Ravensburg", "material": "cotton", "quality": 100, "second_life": 0},
+        {"type": "20x15", "location": "Dornbirn", "material": "cotton", "quality": 100, "second_life": 0}
+      ]
+    },
+    {
+      "garment_type": "Elegant cowl neck top",
+      "co2eq": null,
+      "price": 100,
+      "sold": 0,
+      "fabric_blocks": [
+        {"type": "64x40", "location": "St. Gallen", "material": "silk", "quality": 86, "second_life": 1},
+        {"type": "64x40", "location": "Ravensburg", "material": "silk", "quality": 100, "second_life": 0},
+        {"type": "4x48", "location": "Dornbirn", "material": "silk", "quality": 100, "second_life": 0},
+        {"type": "4x48", "location": "Sigmaringen", "material": "silk", "quality": 100, "second_life": 0}
+      ]
+    }
+  ],
+  "loose_demo_fabric_blocks": [
+    {"type": "64x40", "location": "St. Gallen", "material": "silk", "quality": 91, "second_life": 1}
+  ],
+  "material_supply_chain": [
+    {"material": "hemp", "distance_km": 4570},
+    {"material": "cotton", "distance_km": 4570},
+    {"material": "silk", "distance_km": 4570}
+  ],
+  "resource_events": {
+    "defaults": {"request_type": "Seed", "status": "Done", "co2eq": null},
+    "manufacturer_roles": {
+      "fabric": {"event_trigger": "Supply", "lifecycle_node": "Extraction", "lifecycle_edge": null},
+      "garment": {"event_trigger": "Production", "lifecycle_node": "Production", "lifecycle_edge": null},
+      "repair": {"event_trigger": "Repair", "lifecycle_node": null, "lifecycle_edge": "Repair"},
+      "default": {"event_trigger": "Finishing", "lifecycle_node": "Production", "lifecycle_edge": null}
+    },
+    "lifecycle_nodes": {
+      "resource_type": "Lifecycle stage",
+      "values": ["Extraction", "Production", "Use", "Waste"]
+    },
+    "lifecycle_edges": {
+      "resource_type": "Lifecycle transition",
+      "values": ["Supply", "Deliver", "Release", "Repair", "Remanufacture", "Recycle", "Composting"]
+    },
+    "materials": {
+      "names": ["hemp", "cotton", "silk"],
+      "event_trigger": "Extraction",
+      "lifecycle_node": "Extraction"
+    },
+    "material_transport": {
+      "event_trigger": "Supply",
+      "resource_type": "Material transport",
+      "lifecycle_edge": "Supply"
+    },
+    "manufacturer_transport": {
+      "event_trigger": "Transport",
+      "resource_type": "Transport leg",
+      "fabric_lifecycle_edge": "Supply",
+      "default_lifecycle_edge": "Deliver"
+    }
+  }
+}
