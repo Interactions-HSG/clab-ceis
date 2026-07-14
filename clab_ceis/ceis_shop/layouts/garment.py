@@ -119,7 +119,10 @@ def _get_alternative_emissions(co2_payload: dict) -> float | None:
 
 
 def render_co2_content(
-    selected_material_name: str, co2_payload: dict, base_price_chf: float | None = None
+    selected_material_name: str,
+    co2_payload: dict,
+    base_price_chf: float | None = None,
+    material_cost_per_sqm_chf: float | None = None,
 ) -> html.Div:
     try:
         fabric_blocks_total = co2_payload["fabric_blocks"]["total_emission"]
@@ -144,6 +147,11 @@ def render_co2_content(
         children=[
             html.H3("CO2 Emissions"),
             html.P(f"Material for CO2 calculation: {selected_material_name}."),
+            (
+                html.P(f"Fabric rate: CHF {material_cost_per_sqm_chf:.2f}/m².")
+                if material_cost_per_sqm_chf is not None
+                else html.P("Fabric rate unavailable.")
+            ),
             html.P(f"Total: {total_emission:.3f} kg CO2eq"),
             (
                 html.P(
@@ -233,7 +241,13 @@ def garment_page(garment_type_id: int):
             )
 
         material_options = [
-            {"label": material["name"], "value": material["id"]}
+            {
+                "label": (
+                    f"{material['name']} "
+                    f"(CHF {float(material['cost_per_sqm_chf']):.2f}/m²)"
+                ),
+                "value": material["id"],
+            }
             for material in materials
         ]
         selected_material = materials[0] if len(materials) == 1 else None

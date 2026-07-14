@@ -94,6 +94,7 @@ class ProcessTypeCreate(BaseModel):
 class MaterialCreate(BaseModel):
     name: str
     kg_per_sqm: float
+    cost_per_sqm_chf: float
     activity_id: int
 
 

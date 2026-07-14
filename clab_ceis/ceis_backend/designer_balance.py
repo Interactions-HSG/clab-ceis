@@ -6,6 +6,7 @@ from functools import lru_cache
 from fastapi import HTTPException
 
 from ceis_backend.config import BASE_DIR
+from ceis_backend.costing import calculate_material_cost_chf
 from ceis_backend.data.location_details import (
     ACTIVITY_ID_LONG_DISTANCE_TRANSPORT,
     ACTIVITY_ID_TRANSPORT,
@@ -61,8 +62,8 @@ def get_designer_garment_reference_data(wiser_client: WiserClient) -> dict:
         materials.append(
             {
                 **material,
-                "cost_per_kg_chf": _safe_round(
-                    float(material_mock.get("cost_per_kg_chf", 0))
+                "cost_per_sqm_chf": _safe_round(
+                    float(material["cost_per_sqm_chf"]), 3
                 ),
                 "longevity_wears": int(material_mock.get("longevity_wears", 0)),
                 "co2eq_per_kg": (
@@ -202,7 +203,9 @@ def _build_fabric_block_reference_row(
         if material_emission_per_unit is not None
         else None
     )
-    material_cost = float(material.get("cost_per_kg_chf") or 0) * block_weight_kg
+    material_cost = calculate_material_cost_chf(
+        float(fabric_block_type["sqm"]), float(material["cost_per_sqm_chf"])
+    )
 
     block_processes, block_process_cost, block_process_co2 = (
         _build_fabric_block_process_breakdown(
@@ -287,7 +290,7 @@ def _build_fabric_block_reference_rows(
 
 def _mock_material_data(material_name: str, mock_data: dict) -> dict:
     materials = mock_data.get("materials", {})
-    return materials.get(material_name.lower(), materials.get("default", {}))
+    return materials[material_name.lower()]
 
 
 def _process_cost(process_name: str, amount: float, mock_data: dict) -> float:
@@ -542,7 +545,7 @@ def get_designer_balance_scenario(
     )
 
     material_mock = _mock_material_data(selected_material["name"], mock_data)
-    material_cost_per_kg = float(material_mock.get("cost_per_kg_chf", 0))
+    material_cost_per_sqm = float(selected_material["cost_per_sqm_chf"])
 
     bom_by_block_name: dict[str, dict] = {}
     bop_rows: list[dict] = []
@@ -556,7 +559,9 @@ def get_designer_balance_scenario(
             if selected_material_kg_per_sqm > 0
             else 0.0
         )
-        material_cost = float(fabric_block.weight_kg or 0) * material_cost_per_kg
+        material_cost = calculate_material_cost_chf(
+            sqm_per_unit, material_cost_per_sqm
+        )
         if fabric_block.name not in bom_by_block_name:
             bom_by_block_name[fabric_block.name] = {
                 "fabric_block": fabric_block.name,
@@ -691,7 +696,7 @@ def get_designer_balance_scenario(
         "material": {
             "id": selected_material["id"],
             "name": selected_material["name"],
-            "cost_per_kg_chf": _safe_round(material_cost_per_kg),
+            "cost_per_sqm_chf": _safe_round(material_cost_per_sqm, 3),
             "longevity_wears": int(material_mock.get("longevity_wears", 0)),
         },
         "options": {

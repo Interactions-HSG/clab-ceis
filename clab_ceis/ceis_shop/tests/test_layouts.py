@@ -60,8 +60,8 @@ def test_garment_page_contains_recipe_and_co2_sections():
         materials_response = Mock()
         materials_response.raise_for_status.return_value = None
         materials_response.json.return_value = [
-            {"id": 1, "name": "hemp"},
-            {"id": 2, "name": "cotton"},
+            {"id": 1, "name": "hemp", "cost_per_sqm_chf": 5.04},
+            {"id": 2, "name": "cotton", "cost_per_sqm_chf": 2.52},
         ]
 
         recipe_fabric_blocks_response = Mock()
@@ -102,7 +102,9 @@ def test_garment_page_auto_uses_single_material_for_co2_without_blocking_layout(
 
         materials_response = Mock()
         materials_response.raise_for_status.return_value = None
-        materials_response.json.return_value = [{"id": 1, "name": "hemp"}]
+        materials_response.json.return_value = [
+            {"id": 1, "name": "hemp", "cost_per_sqm_chf": 5.04}
+        ]
 
         recipe_fabric_blocks_response = Mock()
         recipe_fabric_blocks_response.raise_for_status.return_value = None
@@ -180,6 +182,7 @@ def test_render_co2_content_shows_alternatives_and_capped_discount():
             "processes": {"total_emission": 1.0, "details": []},
         },
         base_price_chf=100.0,
+        material_cost_per_sqm_chf=5.04,
     )
 
     text = str(layout)
@@ -197,6 +200,7 @@ def test_render_co2_content_shows_alternatives_and_capped_discount():
         "1.450 kg CO2eq, saving 1.550 kg CO2eq." in text
     )
     assert "Price: CHF 40.00 (60% discount from CHF 100.00)" in text
+    assert "Fabric rate: CHF 5.04/m²." in text
 
 
 def test_render_co2_content_shows_no_savings_message_without_replacements():

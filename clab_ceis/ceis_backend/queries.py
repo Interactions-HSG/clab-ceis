@@ -72,7 +72,11 @@ def db_get_materials() -> list[dict]:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT id, name, kg_per_sqm, activity_id FROM materials ORDER BY name"
+        """
+        SELECT id, name, kg_per_sqm, cost_per_sqm_chf, activity_id
+        FROM materials
+        ORDER BY name
+        """
     )
     materials = cursor.fetchall()
     conn.close()
@@ -81,7 +85,8 @@ def db_get_materials() -> list[dict]:
             "id": row[0],
             "name": row[1],
             "kg_per_sqm": row[2],
-            "activity_id": row[3],
+            "cost_per_sqm_chf": row[3],
+            "activity_id": row[4],
         }
         for row in materials
     ]
@@ -378,7 +383,7 @@ def db_get_materials_for_garment(garment_type_id: int) -> list[dict]:
     cursor = conn.cursor()
     cursor.execute(
         """
-        SELECT m.id, m.name, m.kg_per_sqm, m.activity_id
+        SELECT m.id, m.name, m.kg_per_sqm, m.cost_per_sqm_chf, m.activity_id
         FROM garment_recipe_materials grm
         JOIN materials m ON m.id = grm.material_id
         WHERE grm.garment_type = ?
@@ -393,7 +398,8 @@ def db_get_materials_for_garment(garment_type_id: int) -> list[dict]:
             "id": row[0],
             "name": row[1],
             "kg_per_sqm": row[2],
-            "activity_id": row[3],
+            "cost_per_sqm_chf": row[3],
+            "activity_id": row[4],
         }
         for row in materials
     ]
@@ -425,7 +431,9 @@ def db_get_recipe_fabric_blocks(garment_type_id: int) -> list[dict]:
     ]
 
 
-def db_upsert_material(name: str, kg_per_sqm: float, activity_id: int) -> dict:
+def db_upsert_material(
+    name: str, kg_per_sqm: float, cost_per_sqm_chf: float, activity_id: int
+) -> dict:
     """Create or update a material by name."""
     normalized_name = name.strip()
     if not normalized_name:
@@ -446,16 +454,21 @@ def db_upsert_material(name: str, kg_per_sqm: float, activity_id: int) -> dict:
 
         cursor.execute(
             """
-            INSERT INTO materials (name, kg_per_sqm, activity_id)
-            VALUES (?, ?, ?)
+            INSERT INTO materials (name, kg_per_sqm, cost_per_sqm_chf, activity_id)
+            VALUES (?, ?, ?, ?)
             ON CONFLICT(name) DO UPDATE SET
                 kg_per_sqm = excluded.kg_per_sqm,
+                cost_per_sqm_chf = excluded.cost_per_sqm_chf,
                 activity_id = excluded.activity_id
             """,
-            (normalized_name, kg_per_sqm, activity_id),
+            (normalized_name, kg_per_sqm, cost_per_sqm_chf, activity_id),
         )
         cursor.execute(
-            "SELECT id, name, kg_per_sqm, activity_id FROM materials WHERE name = ?",
+            """
+            SELECT id, name, kg_per_sqm, cost_per_sqm_chf, activity_id
+            FROM materials
+            WHERE name = ?
+            """,
             (normalized_name,),
         )
         row = cursor.fetchone()
@@ -464,7 +477,8 @@ def db_upsert_material(name: str, kg_per_sqm: float, activity_id: int) -> dict:
             "id": row[0],
             "name": row[1],
             "kg_per_sqm": row[2],
-            "activity_id": row[3],
+            "cost_per_sqm_chf": row[3],
+            "activity_id": row[4],
             "action": action,
         }
     finally:

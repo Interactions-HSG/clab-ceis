@@ -335,6 +335,10 @@ def _build_balance_content(scenario: dict):
                                         f"Material: {material.get('name', 'Unknown')}"
                                     ),
                                     html.Li(
+                                        "Fabric rate: "
+                                        f"{_format_currency(material.get('cost_per_sqm_chf'))}/m²"
+                                    ),
+                                    html.Li(
                                         f"Fabric supplier: {scenario.get('selection', {}).get('fabric_supplier', 'N/A')}"
                                     ),
                                     html.Li(
@@ -481,7 +485,13 @@ def register_designer_balance_callbacks(app: Dash, data: ceis_data.CeisData) -> 
 
         materials = fetch_materials_for_garment(garment_type_id)
         material_options = [
-            {"label": material["name"], "value": material["id"]}
+            {
+                "label": (
+                    f"{material['name']} "
+                    f"({_format_currency(material.get('cost_per_sqm_chf'))}/m²)"
+                ),
+                "value": material["id"],
+            }
             for material in materials
         ]
         return material_options, (

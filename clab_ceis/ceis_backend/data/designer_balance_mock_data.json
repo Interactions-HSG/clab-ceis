@@ -1,24 +1,16 @@
 {
     "materials": {
         "cotton": {
-            "cost_per_kg_chf": 18.0,
             "longevity_wears": 85
         },
         "hemp": {
-            "cost_per_kg_chf": 24.0,
             "longevity_wears": 130
         },
         "silk": {
-            "cost_per_kg_chf": 42.0,
             "longevity_wears": 65
         },
         "mikado silk": {
-            "cost_per_kg_chf": 49.0,
             "longevity_wears": 72
-        },
-        "default": {
-            "cost_per_kg_chf": 20.0,
-            "longevity_wears": 80
         }
     },
     "process_types": {

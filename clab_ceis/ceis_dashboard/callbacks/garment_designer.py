@@ -77,6 +77,10 @@ def _build_reference_scenario_card(scenario: dict, target_price: float | int | N
                         f"Reference material longevity: {scenario.get('material', {}).get('longevity_wears', 0)} wears"
                     ),
                     html.Li(
+                        "Reference fabric rate: "
+                        f"{_format_currency(scenario.get('material', {}).get('cost_per_sqm_chf'))}/m²"
+                    ),
+                    html.Li(
                         f"Economic total: {_format_currency(scenario_summary.get('economic_total_chf'))}"
                     ),
                     html.Li(
@@ -194,7 +198,13 @@ def _build_dynamic_designer_panel(reference: dict, scenario: dict):
                             dcc.Dropdown(
                                 id="garment-designer-custom-material",
                                 options=[
-                                    {"label": material["name"], "value": material["name"]}
+                                    {
+                                        "label": (
+                                            f"{material['name']} "
+                                            f"({_format_currency(material.get('cost_per_sqm_chf'))}/m²)"
+                                        ),
+                                        "value": material["name"],
+                                    }
                                     for material in materials
                                 ],
                                 value=default_material,
@@ -590,7 +600,7 @@ def register_garment_designer_callbacks(app: Dash, data: ceis_data.CeisData) -> 
                                 {"name": "Material", "id": "name"},
                                 {"name": "kg/sqm", "id": "kg_per_sqm"},
                                 {"name": "Longevity (wears)", "id": "longevity_wears"},
-                                {"name": "Cost per kg (CHF)", "id": "cost_per_kg_chf"},
+                                {"name": "Cost per m² (CHF)", "id": "cost_per_sqm_chf"},
                                 {"name": "CO2eq per kg", "id": "co2eq_per_kg"},
                             ],
                             materials,

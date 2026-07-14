@@ -259,6 +259,13 @@ def get_recipe_layout():
                                 step=0.01,
                                 placeholder="e.g., 0.21",
                             ),
+                            html.Label("Cost per m² (CHF)"),
+                            dcc.Input(
+                                id="material-cost-per-sqm-chf",
+                                type="number",
+                                step=0.01,
+                                placeholder="e.g., 5.04",
+                            ),
                             html.Label("Activity ID"),
                             dcc.Input(
                                 id="material-activity-id",

@@ -197,7 +197,12 @@ def get_recipe_fabric_blocks_for_garment(garment_type_id: int):
 
 @app.post("/materials")
 def upsert_material(payload: MaterialCreate):
-    return db_upsert_material(payload.name, payload.kg_per_sqm, payload.activity_id)
+    return db_upsert_material(
+        payload.name,
+        payload.kg_per_sqm,
+        payload.cost_per_sqm_chf,
+        payload.activity_id,
+    )
 
 
 @app.delete("/garment-recipes/{garment_type_id}")

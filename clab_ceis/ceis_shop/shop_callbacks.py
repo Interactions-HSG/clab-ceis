@@ -142,6 +142,9 @@ def get_callbacks(app):
         selected_material_name = (
             selected_material.get("name") if selected_material else "Unknown"
         )
+        material_cost_per_sqm_chf = (
+            selected_material.get("cost_per_sqm_chf") if selected_material else None
+        )
 
         try:
             response = requests.get(
@@ -161,5 +164,8 @@ def get_callbacks(app):
             return co2_error
 
         return render_co2_content(
-            selected_material_name, co2_payload, garment_base_price
+            selected_material_name,
+            co2_payload,
+            garment_base_price,
+            material_cost_per_sqm_chf,
         )

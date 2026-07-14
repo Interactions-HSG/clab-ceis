@@ -11,6 +11,50 @@ from ceis_backend.data.location_details import (
     SILK_DISTANCE_TO_MANUFACTURER_KM,
 )
 
+MATERIAL_SEED_DATA = {
+    "cotton": {
+        "kg_per_sqm": 0.14,
+        "cost_per_sqm_chf": 2.52,
+        "activity_id": 6756,
+    },
+    "hemp": {
+        "kg_per_sqm": 0.21,
+        "cost_per_sqm_chf": 5.04,
+        "activity_id": 276186,
+    },
+    "silk": {
+        "kg_per_sqm": 0.082,
+        "cost_per_sqm_chf": 3.444,
+        "activity_id": 20936,
+    },
+    "mikado silk": {
+        "kg_per_sqm": 0.13,
+        "cost_per_sqm_chf": 6.37,
+        "activity_id": 20936,
+    },
+}
+
+GARMENT_PRICE_CHF = {
+    "Basic Trousers": 246.70,
+    "Full Trousers": 263.50,
+    "Basic Jumpsuit short sleeves": 282.20,
+    "Basic Jumpsuit long sleeves": 299.00,
+    "Elegant cowl neck top": 124.00,
+    "Elegant cowl neck dress": 146.40,
+    "Wrap Skirt": 136.60,
+    "Daily dress with pocket": 168.40,
+    "Cocktail fitted dress": 339.20,
+    "Long tabard": 128.80,
+    "Cocoon jacket": 240.60,
+    "Orka jacket": 101.60,
+    "Nordlys Dress": 279.60,
+    "Mangata Dress": 280.20,
+    "Måne top": 127.80,
+    "Sommar Skirt": 183.20,
+    "Basic Unisex Shirt with pocket": 131.00,
+    "Basic Crop Top": 97.40,
+}
+
 
 def create_tables(cursor):
     cursor.execute(
@@ -29,6 +73,7 @@ def create_tables(cursor):
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL UNIQUE,
             kg_per_sqm REAL NOT NULL,
+            cost_per_sqm_chf REAL,
             activity_id INTEGER NOT NULL
         )
     """
@@ -321,12 +366,74 @@ def create_tables(cursor):
                 f"ALTER TABLE resource_events ADD COLUMN {column} {definition}"
             )
 
+    cursor.execute("PRAGMA table_info(materials)")
+    material_columns = {row[1] for row in cursor.fetchall()}
+    if "cost_per_sqm_chf" not in material_columns:
+        cursor.execute("ALTER TABLE materials ADD COLUMN cost_per_sqm_chf REAL")
+    cursor.executemany(
+        """
+        UPDATE materials
+        SET cost_per_sqm_chf = ?
+        WHERE name = ? AND cost_per_sqm_chf IS NULL
+        """,
+        [
+            (material["cost_per_sqm_chf"], material_name)
+            for material_name, material in MATERIAL_SEED_DATA.items()
+        ],
+    )
+
+    cursor.execute(
+        "SELECT 1 FROM sync_state WHERE key = 'workbook_garment_prices_v1'"
+    )
+    if cursor.fetchone() is None:
+        cursor.executemany(
+            """
+            UPDATE garment_types
+            SET price_chf = ?
+            WHERE name = ? AND price_chf = 100
+            """,
+            [
+                (price_chf, garment_name)
+                for garment_name, price_chf in GARMENT_PRICE_CHF.items()
+            ],
+        )
+        cursor.execute(
+            """
+            INSERT INTO sync_state (key, value)
+            VALUES ('workbook_garment_prices_v1', 'applied')
+            """
+        )
+
 
 def seed_data(cursor):
     cursor.execute("SELECT seeded FROM seed_meta WHERE id = 1;")
     if cursor.fetchone()[0] != 0:
         print("Database already seeded, skipping seeding.")
         return
+
+    cursor.executemany(
+        """
+        INSERT OR IGNORE INTO materials (
+            name, kg_per_sqm, cost_per_sqm_chf, activity_id
+        ) VALUES (?, ?, ?, ?)
+        """,
+        [
+            (
+                material_name,
+                material["kg_per_sqm"],
+                material["cost_per_sqm_chf"],
+                material["activity_id"],
+            )
+            for material_name, material in MATERIAL_SEED_DATA.items()
+        ],
+    )
+    cursor.executemany(
+        """
+        INSERT OR IGNORE INTO garment_types (name, price_chf)
+        VALUES (?, ?)
+        """,
+        list(GARMENT_PRICE_CHF.items()),
+    )
 
     cursor.executescript(
         """
@@ -335,32 +442,6 @@ def seed_data(cursor):
         ('Sigmaringen'),
         ('Dornbirn'),
         ('Ravensburg');
-
-        INSERT OR IGNORE INTO materials (name, kg_per_sqm, activity_id) VALUES
-        ('hemp', 0.21, 276186),
-        ('cotton', 0.14, 6756),
-        ('silk', 0.082, 20936),
-        ('mikado silk', 0.13, 20936);
-
-        INSERT OR IGNORE INTO garment_types (name, price_chf) VALUES
-        ('Basic Trousers', 100),
-        ('Full Trousers', 100),
-        ('Basic Jumpsuit short sleeves', 100),
-        ('Basic Jumpsuit long sleeves', 100),
-        ('Elegant cowl neck top', 100),
-        ('Elegant cowl neck dress', 100),
-        ('Wrap Skirt', 100),
-        ('Daily dress with pocket', 100),
-        ('Cocktail fitted dress', 100),
-        ('Long tabard', 100),
-        ('Cocoon jacket', 100),
-        ('Orka jacket', 100),
-        ('Nordlys Dress', 100),
-        ('Mangata Dress', 100),
-        ('Måne top', 100),
-        ('Sommar Skirt', 100),
-        ('Basic Unisex Shirt with pocket', 100),
-        ('Basic Crop Top', 100);
 
         INSERT OR IGNORE INTO fabric_block_types (name, sqm) VALUES
         ('80x64', 0.512),
