@@ -126,7 +126,6 @@ def fetch_designer_balance_scenario(
     material_id: int,
     fabric_supplier: str | None,
     garment_supplier: str | None,
-    finishing_supplier: str | None,
 ) -> dict:
     try:
         resp = requests.get(
@@ -135,7 +134,6 @@ def fetch_designer_balance_scenario(
                 "material_id": material_id,
                 "fabric_supplier": fabric_supplier,
                 "garment_supplier": garment_supplier,
-                "finishing_supplier": finishing_supplier,
             },
         )
         if resp.status_code != 200:

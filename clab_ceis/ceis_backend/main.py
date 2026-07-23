@@ -177,7 +177,6 @@ def get_designer_balance(
     material_id: int | None = None,
     fabric_supplier: str | None = None,
     garment_supplier: str | None = None,
-    finishing_supplier: str | None = None,
     wiser_client: WiserClient = Depends(get_wiser_client),
 ):
     return get_designer_balance_scenario(
@@ -186,7 +185,6 @@ def get_designer_balance(
         material_id=material_id,
         fabric_supplier_name=fabric_supplier,
         garment_supplier_name=garment_supplier,
-        finishing_supplier_name=finishing_supplier,
     )
 
 

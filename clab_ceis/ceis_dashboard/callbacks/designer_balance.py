@@ -344,9 +344,6 @@ def _build_balance_content(scenario: dict):
                                     html.Li(
                                         f"Garment manufacturer: {scenario.get('selection', {}).get('garment_supplier', 'N/A')}"
                                     ),
-                                    html.Li(
-                                        f"Finishing supplier: {scenario.get('selection', {}).get('finishing_supplier', 'N/A')}"
-                                    ),
                                 ]
                             ),
                             html.H3("Transport Legs"),
@@ -432,13 +429,11 @@ def register_designer_balance_callbacks(app: Dash, data: ceis_data.CeisData) -> 
         Output("designer-balance-fabric-supplier", "value"),
         Output("designer-balance-garment-supplier", "options"),
         Output("designer-balance-garment-supplier", "value"),
-        Output("designer-balance-finishing-supplier", "options"),
-        Output("designer-balance-finishing-supplier", "value"),
         Input("url", "pathname"),
     )
     def load_designer_balance_options(pathname):
         if pathname != "/designer-balance":
-            return [], None, [], None, [], None, [], None
+            return [], None, [], None, [], None
 
         options = fetch_designer_balance_options()
         garment_types = options.get("garment_types", [])
@@ -461,7 +456,6 @@ def register_designer_balance_callbacks(app: Dash, data: ceis_data.CeisData) -> 
 
         fabric_options = _supplier_options("fabric")
         garment_supplier_options = _supplier_options("garment")
-        finishing_options = _supplier_options("finishing")
 
         return (
             garment_options,
@@ -470,8 +464,6 @@ def register_designer_balance_callbacks(app: Dash, data: ceis_data.CeisData) -> 
             fabric_options[0]["value"] if fabric_options else None,
             garment_supplier_options,
             garment_supplier_options[0]["value"] if garment_supplier_options else None,
-            finishing_options,
-            finishing_options[0]["value"] if finishing_options else None,
         )
 
     @app.callback(
@@ -504,14 +496,12 @@ def register_designer_balance_callbacks(app: Dash, data: ceis_data.CeisData) -> 
         Input("designer-balance-material", "value"),
         Input("designer-balance-fabric-supplier", "value"),
         Input("designer-balance-garment-supplier", "value"),
-        Input("designer-balance-finishing-supplier", "value"),
     )
     def render_designer_balance(
         garment_type_id,
         material_id,
         fabric_supplier,
         garment_supplier,
-        finishing_supplier,
     ):
         if not garment_type_id or not material_id:
             return html.Div(
@@ -523,7 +513,6 @@ def register_designer_balance_callbacks(app: Dash, data: ceis_data.CeisData) -> 
             material_id,
             fabric_supplier,
             garment_supplier,
-            finishing_supplier,
         )
         if not scenario:
             return html.Div("No balance scenario could be loaded from the backend.")

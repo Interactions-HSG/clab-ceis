@@ -34,7 +34,6 @@
         "actor_base_delay_days": {
             "fabric": 1.5,
             "garment": 2.5,
-            "finishing": 1.0,
             "default": 1.0
         },
         "transport_base_delay_days": 0.5,

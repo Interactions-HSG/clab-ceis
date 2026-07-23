@@ -89,7 +89,7 @@
       "name": "Long tabard",
       "price_chf": 128.8,
       "materials": ["hemp"],
-      "fabric_blocks": {"140x28": 4, "40x14": 1}
+      "fabric_blocks": {"140x28": 4, "40x14": 3, "140x14": 1}
     },
     {
       "name": "Cocoon jacket",
@@ -223,8 +223,7 @@
     "manufacturer_roles": {
       "fabric": {"event_trigger": "Supply", "lifecycle_node": "Extraction", "lifecycle_edge": null},
       "garment": {"event_trigger": "Production", "lifecycle_node": "Production", "lifecycle_edge": null},
-      "repair": {"event_trigger": "Repair", "lifecycle_node": null, "lifecycle_edge": "Repair"},
-      "default": {"event_trigger": "Finishing", "lifecycle_node": "Production", "lifecycle_edge": null}
+      "repair": {"event_trigger": "Repair", "lifecycle_node": null, "lifecycle_edge": "Repair"}
     },
     "lifecycle_nodes": {
       "resource_type": "Lifecycle stage",

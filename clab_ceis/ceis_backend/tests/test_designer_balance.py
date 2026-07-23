@@ -35,7 +35,6 @@ def _insert_manufacturer_data() -> None:
                 "garment",
                 "Burladingen",
             ),
-            ("Finish Lab", "finishing", "finishing", "Ravensburg"),
         ],
     )
 
@@ -71,15 +70,6 @@ def _insert_manufacturer_data() -> None:
                 "Burladingen",
                 260.0,
             ),
-            (
-                "Garment Works",
-                "garment",
-                "Burladingen",
-                "Finish Lab",
-                "finishing",
-                "Ravensburg",
-                80.0,
-            ),
         ],
     )
 
@@ -112,6 +102,7 @@ def test_designer_balance_endpoint_returns_balanced_scenario(tmp_path, monkeypat
             role["company"] == "Fabric Alpha"
             for role in options_payload["suppliers"]["fabric"]
         )
+        assert set(options_payload["suppliers"]) == {"fabric", "garment"}
 
         garment_types = client.get("/garment-types").json()
         basic_trousers = next(
@@ -129,7 +120,6 @@ def test_designer_balance_endpoint_returns_balanced_scenario(tmp_path, monkeypat
                 "material_id": hemp["id"],
                 "fabric_supplier": "Fabric Alpha",
                 "garment_supplier": "Garment Works",
-                "finishing_supplier": "Finish Lab",
             },
         )
 
@@ -139,7 +129,8 @@ def test_designer_balance_endpoint_returns_balanced_scenario(tmp_path, monkeypat
     assert payload["garment"]["name"] == "Basic Trousers"
     assert payload["material"]["name"] == "hemp"
     assert payload["selection"]["fabric_supplier"] == "Fabric Alpha"
-    assert len(payload["supply_chain"]["legs"]) == 2
+    assert set(payload["selection"]) == {"fabric_supplier", "garment_supplier"}
+    assert len(payload["supply_chain"]["legs"]) == 1
     assert payload["summary"]["economic_total_chf"] > 0
     assert payload["summary"]["co2eq_total_kg"] > 0
     assert payload["summary"]["average_lifetime_wears"] == 130
@@ -194,7 +185,6 @@ def test_designer_balance_supplier_switch_changes_transport_balance(
                 "material_id": hemp["id"],
                 "fabric_supplier": "Fabric Alpha",
                 "garment_supplier": "Garment Works",
-                "finishing_supplier": "Finish Lab",
             },
         )
         beta_response = client.get(
@@ -203,7 +193,6 @@ def test_designer_balance_supplier_switch_changes_transport_balance(
                 "material_id": hemp["id"],
                 "fabric_supplier": "Fabric Beta",
                 "garment_supplier": "Garment Works",
-                "finishing_supplier": "Finish Lab",
             },
         )
 

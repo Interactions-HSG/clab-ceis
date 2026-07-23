@@ -58,8 +58,6 @@ def _normalize_role(role: str) -> str | None:
         return "fabric"
     if "garment manufacturer" in role_lower:
         return "garment"
-    if "finishing" in role_lower:
-        return "finishing"
     if "repair" in role_lower:
         return "repair"
     return None
@@ -145,6 +143,38 @@ def _persist_geocode_cache_to_db(
         """,
         valid_rows,
     )
+
+
+def _load_distance_cache_from_db(
+    cursor: sqlite3.Cursor,
+) -> dict[tuple[str, str, str, str, str, str], float]:
+    cursor.execute(
+        """
+        SELECT source_company, source_role_group, source_location,
+               destination_company, destination_role_group, destination_location,
+               distance_km
+        FROM manufacturer_distances
+        """
+    )
+    return {
+        (
+            source_company,
+            source_role_group,
+            source_location,
+            destination_company,
+            destination_role_group,
+            destination_location,
+        ): float(distance_km)
+        for (
+            source_company,
+            source_role_group,
+            source_location,
+            destination_company,
+            destination_role_group,
+            destination_location,
+            distance_km,
+        ) in cursor.fetchall()
+    }
 
 
 def _load_manufacturers(csv_path: Path) -> list[Manufacturer]:
@@ -247,6 +277,9 @@ def _distance_km(
 def _build_distance_rows(
     manufacturers: list[Manufacturer],
     initial_geocode_cache: dict[str, tuple[float, float]] | None = None,
+    initial_distance_cache: (
+        dict[tuple[str, str, str, str, str, str], float] | None
+    ) = None,
 ) -> tuple[
     list[tuple[str, str, str, str, str, str, float]],
     dict[str, tuple[float, float] | None],
@@ -259,57 +292,32 @@ def _build_distance_rows(
 
     fabrics = [m for m in manufacturers if m.role_group == "fabric"]
     garments = [m for m in manufacturers if m.role_group == "garment"]
-    finishing = [m for m in manufacturers if m.role_group == "finishing"]
 
     rows: list[tuple[str, str, str, str, str, str, float]] = []
 
     # fabric -> garment
     for src in fabrics:
-        src_coords = _geocode(src.location, geocode_cache, geocode_errors)
-        if src_coords is None:
-            continue
         for dst in garments:
-            dst_coords = _geocode(dst.location, geocode_cache, geocode_errors)
-            if dst_coords is None:
-                continue
-            distance = _distance_km(src_coords, dst_coords)
-            if distance is None:
-                continue
-            rows.append(
-                (
-                    src.company,
-                    src.role_group,
-                    src.location,
-                    dst.company,
-                    dst.role_group,
-                    dst.location,
-                    distance,
-                )
+            distance_key = (
+                src.company,
+                src.role_group,
+                src.location,
+                dst.company,
+                dst.role_group,
+                dst.location,
             )
-
-    # garment -> finishing
-    for src in garments:
-        src_coords = _geocode(src.location, geocode_cache, geocode_errors)
-        if src_coords is None:
-            continue
-        for dst in finishing:
-            dst_coords = _geocode(dst.location, geocode_cache, geocode_errors)
-            if dst_coords is None:
-                continue
-            distance = _distance_km(src_coords, dst_coords)
+            distance = (initial_distance_cache or {}).get(distance_key)
             if distance is None:
-                continue
-            rows.append(
-                (
-                    src.company,
-                    src.role_group,
-                    src.location,
-                    dst.company,
-                    dst.role_group,
-                    dst.location,
-                    distance,
-                )
-            )
+                src_coords = _geocode(src.location, geocode_cache, geocode_errors)
+                if src_coords is None:
+                    continue
+                dst_coords = _geocode(dst.location, geocode_cache, geocode_errors)
+                if dst_coords is None:
+                    continue
+                distance = _distance_km(src_coords, dst_coords)
+                if distance is None:
+                    continue
+            rows.append((*distance_key, distance))
 
     return rows, geocode_cache, geocode_errors
 
@@ -321,6 +329,7 @@ def sync_manufacturer_distances_if_changed() -> dict:
 
     csv_hash = _csv_sha256(CSV_PATH)
     conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")
     cursor = conn.cursor()
 
     cursor.execute("SELECT value FROM sync_state WHERE key = ?", (SYNC_HASH_KEY,))
@@ -335,29 +344,20 @@ def sync_manufacturer_distances_if_changed() -> dict:
     manufacturers = _load_manufacturers(CSV_PATH)
     fabrics = [m for m in manufacturers if m.role_group == "fabric"]
     garments = [m for m in manufacturers if m.role_group == "garment"]
-    finishing = [m for m in manufacturers if m.role_group == "finishing"]
-    expected_pairs = (len(fabrics) * len(garments)) + (len(garments) * len(finishing))
+    expected_pairs = len(fabrics) * len(garments)
     db_geocode_cache = _load_geocode_cache_from_db(cursor)
+    db_distance_cache = _load_distance_cache_from_db(cursor)
     distance_rows, geocode_cache, geocode_errors = _build_distance_rows(
-        manufacturers, initial_geocode_cache=db_geocode_cache
+        manufacturers,
+        initial_geocode_cache=db_geocode_cache,
+        initial_distance_cache=db_distance_cache,
     )
     _persist_geocode_cache_to_db(cursor, geocode_cache)
     unresolved_locations = [
         location for location, coords in geocode_cache.items() if coords is None
     ]
 
-    cursor.execute("DELETE FROM manufacturers")
-    cursor.executemany(
-        """
-        INSERT INTO manufacturers (company, role, role_group, location)
-        VALUES (?, ?, ?, ?)
-        """,
-        [(m.company, m.role, m.role_group, m.location) for m in manufacturers],
-    )
-
-    cursor.execute("DELETE FROM manufacturer_distances")
     if expected_pairs > 0 and not distance_rows:
-        conn.commit()
         conn.close()
         return {
             "updated": False,
@@ -371,6 +371,16 @@ def sync_manufacturer_distances_if_changed() -> dict:
                 for loc in unresolved_locations[:3]
             },
         }
+
+    cursor.execute("DELETE FROM manufacturer_distances")
+    cursor.execute("DELETE FROM manufacturers")
+    cursor.executemany(
+        """
+        INSERT INTO manufacturers (company, role, role_group, location)
+        VALUES (?, ?, ?, ?)
+        """,
+        [(m.company, m.role, m.role_group, m.location) for m in manufacturers],
+    )
 
     if distance_rows:
         cursor.executemany(

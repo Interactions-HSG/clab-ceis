@@ -545,10 +545,9 @@ def seed_resource_events(cursor):
     for manufacturer_id, role, role_group in cursor.fetchall():
         if _resource_event_exists(cursor, "manufacturer_id", manufacturer_id):
             continue
-        template = seed_data["manufacturer_roles"].get(
-            role_group,
-            seed_data["manufacturer_roles"]["default"],
-        )
+        template = seed_data["manufacturer_roles"].get(role_group)
+        if template is None:
+            continue
         _insert_resource_event(
             cursor,
             {

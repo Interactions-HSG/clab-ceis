@@ -45,7 +45,6 @@ def get_designer_balance_options() -> dict:
         "suppliers": {
             "fabric": db_get_manufacturers("fabric"),
             "garment": db_get_manufacturers("garment"),
-            "finishing": db_get_manufacturers("finishing"),
         },
     }
 
@@ -359,7 +358,6 @@ def _select_default_company(
 def _build_supply_chain_legs(
     fabric_supplier: dict | None,
     garment_supplier: dict | None,
-    finishing_supplier: dict | None,
     total_weight_kg: float,
     transport_emission_per_unit: float | None,
     mock_data: dict,
@@ -383,20 +381,7 @@ def _build_supply_chain_legs(
                 "delay_days": _actor_delay("garment", mock_data),
             }
         )
-    if finishing_supplier:
-        actors.append(
-            {
-                "role_group": "finishing",
-                "company": finishing_supplier["company"],
-                "location": finishing_supplier["location"],
-                "delay_days": _actor_delay("finishing", mock_data),
-            }
-        )
-
-    raw_legs = [
-        (fabric_supplier, garment_supplier),
-        (garment_supplier, finishing_supplier),
-    ]
+    raw_legs = [(fabric_supplier, garment_supplier)]
     legs = []
     transport_cost_total = 0.0
     transport_co2_total = 0.0
@@ -474,7 +459,6 @@ def get_designer_balance_scenario(
     material_id: int | None = None,
     fabric_supplier_name: str | None = None,
     garment_supplier_name: str | None = None,
-    finishing_supplier_name: str | None = None,
 ) -> dict:
     mock_data = load_designer_balance_mock_data()
     garment_types = db_get_garment_types()
@@ -517,7 +501,6 @@ def get_designer_balance_scenario(
     supplier_options = {
         "fabric": db_get_manufacturers("fabric"),
         "garment": db_get_manufacturers("garment"),
-        "finishing": db_get_manufacturers("finishing"),
     }
     selected_supplier_names = {
         "fabric": _select_default_company(
@@ -525,9 +508,6 @@ def get_designer_balance_scenario(
         ),
         "garment": _select_default_company(
             supplier_options["garment"], garment_supplier_name
-        ),
-        "finishing": _select_default_company(
-            supplier_options["finishing"], finishing_supplier_name
         ),
     }
     supplier_lookup = {
@@ -539,10 +519,6 @@ def get_designer_balance_scenario(
     garment_supplier = supplier_lookup["garment"].get(
         selected_supplier_names["garment"]
     )
-    finishing_supplier = supplier_lookup["finishing"].get(
-        selected_supplier_names["finishing"]
-    )
-
     total_weight_kg = sum(float(block.weight_kg or 0) for block in recipe.fabric_blocks)
     selected_material_kg_per_sqm = float(selected_material.get("kg_per_sqm") or 0)
     transport_emission_per_unit = wiser_client.get_emission_per_unit(
@@ -553,7 +529,6 @@ def get_designer_balance_scenario(
         _build_supply_chain_legs(
             fabric_supplier,
             garment_supplier,
-            finishing_supplier,
             total_weight_kg,
             transport_emission_per_unit,
             mock_data,
@@ -732,7 +707,6 @@ def get_designer_balance_scenario(
         "selection": {
             "fabric_supplier": selected_supplier_names["fabric"],
             "garment_supplier": selected_supplier_names["garment"],
-            "finishing_supplier": selected_supplier_names["finishing"],
         },
         "summary": {
             "bom_cost_chf": _safe_round(total_material_cost),

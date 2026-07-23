@@ -69,18 +69,6 @@ def get_designer_balance_layout():
                                     ],
                                     className="designer-balance-control",
                                 ),
-                                html.Div(
-                                    [
-                                        html.Label("Finishing supplier"),
-                                        dcc.Dropdown(
-                                            id="designer-balance-finishing-supplier",
-                                            options=[],
-                                            placeholder="Select a finishing supplier",
-                                            clearable=False,
-                                        ),
-                                    ],
-                                    className="designer-balance-control",
-                                ),
                             ],
                             className="designer-balance-controls",
                         ),

@@ -573,7 +573,6 @@ def register_garment_designer_callbacks(app: Dash, data: ceis_data.CeisData) -> 
             material_id,
             None,
             None,
-            None,
         )
 
     @app.callback(
