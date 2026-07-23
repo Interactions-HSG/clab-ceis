@@ -4,7 +4,9 @@ from dash import Dash, Input, Output, ctx
 import ceis_data
 from ceis_dashboard.callbacks.api import fetch_resource_events
 from pages.flow import (
+    VALUE_CHAIN_BRAND_ID,
     VALUE_CHAIN_CUSTOMER_ID,
+    VALUE_CHAIN_LOCAL_SERVICE_ID,
     VALUE_CHAIN_STEP_IDS,
     get_flow_chart_stylesheet,
     get_supply_chain_stylesheet,
@@ -14,13 +16,15 @@ from pages.flow import (
 VALUE_CHAIN_EDGE_IDS = {
     "feedstock": "value-chain-material-to-fabric",
     "raw_fabrics": "value-chain-fabric-to-garment",
-    "raw_garments": "value-chain-garment-to-service",
-    "deliver": "value-chain-service-to-customer",
-    "repair": "value-chain-customer-to-service",
-    "remanufacture": "value-chain-customer-to-garment",
-    "self_repair": "value-chain-customer-self-repair",
-    "reuse": "value-chain-customer-to-fabric",
-    "recycle": "value-chain-customer-to-material",
+    "raw_garments": "value-chain-garment-to-brand",
+    "service_supply": "value-chain-service-to-brand",
+    "deliver": "value-chain-brand-to-customer",
+    "recycle": "value-chain-brand-to-material",
+    "remanufacture": "value-chain-brand-to-garment",
+    "repair": "value-chain-brand-to-service-repair",
+    "reuse": "value-chain-brand-to-service-reuse",
+    "local_repair": "value-chain-customer-to-local-service",
+    "maintain": "value-chain-customer-to-brand",
 }
 
 LIFECYCLE_NODE_TO_VALUE_CHAIN_NODES = {
@@ -28,7 +32,9 @@ LIFECYCLE_NODE_TO_VALUE_CHAIN_NODES = {
     "Production": {
         VALUE_CHAIN_STEP_IDS["fabric"],
         VALUE_CHAIN_STEP_IDS["garment"],
-        VALUE_CHAIN_STEP_IDS["finishing"],
+        VALUE_CHAIN_STEP_IDS["service"],
+        VALUE_CHAIN_BRAND_ID,
+        VALUE_CHAIN_LOCAL_SERVICE_ID,
     },
     "Use": {VALUE_CHAIN_CUSTOMER_ID},
     "Waste": set(),
@@ -39,12 +45,14 @@ LIFECYCLE_EDGE_TO_VALUE_CHAIN_EDGES = {
         VALUE_CHAIN_EDGE_IDS["feedstock"],
         VALUE_CHAIN_EDGE_IDS["raw_fabrics"],
         VALUE_CHAIN_EDGE_IDS["raw_garments"],
+        VALUE_CHAIN_EDGE_IDS["service_supply"],
     },
     "Deliver": {VALUE_CHAIN_EDGE_IDS["deliver"]},
     "Release": set(),
     "Repair": {
         VALUE_CHAIN_EDGE_IDS["repair"],
-        VALUE_CHAIN_EDGE_IDS["self_repair"],
+        VALUE_CHAIN_EDGE_IDS["local_repair"],
+        VALUE_CHAIN_EDGE_IDS["maintain"],
     },
     "Remanufacture": {
         VALUE_CHAIN_EDGE_IDS["remanufacture"],

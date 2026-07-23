@@ -3,7 +3,16 @@ from unittest.mock import patch
 from dash import Dash
 
 from main import CeisMonitor
-from pages.flow import CeStages, get_flow_chart_data, get_supply_chain_elements
+from pages.flow import (
+    CeStages,
+    VALUE_CHAIN_BRAND_ID,
+    VALUE_CHAIN_CUSTOMER_ID,
+    VALUE_CHAIN_LOCAL_SERVICE_ID,
+    VALUE_CHAIN_STEP_IDS,
+    get_flow_chart_data,
+    get_supply_chain_elements,
+    get_supply_chain_stylesheet,
+)
 from pages.ui import page_hero
 
 
@@ -51,24 +60,10 @@ def test_product_lifecycle_uses_top_to_bottom_flow():
     )
 
 
-def test_value_chain_folds_repair_shops_into_garment_manufacturer_step():
+def test_value_chain_links_repair_shops_to_local_service_provider():
     elements = get_supply_chain_elements(
         {
             "nodes": [
-                {
-                    "id": 1,
-                    "company": "Finisher A",
-                    "role": "finishing",
-                    "role_group": "finishing",
-                    "location": "A",
-                },
-                {
-                    "id": 2,
-                    "company": "Finisher B",
-                    "role": "finishing",
-                    "role_group": "finishing",
-                    "location": "B",
-                },
                 {
                     "id": 3,
                     "company": "Repair A",
@@ -101,31 +96,28 @@ def test_value_chain_folds_repair_shops_into_garment_manufacturer_step():
     }
 
     assert "value-chain-repair" not in nodes_by_id
-    assert "2 repair partners" in nodes_by_id["value-chain-garment"]["data"]["label"]
-    assert edges_by_id["value-chain-customer-to-service"]["data"]["target"] == (
-        "value-chain-service"
-    )
-    assert edges_by_id["value-chain-customer-to-garment"]["data"]["target"] == (
-        "value-chain-garment"
-    )
-    assert edges_by_id["value-chain-customer-to-service"]["data"]["label"] == "repair"
-    assert edges_by_id["value-chain-customer-to-garment"]["data"]["label"] == (
-        "repair / remanufacture"
-    )
-    assert edges_by_id["value-chain-customer-self-repair"]["data"]["source"] == (
-        "value-chain-customer"
-    )
-    assert edges_by_id["value-chain-customer-self-repair"]["data"]["target"] == (
-        "value-chain-customer"
+    assert "2 partners" in nodes_by_id[VALUE_CHAIN_STEP_IDS["service"]]["data"][
+        "label"
+    ]
+    assert "partners" not in nodes_by_id[VALUE_CHAIN_LOCAL_SERVICE_ID]["data"]["label"]
+    assert nodes_by_id[VALUE_CHAIN_STEP_IDS["service"]]["data"]["manufacturer_ids"] == [
+        3,
+        4,
+    ]
+    assert nodes_by_id[VALUE_CHAIN_STEP_IDS["garment"]]["data"][
+        "manufacturer_ids"
+    ] == []
+    assert edges_by_id["value-chain-customer-to-local-service"]["data"]["target"] == (
+        VALUE_CHAIN_LOCAL_SERVICE_ID
     )
     assert (
-        edges_by_id["value-chain-customer-self-repair"]["data"]["label"]
-        == "self-repair"
+        edges_by_id["value-chain-customer-to-local-service"]["data"]["label"]
+        == "Repair"
     )
-    assert nodes_by_id["value-chain-garment"]["data"]["manufacturer_ids"] == [3, 4]
+    assert "value-chain-local-service-to-customer" not in edges_by_id
 
 
-def test_value_chain_uses_butterfly_role_flow():
+def test_value_chain_matches_reference_actor_and_labeled_recovery_flow():
     elements = get_supply_chain_elements(
         {
             "nodes": [
@@ -142,13 +134,6 @@ def test_value_chain_uses_butterfly_role_flow():
                     "role": "garment manufacturer",
                     "role_group": "garment",
                     "location": "B",
-                },
-                {
-                    "id": 3,
-                    "company": "Finisher A",
-                    "role": "finishing",
-                    "role_group": "finishing",
-                    "location": "C",
                 },
                 {
                     "id": 4,
@@ -193,61 +178,96 @@ def test_value_chain_uses_butterfly_role_flow():
     )
     assert (
         node_positions["value-chain-service"]["y"]
-        < node_positions["value-chain-customer"]["y"]
+        < node_positions[VALUE_CHAIN_BRAND_ID]["y"]
     )
     assert (
-        edges_by_id["value-chain-service-to-customer"]["data"]["target"]
-        == "value-chain-customer"
-    )
-    assert nodes_by_id["value-chain-customer"]["data"]["label"] == "Customer"
-    assert (
-        node_positions["deliver-label"]["x"]
-        > node_positions["value-chain-service"]["x"]
+        node_positions[VALUE_CHAIN_BRAND_ID]["y"]
+        < node_positions[VALUE_CHAIN_CUSTOMER_ID]["y"]
     )
     assert (
-        edges_by_id["value-chain-fabric-to-garment"]["data"]["label"]
-        == "raw fabrics"
+        node_positions[VALUE_CHAIN_LOCAL_SERVICE_ID]["y"]
+        == node_positions[VALUE_CHAIN_CUSTOMER_ID]["y"]
     )
-    assert (
-        edges_by_id["value-chain-garment-to-service"]["data"]["label"]
-        == "raw garments"
+    assert edges_by_id["value-chain-garment-to-brand"]["data"]["target"] == (
+        VALUE_CHAIN_BRAND_ID
     )
-    assert edges_by_id["value-chain-service-to-customer"]["data"]["label"] == "deliver"
-    assert edges_by_id["value-chain-material-to-fabric"]["classes"] == "feedstock-leg"
+    assert edges_by_id["value-chain-service-to-brand"]["data"]["target"] == (
+        VALUE_CHAIN_BRAND_ID
+    )
+    assert edges_by_id["value-chain-brand-to-customer"]["data"]["target"] == (
+        VALUE_CHAIN_CUSTOMER_ID
+    )
     assert edges_by_id["value-chain-material-to-fabric"]["data"][
         "material_manufacturer_distance_ids"
     ] == []
-    assert edges_by_id["value-chain-customer-to-material"]["data"]["target"] == (
-        "value-chain-materials"
-    )
-    assert edges_by_id["value-chain-customer-to-fabric"]["data"]["target"] == (
-        "value-chain-fabric"
-    )
-    assert edges_by_id["value-chain-customer-to-garment"]["data"]["target"] == (
-        "value-chain-garment"
-    )
-    assert edges_by_id["value-chain-customer-to-service"]["data"]["target"] == (
-        "value-chain-service"
-    )
-    assert edges_by_id["value-chain-customer-to-service"]["data"]["label"] == "repair"
-    assert edges_by_id["value-chain-customer-to-garment"]["data"]["label"] == (
-        "repair / remanufacture"
+    assert edges_by_id["value-chain-brand-to-material"]["data"]["target"] == (
+        VALUE_CHAIN_STEP_IDS["material"]
     )
     assert (
-        edges_by_id["value-chain-customer-self-repair"]["data"]["label"]
-        == "self-repair"
+        edges_by_id["value-chain-brand-to-material"]["data"]["label"]
+        == "Fibre recycle"
+    )
+    assert edges_by_id["value-chain-brand-to-garment"]["data"]["target"] == (
+        VALUE_CHAIN_STEP_IDS["garment"]
+    )
+    assert (
+        edges_by_id["value-chain-brand-to-garment"]["data"]["label"]
+        == "Remanufacture"
+    )
+    assert edges_by_id["value-chain-brand-to-service-repair"]["data"]["target"] == (
+        VALUE_CHAIN_STEP_IDS["service"]
+    )
+    assert (
+        edges_by_id["value-chain-brand-to-service-repair"]["data"]["label"]
+        == "Repair"
+    )
+    assert (
+        edges_by_id["value-chain-brand-to-service-reuse"]["data"]["label"]
+        == "Reuse / redistribute"
+    )
+    assert (
+        edges_by_id["value-chain-customer-to-brand"]["data"]["label"]
+        == "Maintain / prolong"
     )
 
-    step_node_ids = {
+    actor_node_ids = {
         element["data"]["id"]
         for element in elements
         if "position" in element
-        and element["data"]["id"].startswith("value-chain")
     }
-    assert step_node_ids == {
-        "value-chain-materials",
-        "value-chain-fabric",
-        "value-chain-garment",
-        "value-chain-service",
-        "value-chain-customer",
+    assert actor_node_ids == {
+        *VALUE_CHAIN_STEP_IDS.values(),
+        VALUE_CHAIN_BRAND_ID,
+        VALUE_CHAIN_LOCAL_SERVICE_ID,
+        VALUE_CHAIN_CUSTOMER_ID,
     }
+    assert all("process-node" not in element.get("classes", "") for element in elements)
+
+
+def test_value_chain_recovery_routes_use_separate_lanes_and_horizontal_labels():
+    styles_by_selector = {
+        rule["selector"]: rule["style"] for rule in get_supply_chain_stylesheet()
+    }
+
+    assert styles_by_selector["edge"]["text-rotation"] == "none"
+    local_service_style = styles_by_selector[".local-service-loop"]
+    assert local_service_style["source-arrow-shape"] == "triangle"
+
+    recovery_selectors = (
+        ".repair-loop",
+        ".reuse-loop",
+        ".remanufacture-loop",
+        ".recycle-loop",
+    )
+    lane_distances = []
+    source_endpoints = []
+    for selector in recovery_selectors:
+        style = styles_by_selector[selector]
+        distances = style["control-point-distances"].split()
+        assert len(distances) == 2
+        assert distances[0] == distances[1]
+        lane_distances.append(distances[0])
+        source_endpoints.append(style["source-endpoint"])
+
+    assert len(set(lane_distances)) == len(recovery_selectors)
+    assert len(set(source_endpoints)) == len(recovery_selectors)

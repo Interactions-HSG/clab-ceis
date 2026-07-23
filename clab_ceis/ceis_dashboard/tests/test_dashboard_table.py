@@ -26,18 +26,18 @@ def test_lifecycle_deliver_highlights_deliver_edge_without_adjacent_nodes():
     assert flow_nodes == set()
     assert flow_edges == {"Deliver"}
     assert supply_nodes == set()
-    assert supply_edges == {"value-chain-service-to-customer"}
+    assert supply_edges == {"value-chain-brand-to-customer"}
 
 
 def test_value_chain_edge_highlights_matching_lifecycle_edge_only():
     flow_nodes, flow_edges, supply_nodes, supply_edges = _highlight_for_value_chain_edge(
-        "value-chain-service-to-customer"
+        "value-chain-brand-to-customer"
     )
 
     assert flow_nodes == set()
     assert flow_edges == {"Deliver"}
     assert supply_nodes == set()
-    assert supply_edges == {"value-chain-service-to-customer"}
+    assert supply_edges == {"value-chain-brand-to-customer"}
 
 
 def test_value_chain_customer_highlights_lifecycle_use():
@@ -121,8 +121,8 @@ def test_filter_events_for_deliver_edge_uses_lifecycle_deliver_events():
     filtered = _filter_events_for_value_chain_element(
         events,
         {
-            "id": "value-chain-service-to-customer",
-            "source": "value-chain-service",
+            "id": "value-chain-brand-to-customer",
+            "source": "value-chain-brand",
             "target": "value-chain-customer",
             "manufacturer_distance_ids": [],
             "material_manufacturer_distance_ids": [],

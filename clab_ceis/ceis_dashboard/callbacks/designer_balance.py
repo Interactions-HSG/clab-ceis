@@ -43,10 +43,8 @@ def _build_supply_chain_graph(supply_chain: dict):
         return html.Div("No supplier data available for this scenario.")
 
     positions = {
-        "fabric": {"x": 480, "y": 60},
-        "garment": {"x": 480, "y": 180},
-        "finishing": {"x": 480, "y": 300},
-        "customer": {"x": 480, "y": 430},
+        "fabric": {"x": 120, "y": 165},
+        "garment": {"x": 480, "y": 165},
     }
 
     elements = []
@@ -62,20 +60,9 @@ def _build_supply_chain_graph(supply_chain: dict):
                         f"Delay: {actor.get('delay_days', 0)} d"
                     ),
                 },
-                "classes": "producer-node",
                 "position": positions.get(role_group, {"x": 0, "y": 0}),
             }
         )
-    elements.append(
-        {
-            "data": {
-                "id": "customer",
-                "label": "Customer",
-            },
-            "classes": "customer-node",
-            "position": positions["customer"],
-        }
-    )
 
     for index, leg in enumerate(legs):
         elements.append(
@@ -88,42 +75,8 @@ def _build_supply_chain_graph(supply_chain: dict):
                         f"{leg.get('distance_km', 0)} km | "
                         f"{leg.get('delay_days', 0)} d"
                     ),
-                },
-                "classes": "value-chain-leg",
+                }
             }
-        )
-    production_roles = [
-        actor.get("role_group")
-        for actor in actors
-        if actor.get("role_group") in {"fabric", "garment", "finishing"}
-    ]
-    if production_roles:
-        final_production_role = production_roles[-1]
-        return_edges = [
-            {
-                "data": {
-                    "id": f"customer-return-{role}",
-                    "source": "customer",
-                    "target": role,
-                    "label": "return / repair" if role == "finishing" else "return",
-                },
-                "classes": "technical-loop",
-            }
-            for role in production_roles
-        ]
-        elements.extend(
-            [
-                {
-                    "data": {
-                        "id": "customer-delivery",
-                        "source": final_production_role,
-                        "target": "customer",
-                        "label": "to customer",
-                    },
-                    "classes": "customer-leg",
-                },
-                *return_edges,
-            ]
         )
 
     return cyto.Cytoscape(
@@ -141,74 +94,38 @@ def _build_supply_chain_graph(supply_chain: dict):
                 "selector": "node",
                 "style": {
                     "label": "data(label)",
-                    "shape": "ellipse",
-                    "background-color": "#2f6f5e",
+                    "shape": "round-rectangle",
+                    "background-color": "#0b5f56",
                     "border-width": 3,
-                    "border-color": "#dfeee8",
-                    "color": "#ffffff",
+                    "border-color": "#99f6e4",
+                    "color": "#f0fdfa",
                     "text-wrap": "wrap",
-                    "text-max-width": 128,
-                    "font-size": 12,
+                    "text-max-width": 190,
+                    "font-size": 13,
                     "font-weight": 700,
                     "text-valign": "center",
                     "text-halign": "center",
-                    "width": 118,
-                    "height": 118,
-                },
-            },
-            {
-                "selector": ".producer-node",
-                "style": {
-                    "shape": "round-rectangle",
-                    "background-color": "#f7f4ec",
-                    "border-color": "#c8c1b3",
-                    "color": "#1d2420",
+                    "padding": "14px",
                     "width": 210,
                     "height": 104,
-                    "text-max-width": 190,
-                    "font-size": 13,
-                },
-            },
-            {
-                "selector": ".customer-node",
-                "style": {
-                    "background-color": "#2f6f5e",
-                    "border-color": "#99f6e4",
                 },
             },
             {
                 "selector": "edge",
                 "style": {
                     "label": "data(label)",
-                    "line-color": "#8f978f",
-                    "target-arrow-color": "#8f978f",
+                    "line-color": "#0e7490",
+                    "target-arrow-color": "#0e7490",
                     "target-arrow-shape": "triangle",
                     "curve-style": "straight",
                     "width": 4,
                     "font-size": 12,
                     "font-weight": 700,
-                    "text-background-color": "#faf8f2",
-                    "text-background-opacity": 0.95,
+                    "text-background-color": "#cffafe",
+                    "text-background-opacity": 1,
                     "text-background-padding": 6,
-                },
-            },
-            {
-                "selector": ".customer-leg",
-                "style": {
-                    "curve-style": "bezier",
-                    "line-color": "#2878a8",
-                    "target-arrow-color": "#2878a8",
-                    "color": "#155e75",
-                },
-            },
-            {
-                "selector": ".technical-loop",
-                "style": {
-                    "curve-style": "unbundled-bezier",
-                    "control-point-distance": 150,
-                    "line-color": "#2878a8",
-                    "target-arrow-color": "#2878a8",
-                    "color": "#155e75",
+                    "text-border-color": "#155e75",
+                    "text-border-width": 1,
                 },
             },
         ],
@@ -314,7 +231,7 @@ def _build_balance_content(scenario: dict):
                 [
                     html.H2("Value Chain"),
                     html.P(
-                        "Switch suppliers above to see how transport, delays, customer delivery, and circular returns change for the current garment scenario."
+                        "Switch suppliers above to see how transport, delays, and product balance change for the current garment scenario."
                     ),
                     _build_supply_chain_leg_cards(supply_chain),
                     _build_supply_chain_graph(supply_chain),
