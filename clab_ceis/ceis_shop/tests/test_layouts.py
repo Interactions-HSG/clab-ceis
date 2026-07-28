@@ -45,7 +45,7 @@ def test_scenarios_page_contains_scenarios_section():
     assert "customer-repair-content" in text
     assert "page-home-link" in text
     assert "shop-home-button" in text
-    assert "Button" in text
+    assert "Link" in text
     assert "Back to Home" not in text
 
 
@@ -86,7 +86,7 @@ def test_garment_page_contains_recipe_and_co2_sections():
     assert "garment-material-dropdown" in text
     assert "page-home-link" in text
     assert "shop-home-button" in text
-    assert "Button" in text
+    assert "Link" in text
     assert "Back to Home" not in text
 
 
