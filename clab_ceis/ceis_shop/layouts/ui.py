@@ -1,11 +1,11 @@
-from dash import html
+from dash import dcc
 
 
 def shop_home_link():
-    return html.Button(
+    return dcc.Link(
         "Home",
+        href="/",
         id="shop-home-button",
         className="page-home-link shop-home-button",
-        n_clicks=0,
         title="Go to home page",
     )
