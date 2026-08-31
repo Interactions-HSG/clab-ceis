@@ -78,6 +78,17 @@ def _get_discount_rate(co2_payload: dict) -> float:
     )  # 20% discount per lower-quality block, capped at 60% total discount
 
 
+def _format_condition(quality: float) -> str:
+    """Translate the internal quality score into customer-friendly condition text."""
+    if quality >= 90:
+        return "excellent condition"
+    if quality >= 75:
+        return "very good condition"
+    if quality >= 50:
+        return "good condition"
+    return "fair condition"
+
+
 def _build_alternative_fabric_block_items(co2_payload: dict) -> list[html.Li]:
     items: list[html.Li] = []
 
@@ -89,14 +100,15 @@ def _build_alternative_fabric_block_items(co2_payload: dict) -> list[html.Li]:
 
         if alternative_id is None or quality is None:
             continue
-        if float(quality) >= 100:
+        quality_score = float(quality)
+        if quality_score >= 100:
             continue
 
         items.append(
             html.Li(
                 f"{detail.get('fabric_block', 'Unknown')} can be replaced by a "
                 f"second-life {alternative_material} block "
-                f"with quality {float(quality):.0f} %"
+                f"in {_format_condition(quality_score)}"
             )
         )
 

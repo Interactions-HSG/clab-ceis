@@ -3,7 +3,11 @@ from __future__ import annotations
 from unittest.mock import Mock, patch
 
 from ceis_shop.layouts.scenarios import scenarios_page
-from ceis_shop.layouts.garment import garment_page, render_co2_content
+from ceis_shop.layouts.garment import (
+    _format_condition,
+    garment_page,
+    render_co2_content,
+)
 from ceis_shop.layouts.home import home_page
 from ceis_shop.main import app as shop_app
 
@@ -188,12 +192,17 @@ def test_render_co2_content_shows_alternatives_and_capped_discount():
     text = str(layout)
 
     assert (
-        "80x64 can be replaced by a second-life cotton block with quality 80 %" in text
+        "80x64 can be replaced by a second-life cotton block in very good condition"
+        in text
     )
     assert (
-        "64x40 can be replaced by a second-life linen block with quality 95 %" in text
+        "64x40 can be replaced by a second-life linen block in excellent condition"
+        in text
     )
-    assert "32x32 can be replaced by a second-life wool block with quality 70 %" in text
+    assert (
+        "32x32 can be replaced by a second-life wool block in good condition" in text
+    )
+    assert "with quality" not in text
     assert "16x16 can be replaced" not in text
     assert (
         "Choosing the available alternative fabric blocks would reduce this to "
@@ -201,6 +210,15 @@ def test_render_co2_content_shows_alternatives_and_capped_discount():
     )
     assert "Price: CHF 40.00 (60% discount from CHF 100.00)" in text
     assert "Fabric rate: CHF 5.04/m²." in text
+
+
+def test_format_condition_uses_clear_quality_bands():
+    assert _format_condition(90) == "excellent condition"
+    assert _format_condition(89.9) == "very good condition"
+    assert _format_condition(75) == "very good condition"
+    assert _format_condition(74.9) == "good condition"
+    assert _format_condition(50) == "good condition"
+    assert _format_condition(49.9) == "fair condition"
 
 
 def test_render_co2_content_shows_no_savings_message_without_replacements():
