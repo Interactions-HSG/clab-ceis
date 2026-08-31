@@ -12,6 +12,18 @@ class _Response:
         return self._payload
 
 
+def test_fetch_resource_events_passes_graph_filter(monkeypatch):
+    def fake_get(url, params, timeout):
+        assert url.endswith("/resource-events")
+        assert params == {"material_id": 3}
+        assert timeout == 30
+        return _Response(200, [{"event_id": 7}])
+
+    monkeypatch.setattr(api.requests, "get", fake_get)
+
+    assert api.fetch_resource_events(material_id=3) == [{"event_id": 7}]
+
+
 def test_fetch_garment_types_returns_payload(monkeypatch):
     def fake_get(url):
         assert url.endswith("/garment-types")

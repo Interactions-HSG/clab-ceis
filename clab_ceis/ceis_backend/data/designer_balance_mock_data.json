@@ -1,24 +1,16 @@
 {
     "materials": {
         "cotton": {
-            "cost_per_kg_chf": 18.0,
             "longevity_wears": 85
         },
         "hemp": {
-            "cost_per_kg_chf": 24.0,
             "longevity_wears": 130
         },
         "silk": {
-            "cost_per_kg_chf": 42.0,
             "longevity_wears": 65
         },
         "mikado silk": {
-            "cost_per_kg_chf": 49.0,
             "longevity_wears": 72
-        },
-        "default": {
-            "cost_per_kg_chf": 20.0,
-            "longevity_wears": 80
         }
     },
     "process_types": {
@@ -36,16 +28,12 @@
         },
         "transport": {
             "cost_per_ton_km_chf": 0.42
-        },
-        "default": {
-            "cost_per_unit_chf": 10.0
         }
     },
     "delay_model": {
         "actor_base_delay_days": {
             "fabric": 1.5,
             "garment": 2.5,
-            "finishing": 1.0,
             "default": 1.0
         },
         "transport_base_delay_days": 0.5,

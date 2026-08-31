@@ -4,7 +4,7 @@ from pathlib import Path
 
 import plotly.graph_objects as go
 from dash import dcc, html
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 
 from ceis_shop import config
 from ceis_shop.layouts.garment import (
@@ -16,6 +16,41 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "ceis_dashboard"))
 
 
 def get_callbacks(app):
+    @app.callback(
+        Output("garment-order-result", "children"),
+        Input("garment-order-button", "n_clicks"),
+        State("garment-type-id-store", "data"),
+        State("garment-material-dropdown", "value"),
+        prevent_initial_call=True,
+    )
+    def place_order(n_clicks, garment_type_id, material_id):
+        if not n_clicks:
+            return html.Div()
+        if material_id is None:
+            return html.P("Select a material before placing the order.")
+        try:
+            response = requests.post(
+                f"{config.BACKEND_API_URL}/orders",
+                json={
+                    "garment_type_id": garment_type_id,
+                    "material_id": material_id,
+                },
+                timeout=30,
+            )
+            response.raise_for_status()
+            order = response.json()
+        except Exception as exc:
+            return html.P(f"Unable to place order: {exc}")
+
+        if order.get("fulfillment_type") == "stock":
+            message = "In stock — delivery has started."
+        else:
+            message = "Not in stock — production has been requested."
+        return html.Div(
+            [html.Strong(f"Order #{order['id']}"), html.P(message)],
+            className="panel-muted",
+        )
+
     @app.callback(
         Output("customer-repair-content", "children"),
         Input("url", "pathname"),
@@ -107,6 +142,9 @@ def get_callbacks(app):
         selected_material_name = (
             selected_material.get("name") if selected_material else "Unknown"
         )
+        material_cost_per_sqm_chf = (
+            selected_material.get("cost_per_sqm_chf") if selected_material else None
+        )
 
         try:
             response = requests.get(
@@ -126,5 +164,8 @@ def get_callbacks(app):
             return co2_error
 
         return render_co2_content(
-            selected_material_name, co2_payload, garment_base_price
+            selected_material_name,
+            co2_payload,
+            garment_base_price,
+            material_cost_per_sqm_chf,
         )

@@ -6,11 +6,13 @@ from functools import lru_cache
 from fastapi import HTTPException
 
 from ceis_backend.config import BASE_DIR
+from ceis_backend.costing import calculate_material_cost_chf
 from ceis_backend.data.location_details import (
     ACTIVITY_ID_LONG_DISTANCE_TRANSPORT,
     ACTIVITY_ID_TRANSPORT,
     COTTON_DISTANCE_TO_MANUFACTURER_KM,
     HEMP_DISTANCE_TO_MANUFACTURER_KM,
+    MATERIAL_TRANSPORT_PROCESS_NAME,
     SILK_DISTANCE_TO_MANUFACTURER_KM,
 )
 from ceis_backend.queries import (
@@ -43,7 +45,6 @@ def get_designer_balance_options() -> dict:
         "suppliers": {
             "fabric": db_get_manufacturers("fabric"),
             "garment": db_get_manufacturers("garment"),
-            "finishing": db_get_manufacturers("finishing"),
         },
     }
 
@@ -61,8 +62,8 @@ def get_designer_garment_reference_data(wiser_client: WiserClient) -> dict:
         materials.append(
             {
                 **material,
-                "cost_per_kg_chf": _safe_round(
-                    float(material_mock.get("cost_per_kg_chf", 0))
+                "cost_per_sqm_chf": _safe_round(
+                    float(material["cost_per_sqm_chf"]), 3
                 ),
                 "longevity_wears": int(material_mock.get("longevity_wears", 0)),
                 "co2eq_per_kg": (
@@ -74,11 +75,8 @@ def get_designer_garment_reference_data(wiser_client: WiserClient) -> dict:
         )
 
     process_rows = []
-    process_defs = mock_data.get("process_types", {})
     for process_type in db_get_process_types():
-        process_mock = process_defs.get(
-            process_type["name"].lower(), process_defs.get("default", {})
-        )
+        process_mock = _process_cost_definition(process_type["name"], mock_data)
         ecological_unit_cost = _get_emission_per_unit(
             wiser_client, process_type["activity_id"], emission_cache
         )
@@ -87,7 +85,7 @@ def get_designer_garment_reference_data(wiser_client: WiserClient) -> dict:
             {
                 **process_type,
                 "economic_cost_per_unit_chf": _safe_round(
-                    float(process_mock.get("cost_per_unit_chf", 0))
+                    _process_unit_cost(process_type["name"], process_mock)
                 ),
                 "ecological_cost_per_unit_co2eq": (
                     _safe_round(float(ecological_unit_cost), 6)
@@ -202,7 +200,9 @@ def _build_fabric_block_reference_row(
         if material_emission_per_unit is not None
         else None
     )
-    material_cost = float(material.get("cost_per_kg_chf") or 0) * block_weight_kg
+    material_cost = calculate_material_cost_chf(
+        float(fabric_block_type["sqm"]), float(material["cost_per_sqm_chf"])
+    )
 
     block_processes, block_process_cost, block_process_co2 = (
         _build_fabric_block_process_breakdown(
@@ -211,6 +211,7 @@ def _build_fabric_block_reference_row(
     )
 
     distance_km = _get_material_distance_to_manufacturer_km(material["name"])
+    material_transport_cost = _transport_cost(distance_km, block_weight_kg, mock_data)
     transport_emission = calculate_transport_emission(
         float(distance_km or 0),
         block_weight_kg,
@@ -221,9 +222,9 @@ def _build_fabric_block_reference_row(
     if distance_km is not None:
         block_processes.append(
             {
-                "process": "material transport to manufacturer",
+                "process": MATERIAL_TRANSPORT_PROCESS_NAME,
                 "amount": _safe_round(distance_km, 3),
-                "economic_cost_chf": 0.0,
+                "economic_cost_chf": _safe_round(material_transport_cost),
                 "co2eq_kg": (
                     _safe_round(transport_emission, 3)
                     if transport_emission is not None
@@ -247,8 +248,12 @@ def _build_fabric_block_reference_row(
         "material": material["name"],
         "weight_kg": _safe_round(block_weight_kg, 3),
         "material_cost_chf": _safe_round(material_cost),
-        "block_process_cost_chf": _safe_round(block_process_cost),
-        "total_cost_chf": _safe_round(material_cost + block_process_cost),
+        "block_process_cost_chf": _safe_round(
+            block_process_cost + material_transport_cost
+        ),
+        "total_cost_chf": _safe_round(
+            material_cost + block_process_cost + material_transport_cost
+        ),
         "material_co2eq_kg": (
             _safe_round(material_emission, 3) if material_emission is not None else None
         ),
@@ -287,15 +292,28 @@ def _build_fabric_block_reference_rows(
 
 def _mock_material_data(material_name: str, mock_data: dict) -> dict:
     materials = mock_data.get("materials", {})
-    return materials.get(material_name.lower(), materials.get("default", {}))
+    return materials[material_name.lower()]
+
+
+def _process_unit_cost(process_name: str, process_data: dict) -> float:
+    if process_name.lower() == "transport":
+        return float(process_data["cost_per_ton_km_chf"])
+    return float(process_data["cost_per_unit_chf"])
+
+
+def _process_cost_definition(process_name: str, mock_data: dict) -> dict:
+    process_definitions = mock_data.get("process_types", {})
+    process_key = process_name.lower()
+    if process_key not in process_definitions:
+        raise KeyError(
+            f"No economic cost configured for process '{process_name}'"
+        )
+    return process_definitions[process_key]
 
 
 def _process_cost(process_name: str, amount: float, mock_data: dict) -> float:
-    process_definitions = mock_data.get("process_types", {})
-    process_data = process_definitions.get(
-        process_name.lower(), process_definitions.get("default", {})
-    )
-    return float(process_data.get("cost_per_unit_chf", 0)) * float(amount)
+    process_data = _process_cost_definition(process_name, mock_data)
+    return _process_unit_cost(process_name, process_data) * float(amount)
 
 
 def _transport_cost(
@@ -305,7 +323,7 @@ def _transport_cost(
         return 0.0
     process_definitions = mock_data.get("process_types", {})
     cost_per_ton_km = float(
-        process_definitions.get("transport", {}).get("cost_per_ton_km_chf", 0)
+        process_definitions["transport"]["cost_per_ton_km_chf"]
     )
     return cost_per_ton_km * (float(amount_kg) / 1000.0) * float(distance_km)
 
@@ -340,7 +358,6 @@ def _select_default_company(
 def _build_supply_chain_legs(
     fabric_supplier: dict | None,
     garment_supplier: dict | None,
-    finishing_supplier: dict | None,
     total_weight_kg: float,
     transport_emission_per_unit: float | None,
     mock_data: dict,
@@ -364,20 +381,7 @@ def _build_supply_chain_legs(
                 "delay_days": _actor_delay("garment", mock_data),
             }
         )
-    if finishing_supplier:
-        actors.append(
-            {
-                "role_group": "finishing",
-                "company": finishing_supplier["company"],
-                "location": finishing_supplier["location"],
-                "delay_days": _actor_delay("finishing", mock_data),
-            }
-        )
-
-    raw_legs = [
-        (fabric_supplier, garment_supplier),
-        (garment_supplier, finishing_supplier),
-    ]
+    raw_legs = [(fabric_supplier, garment_supplier)]
     legs = []
     transport_cost_total = 0.0
     transport_co2_total = 0.0
@@ -455,7 +459,6 @@ def get_designer_balance_scenario(
     material_id: int | None = None,
     fabric_supplier_name: str | None = None,
     garment_supplier_name: str | None = None,
-    finishing_supplier_name: str | None = None,
 ) -> dict:
     mock_data = load_designer_balance_mock_data()
     garment_types = db_get_garment_types()
@@ -498,7 +501,6 @@ def get_designer_balance_scenario(
     supplier_options = {
         "fabric": db_get_manufacturers("fabric"),
         "garment": db_get_manufacturers("garment"),
-        "finishing": db_get_manufacturers("finishing"),
     }
     selected_supplier_names = {
         "fabric": _select_default_company(
@@ -506,9 +508,6 @@ def get_designer_balance_scenario(
         ),
         "garment": _select_default_company(
             supplier_options["garment"], garment_supplier_name
-        ),
-        "finishing": _select_default_company(
-            supplier_options["finishing"], finishing_supplier_name
         ),
     }
     supplier_lookup = {
@@ -520,10 +519,6 @@ def get_designer_balance_scenario(
     garment_supplier = supplier_lookup["garment"].get(
         selected_supplier_names["garment"]
     )
-    finishing_supplier = supplier_lookup["finishing"].get(
-        selected_supplier_names["finishing"]
-    )
-
     total_weight_kg = sum(float(block.weight_kg or 0) for block in recipe.fabric_blocks)
     selected_material_kg_per_sqm = float(selected_material.get("kg_per_sqm") or 0)
     transport_emission_per_unit = wiser_client.get_emission_per_unit(
@@ -534,7 +529,6 @@ def get_designer_balance_scenario(
         _build_supply_chain_legs(
             fabric_supplier,
             garment_supplier,
-            finishing_supplier,
             total_weight_kg,
             transport_emission_per_unit,
             mock_data,
@@ -542,7 +536,7 @@ def get_designer_balance_scenario(
     )
 
     material_mock = _mock_material_data(selected_material["name"], mock_data)
-    material_cost_per_kg = float(material_mock.get("cost_per_kg_chf", 0))
+    material_cost_per_sqm = float(selected_material["cost_per_sqm_chf"])
 
     bom_by_block_name: dict[str, dict] = {}
     bop_rows: list[dict] = []
@@ -556,7 +550,9 @@ def get_designer_balance_scenario(
             if selected_material_kg_per_sqm > 0
             else 0.0
         )
-        material_cost = float(fabric_block.weight_kg or 0) * material_cost_per_kg
+        material_cost = calculate_material_cost_chf(
+            sqm_per_unit, material_cost_per_sqm
+        )
         if fabric_block.name not in bom_by_block_name:
             bom_by_block_name[fabric_block.name] = {
                 "fabric_block": fabric_block.name,
@@ -583,7 +579,18 @@ def get_designer_balance_scenario(
             process_name = process_detail.get("process", "Unknown")
             process_amount = float(process_detail.get("amount", 0))
             process_emission = float(process_detail.get("emission", 0))
-            process_cost = _process_cost(process_name, process_amount, mock_data)
+            if process_name == MATERIAL_TRANSPORT_PROCESS_NAME:
+                process_cost = _transport_cost(
+                    process_amount, float(fabric_block.weight_kg or 0), mock_data
+                )
+                process_key = "transport"
+                process_usage_amount = (
+                    process_amount * float(fabric_block.weight_kg or 0) / 1000.0
+                )
+            else:
+                process_cost = _process_cost(process_name, process_amount, mock_data)
+                process_key = process_name.lower()
+                process_usage_amount = process_amount
             bop_rows.append(
                 {
                     "source": f"Fabric block {fabric_block.name}",
@@ -593,15 +600,12 @@ def get_designer_balance_scenario(
                     "co2eq_kg": _safe_round(process_emission, 3),
                 }
             )
-            if process_name.lower() in {
-                item["name"].lower() for item in db_get_process_types()
-            }:
-                process_key = process_name.lower()
+            if process_key in {item["name"].lower() for item in db_get_process_types()}:
                 current = process_usage.setdefault(
                     process_key,
                     {"amount": 0.0, "economic_cost_chf": 0.0, "co2eq_kg": 0.0},
                 )
-                current["amount"] += process_amount
+                current["amount"] += process_usage_amount
                 current["economic_cost_chf"] += process_cost
                 current["co2eq_kg"] += process_emission
 
@@ -647,11 +651,13 @@ def get_designer_balance_scenario(
         for leg in supply_chain_legs
     )
 
-    process_usage["transport"] = {
-        "amount": transport_tkm,
-        "economic_cost_chf": total_transport_cost,
-        "co2eq_kg": total_transport_co2,
-    }
+    transport_usage = process_usage.setdefault(
+        "transport",
+        {"amount": 0.0, "economic_cost_chf": 0.0, "co2eq_kg": 0.0},
+    )
+    transport_usage["amount"] += transport_tkm
+    transport_usage["economic_cost_chf"] += total_transport_cost
+    transport_usage["co2eq_kg"] += total_transport_co2
 
     bom_rows = []
     total_material_cost = 0.0
@@ -691,7 +697,7 @@ def get_designer_balance_scenario(
         "material": {
             "id": selected_material["id"],
             "name": selected_material["name"],
-            "cost_per_kg_chf": _safe_round(material_cost_per_kg),
+            "cost_per_sqm_chf": _safe_round(material_cost_per_sqm, 3),
             "longevity_wears": int(material_mock.get("longevity_wears", 0)),
         },
         "options": {
@@ -701,7 +707,6 @@ def get_designer_balance_scenario(
         "selection": {
             "fabric_supplier": selected_supplier_names["fabric"],
             "garment_supplier": selected_supplier_names["garment"],
-            "finishing_supplier": selected_supplier_names["finishing"],
         },
         "summary": {
             "bom_cost_chf": _safe_round(total_material_cost),

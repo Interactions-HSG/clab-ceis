@@ -13,6 +13,7 @@ from ceis_backend.utils import (
     calculate_replacement_fabric_blocks_emissions,
     refresh_sold_garment_co2_values,
 )
+from ceis_backend.resource_event_emissions import enrich_resource_events_with_co2
 from ceis_backend.designer_balance import (
     get_designer_garment_reference_data,
     get_designer_balance_options,
@@ -27,6 +28,9 @@ from ceis_backend.queries import (
     db_get_strategy_progress,
     db_get_materials_for_garment,
     db_get_recipe_fabric_blocks,
+    db_get_resource_events,
+    db_get_supply_chain_graph,
+    db_create_order,
     db_upsert_material,
     db_delete_garment_recipe,
     db_create_fabric_block_type,
@@ -53,6 +57,7 @@ from ceis_backend.models import (
     GarmentTypeCreate,
     MaterialCreate,
     ProcessTypeCreate,
+    OrderCreate,
 )
 
 
@@ -104,8 +109,49 @@ def get_materials():
 def get_strategy_progress(
     wiser_client: WiserClient = Depends(get_wiser_client),
 ):
-    refresh_sold_garment_co2_values(wiser_client)
+    try:
+        refresh_sold_garment_co2_values(wiser_client)
+    except WiserClientError:
+        # Strategy progress should remain available from stored DB values even
+        # when Wiser is offline or credentials/network are unavailable.
+        pass
     return db_get_strategy_progress()
+
+
+@app.get("/supply-chain")
+def get_supply_chain():
+    return db_get_supply_chain_graph()
+
+
+@app.get("/resource-events")
+def get_resource_events(
+    manufacturer_id: int | None = None,
+    manufacturer_distance_id: int | None = None,
+    material_id: int | None = None,
+    material_manufacturer_distance_id: int | None = None,
+    lifecycle_node: str | None = None,
+    lifecycle_edge: str | None = None,
+    supply_chain_only: bool = False,
+    wiser_client: WiserClient = Depends(get_wiser_client),
+):
+    events = db_get_resource_events(
+        manufacturer_id=manufacturer_id,
+        manufacturer_distance_id=manufacturer_distance_id,
+        material_id=material_id,
+        material_manufacturer_distance_id=material_manufacturer_distance_id,
+        lifecycle_node=lifecycle_node,
+        lifecycle_edge=lifecycle_edge,
+        supply_chain_only=supply_chain_only,
+    )
+    try:
+        return enrich_resource_events_with_co2(events, wiser_client)
+    except WiserClientError:
+        return events
+
+
+@app.post("/orders", status_code=201)
+def create_order(payload: OrderCreate):
+    return db_create_order(payload.garment_type_id, payload.material_id)
 
 
 @app.get("/garment-types/{garment_type_id}/materials")
@@ -131,7 +177,6 @@ def get_designer_balance(
     material_id: int | None = None,
     fabric_supplier: str | None = None,
     garment_supplier: str | None = None,
-    finishing_supplier: str | None = None,
     wiser_client: WiserClient = Depends(get_wiser_client),
 ):
     return get_designer_balance_scenario(
@@ -140,7 +185,6 @@ def get_designer_balance(
         material_id=material_id,
         fabric_supplier_name=fabric_supplier,
         garment_supplier_name=garment_supplier,
-        finishing_supplier_name=finishing_supplier,
     )
 
 
@@ -151,7 +195,12 @@ def get_recipe_fabric_blocks_for_garment(garment_type_id: int):
 
 @app.post("/materials")
 def upsert_material(payload: MaterialCreate):
-    return db_upsert_material(payload.name, payload.kg_per_sqm, payload.activity_id)
+    return db_upsert_material(
+        payload.name,
+        payload.kg_per_sqm,
+        payload.cost_per_sqm_chf,
+        payload.activity_id,
+    )
 
 
 @app.delete("/garment-recipes/{garment_type_id}")
