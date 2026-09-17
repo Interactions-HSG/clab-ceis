@@ -3,7 +3,11 @@ from __future__ import annotations
 from unittest.mock import Mock, patch
 
 from ceis_shop.layouts.scenarios import scenarios_page
-from ceis_shop.layouts.garment import garment_page, render_co2_content
+from ceis_shop.layouts.garment import (
+    _format_condition,
+    garment_page,
+    render_co2_content,
+)
 from ceis_shop.layouts.home import home_page
 from ceis_shop.main import app as shop_app
 
@@ -60,8 +64,8 @@ def test_garment_page_contains_recipe_and_co2_sections():
         materials_response = Mock()
         materials_response.raise_for_status.return_value = None
         materials_response.json.return_value = [
-            {"id": 1, "name": "hemp"},
-            {"id": 2, "name": "cotton"},
+            {"id": 1, "name": "hemp", "cost_per_sqm_chf": 5.04},
+            {"id": 2, "name": "cotton", "cost_per_sqm_chf": 2.52},
         ]
 
         recipe_fabric_blocks_response = Mock()
@@ -84,6 +88,8 @@ def test_garment_page_contains_recipe_and_co2_sections():
     assert "Select a material to view recipe details." not in text
     assert "Select a material to view CO2 emissions." in text
     assert "garment-material-dropdown" in text
+    assert "garment-order-button" in text
+    assert "garment-order-result" in text
     assert "page-home-link" in text
     assert "shop-home-button" in text
     assert "Link" in text
@@ -100,7 +106,9 @@ def test_garment_page_auto_uses_single_material_for_co2_without_blocking_layout(
 
         materials_response = Mock()
         materials_response.raise_for_status.return_value = None
-        materials_response.json.return_value = [{"id": 1, "name": "hemp"}]
+        materials_response.json.return_value = [
+            {"id": 1, "name": "hemp", "cost_per_sqm_chf": 5.04}
+        ]
 
         recipe_fabric_blocks_response = Mock()
         recipe_fabric_blocks_response.raise_for_status.return_value = None
@@ -178,23 +186,39 @@ def test_render_co2_content_shows_alternatives_and_capped_discount():
             "processes": {"total_emission": 1.0, "details": []},
         },
         base_price_chf=100.0,
+        material_cost_per_sqm_chf=5.04,
     )
 
     text = str(layout)
 
     assert (
-        "80x64 can be replaced by a second-life cotton block with quality 80 %" in text
+        "80x64 can be replaced by a second-life cotton block in very good condition"
+        in text
     )
     assert (
-        "64x40 can be replaced by a second-life linen block with quality 95 %" in text
+        "64x40 can be replaced by a second-life linen block in excellent condition"
+        in text
     )
-    assert "32x32 can be replaced by a second-life wool block with quality 70 %" in text
+    assert (
+        "32x32 can be replaced by a second-life wool block in good condition" in text
+    )
+    assert "with quality" not in text
     assert "16x16 can be replaced" not in text
     assert (
         "Choosing the available alternative fabric blocks would reduce this to "
         "1.450 kg CO2eq, saving 1.550 kg CO2eq." in text
     )
     assert "Price: CHF 40.00 (60% discount from CHF 100.00)" in text
+    assert "Fabric rate: CHF 5.04/m²." in text
+
+
+def test_format_condition_uses_clear_quality_bands():
+    assert _format_condition(90) == "excellent condition"
+    assert _format_condition(89.9) == "very good condition"
+    assert _format_condition(75) == "very good condition"
+    assert _format_condition(74.9) == "good condition"
+    assert _format_condition(50) == "good condition"
+    assert _format_condition(49.9) == "fair condition"
 
 
 def test_render_co2_content_shows_no_savings_message_without_replacements():

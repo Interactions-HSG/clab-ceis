@@ -1,10 +1,188 @@
-import sqlite3
+import json
 import os
+import sqlite3
+from pathlib import Path
 
 from ceis_backend.config import DB_PATH
 from ceis_backend.manufacturer_distance_sync import (
     sync_manufacturer_distances_if_changed,
 )
+
+SEED_DATA_PATH = Path(__file__).with_name("data") / "seed_data.json"
+
+
+def load_seed_data():
+    with SEED_DATA_PATH.open(encoding="utf-8") as seed_file:
+        return json.load(seed_file)
+
+
+def _id_for_name(cursor, table, name):
+    cursor.execute(f"SELECT id FROM {table} WHERE name = ?", (name,))
+    row = cursor.fetchone()
+    if row is None:
+        raise ValueError(f"Missing seed dependency: {table}.{name}")
+    return row[0]
+
+
+def _insert_recipe_row(cursor, table, values, identity_columns):
+    columns = tuple(values)
+    placeholders = ", ".join("?" for _ in columns)
+    identity_clause = " AND ".join(f"{column} = ?" for column in identity_columns)
+    cursor.execute(
+        f"""
+        INSERT INTO {table} ({", ".join(columns)})
+        SELECT {placeholders}
+        WHERE NOT EXISTS (
+            SELECT 1 FROM {table} WHERE {identity_clause}
+        )
+        """,
+        tuple(values.values()) + tuple(values[column] for column in identity_columns),
+    )
+
+
+def seed_data(cursor):
+    seed_data = load_seed_data()
+
+    cursor.executemany(
+        """
+        INSERT OR IGNORE INTO materials (
+            name, kg_per_sqm, cost_per_sqm_chf, activity_id
+        ) VALUES (:name, :kg_per_sqm, :cost_per_sqm_chf, :activity_id)
+        """,
+        seed_data["materials"],
+    )
+    cursor.executemany(
+        "INSERT OR IGNORE INTO locations (name) VALUES (:name)",
+        seed_data["locations"],
+    )
+    cursor.executemany(
+        """
+        INSERT OR IGNORE INTO fabric_block_types (name, sqm)
+        VALUES (:name, :sqm)
+        """,
+        seed_data["fabric_block_types"],
+    )
+    cursor.executemany(
+        """
+        INSERT OR IGNORE INTO process_types (name, unit, activity_id)
+        VALUES (:name, :unit, :activity_id)
+        """,
+        seed_data["process_types"],
+    )
+    cursor.executemany(
+        """
+        INSERT OR IGNORE INTO garment_types (name, price_chf)
+        VALUES (:name, :price_chf)
+        """,
+        seed_data["garment_types"],
+    )
+
+    for garment in seed_data["garment_types"]:
+        garment_id = _id_for_name(cursor, "garment_types", garment["name"])
+
+        for fabric_block_name, amount in garment["fabric_blocks"].items():
+            _insert_recipe_row(
+                cursor,
+                "garment_recipe_fabric_blocks",
+                {
+                    "garment_type": garment_id,
+                    "fabric_block_id": _id_for_name(
+                        cursor, "fabric_block_types", fabric_block_name
+                    ),
+                    "amount": amount,
+                },
+                ("garment_type", "fabric_block_id"),
+            )
+
+        for material_name in garment["materials"]:
+            _insert_recipe_row(
+                cursor,
+                "garment_recipe_materials",
+                {
+                    "garment_type": garment_id,
+                    "material_id": _id_for_name(
+                        cursor, "materials", material_name
+                    ),
+                },
+                ("garment_type", "material_id"),
+            )
+
+        for process in seed_data["default_garment_processes"]:
+            _insert_recipe_row(
+                cursor,
+                "garment_recipe_processes",
+                {
+                    "garment_type": garment_id,
+                    "process_id": _id_for_name(
+                        cursor, "process_types", process["process"]
+                    ),
+                    "amount": process["amount"],
+                },
+                ("garment_type", "process_id"),
+            )
+
+    for process in seed_data["fabric_block_processes"]:
+        _insert_recipe_row(
+            cursor,
+            "fabric_block_recipe_processes",
+            {
+                "fabric_block_type": _id_for_name(
+                    cursor, "fabric_block_types", process["fabric_block"]
+                ),
+                "process_id": _id_for_name(
+                    cursor, "process_types", process["process"]
+                ),
+                "amount": process["amount"],
+            },
+            ("fabric_block_type", "process_id"),
+        )
+
+
+def _insert_demo_fabric_block(cursor, fabric_block, garment_id=None):
+    cursor.execute(
+        """
+        INSERT INTO fabric_blocks_inventory (
+            type_id, co2eq, garment_id, location_id, material_id, quality,
+            second_life
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            _id_for_name(cursor, "fabric_block_types", fabric_block["type"]),
+            fabric_block.get("co2eq"),
+            garment_id,
+            _id_for_name(cursor, "locations", fabric_block["location"]),
+            _id_for_name(cursor, "materials", fabric_block["material"]),
+            fabric_block["quality"],
+            fabric_block["second_life"],
+        ),
+    )
+
+
+def seed_demo_sales_data(cursor):
+    cursor.execute("SELECT COUNT(*) FROM garments_inventory")
+    if cursor.fetchone()[0] > 0:
+        return
+
+    seed_data = load_seed_data()
+    for garment in seed_data["demo_garments"]:
+        cursor.execute(
+            """
+            INSERT INTO garments_inventory (type_id, co2eq, price, sold)
+            VALUES (?, ?, ?, ?)
+            """,
+            (
+                _id_for_name(cursor, "garment_types", garment["garment_type"]),
+                garment["co2eq"],
+                garment["price"],
+                garment["sold"],
+            ),
+        )
+        garment_id = cursor.lastrowid
+        for fabric_block in garment["fabric_blocks"]:
+            _insert_demo_fabric_block(cursor, fabric_block, garment_id)
+
+    for fabric_block in seed_data["loose_demo_fabric_blocks"]:
+        _insert_demo_fabric_block(cursor, fabric_block)
 
 
 def create_tables(cursor):
@@ -24,6 +202,7 @@ def create_tables(cursor):
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL UNIQUE,
             kg_per_sqm REAL NOT NULL,
+            cost_per_sqm_chf REAL,
             activity_id INTEGER NOT NULL
         )
     """
@@ -174,10 +353,11 @@ def create_tables(cursor):
         """
         CREATE TABLE IF NOT EXISTS manufacturers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            company TEXT NOT NULL UNIQUE,
+            company TEXT NOT NULL,
             role TEXT NOT NULL,
             role_group TEXT NOT NULL,
-            location TEXT NOT NULL
+            location TEXT NOT NULL,
+            UNIQUE(company, role_group)
         )
     """
     )
@@ -194,6 +374,69 @@ def create_tables(cursor):
             destination_location TEXT NOT NULL,
             distance_km REAL NOT NULL,
             UNIQUE(source_company, destination_company)
+        )
+    """
+    )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            garment_type_id INTEGER NOT NULL,
+            material_id INTEGER,
+            garment_inventory_id INTEGER,
+            fulfillment_type TEXT NOT NULL CHECK (fulfillment_type IN ('stock', 'production')),
+            status TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (garment_type_id) REFERENCES garment_types(id),
+            FOREIGN KEY (material_id) REFERENCES materials(id),
+            FOREIGN KEY (garment_inventory_id) REFERENCES garments_inventory(id)
+        )
+    """
+    )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS material_manufacturer_distances (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            material_id INTEGER NOT NULL,
+            destination_manufacturer_id INTEGER NOT NULL,
+            distance_km REAL NOT NULL,
+            FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE,
+            FOREIGN KEY (destination_manufacturer_id) REFERENCES manufacturers(id) ON DELETE CASCADE,
+            UNIQUE(material_id, destination_manufacturer_id)
+        )
+    """
+    )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS resource_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_trigger TEXT NOT NULL,
+            timestamp TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            request_type TEXT NOT NULL,
+            resource_type TEXT NOT NULL,
+            co2eq REAL,
+            status TEXT NOT NULL,
+            lifecycle_node TEXT,
+            lifecycle_edge TEXT,
+            manufacturer_id INTEGER,
+            manufacturer_distance_id INTEGER,
+            material_id INTEGER,
+            material_manufacturer_distance_id INTEGER,
+            order_id INTEGER,
+            FOREIGN KEY (manufacturer_id) REFERENCES manufacturers(id) ON DELETE CASCADE,
+            FOREIGN KEY (manufacturer_distance_id) REFERENCES manufacturer_distances(id) ON DELETE CASCADE,
+            FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE,
+            FOREIGN KEY (material_manufacturer_distance_id) REFERENCES material_manufacturer_distances(id) ON DELETE CASCADE,
+            FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+            CHECK (
+                (manufacturer_id IS NOT NULL) +
+                (manufacturer_distance_id IS NOT NULL) +
+                (material_id IS NOT NULL) +
+                (material_manufacturer_distance_id IS NOT NULL) <= 1
+            )
         )
     """
     )
@@ -227,279 +470,192 @@ def create_tables(cursor):
     """
     )
 
-    cursor.executescript(
+
+def seed_material_supply_chain(cursor):
+    for distance in load_seed_data()["material_supply_chain"]:
+        cursor.execute(
+            """
+            INSERT OR IGNORE INTO material_manufacturer_distances (
+                material_id, destination_manufacturer_id, distance_km
+            )
+            SELECT materials.id, manufacturers.id, ?
+            FROM materials CROSS JOIN manufacturers
+            WHERE materials.name = ? AND manufacturers.role_group = 'fabric'
+            """,
+            (distance["distance_km"], distance["material"]),
+        )
+
+
+RESOURCE_EVENT_LINK_COLUMNS = {
+    "manufacturer_id",
+    "manufacturer_distance_id",
+    "material_id",
+    "material_manufacturer_distance_id",
+}
+
+
+def _resource_event_exists(cursor, column, value):
+    if column not in RESOURCE_EVENT_LINK_COLUMNS | {
+        "lifecycle_node",
+        "lifecycle_edge",
+    }:
+        raise ValueError(f"Unsupported resource event identity: {column}")
+    cursor.execute(
+        f"SELECT 1 FROM resource_events WHERE {column} = ?",
+        (value,),
+    )
+    return cursor.fetchone() is not None
+
+
+def _insert_resource_event(cursor, event, timestamp_offset="0 minutes"):
+    cursor.execute(
         """
-        CREATE TABLE IF NOT EXISTS seed_meta (
-            id INTEGER PRIMARY KEY CHECK (id = 1),
-            seeded INTEGER NOT NULL
-        );
-        INSERT OR IGNORE INTO seed_meta (id, seeded) VALUES (1, 0);
-    """
+        INSERT INTO resource_events (
+            event_trigger, timestamp, request_type, resource_type, co2eq, status,
+            lifecycle_node, lifecycle_edge, manufacturer_id,
+            manufacturer_distance_id, material_id,
+            material_manufacturer_distance_id
+        ) VALUES (?, datetime('now', ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            event["event_trigger"],
+            timestamp_offset,
+            event["request_type"],
+            event["resource_type"],
+            event["co2eq"],
+            event["status"],
+            event.get("lifecycle_node"),
+            event.get("lifecycle_edge"),
+            event.get("manufacturer_id"),
+            event.get("manufacturer_distance_id"),
+            event.get("material_id"),
+            event.get("material_manufacturer_distance_id"),
+        ),
     )
 
 
-def seed_data(cursor):
-    cursor.execute("SELECT seeded FROM seed_meta WHERE id = 1;")
-    if cursor.fetchone()[0] != 0:
-        print("Database already seeded, skipping seeding.")
-        return
+def seed_resource_events(cursor):
+    """Seed resource events from JSON templates and current supply-chain rows."""
+    seed_data = load_seed_data()["resource_events"]
+    defaults = seed_data["defaults"]
 
-    cursor.executescript(
-        """
-        INSERT OR IGNORE INTO locations (name) VALUES
-        ('St. Gallen'),
-        ('Sigmaringen'),
-        ('Dornbirn'),
-        ('Ravensburg');
-
-        INSERT OR IGNORE INTO materials (name, kg_per_sqm, activity_id) VALUES
-        ('hemp', 0.21, 276186),
-        ('cotton', 0.14, 6756),
-        ('silk', 0.082, 20936),
-        ('mikado silk', 0.13, 20936);
-
-        INSERT OR IGNORE INTO garment_types (name, price_chf) VALUES
-        ('Basic Trousers', 100),
-        ('Full Trousers', 100),
-        ('Basic Jumpsuit short sleeves', 100),
-        ('Basic Jumpsuit long sleeves', 100),
-        ('Elegant cowl neck top', 100),
-        ('Elegant cowl neck dress', 100),
-        ('Wrap Skirt', 100),
-        ('Daily dress with pocket', 100),
-        ('Cocktail fitted dress', 100),
-        ('Long tabard', 100),
-        ('Cocoon jacket', 100),
-        ('Orka jacket', 100),
-        ('Nordlys Dress', 100),
-        ('Mangata Dress', 100),
-        ('Måne top', 100),
-        ('Sommar Skirt', 100),
-        ('Basic Unisex Shirt with pocket', 100),
-        ('Basic Crop Top', 100);
-
-        INSERT OR IGNORE INTO fabric_block_types (name, sqm) VALUES
-        ('80x64', 0.512),
-        ('40x14', 0.056),
-        ('20x15', 0.03),
-        ('64x40', 0.256),
-        ('100x64', 0.64),
-        ('100x80', 0.8),
-        ('140x14', 0.196),
-        ('140x28', 0.392),
-        ('160x100', 1.6),
-        ('4x48', 0.0192);
-
-        INSERT OR IGNORE INTO process_types (name, unit, activity_id) VALUES
-        ('sewing', 'kWh', 6566),
-        ('steaming', 'kWh', 6566),
-        ('washing', 'kWh', 6566),
-        ('dyeing', 'kg', 21893),
-        -- Transport of fabric to Cristina. Assumes lorry, >32 metric ton, diesel, EURO 5
-        ('transport', 'tkm', 17901);
-
-        INSERT OR IGNORE INTO garment_recipe_fabric_blocks (garment_type, fabric_block_id, amount) VALUES
-        -- Basic Trousers
-        ((SELECT id FROM garment_types WHERE name='Basic Trousers'), (SELECT id FROM fabric_block_types WHERE name='100x64'), 2),
-        ((SELECT id FROM garment_types WHERE name='Basic Trousers'), (SELECT id FROM fabric_block_types WHERE name='64x40'), 2),
-        ((SELECT id FROM garment_types WHERE name='Basic Trousers'), (SELECT id FROM fabric_block_types WHERE name='20x15'), 4),
-        -- Full Trousers
-        ((SELECT id FROM garment_types WHERE name='Full Trousers'), (SELECT id FROM fabric_block_types WHERE name='100x64'), 2),
-        ((SELECT id FROM garment_types WHERE name='Full Trousers'), (SELECT id FROM fabric_block_types WHERE name='64x40'), 4),
-        ((SELECT id FROM garment_types WHERE name='Full Trousers'), (SELECT id FROM fabric_block_types WHERE name='20x15'), 4),
-        -- Basic Jumpsuit short sleeves
-        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit short sleeves'), (SELECT id FROM fabric_block_types WHERE name='80x64'), 1),
-        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit short sleeves'), (SELECT id FROM fabric_block_types WHERE name='100x64'), 2),
-        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit short sleeves'), (SELECT id FROM fabric_block_types WHERE name='140x14'), 1),
-        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit short sleeves'), (SELECT id FROM fabric_block_types WHERE name='40x14'), 4),
-        -- Basic Jumpsuit long sleeves
-        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit long sleeves'), (SELECT id FROM fabric_block_types WHERE name='80x64'), 1),
-        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit long sleeves'), (SELECT id FROM fabric_block_types WHERE name='100x64'), 2),
-        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit long sleeves'), (SELECT id FROM fabric_block_types WHERE name='140x14'), 1),
-        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit long sleeves'), (SELECT id FROM fabric_block_types WHERE name='40x14'), 4),
-        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit long sleeves'), (SELECT id FROM fabric_block_types WHERE name='64x40'), 2),
-        -- Elegant cowl neck top
-        ((SELECT id FROM garment_types WHERE name='Elegant cowl neck top'), (SELECT id FROM fabric_block_types WHERE name='64x40'), 2),
-        ((SELECT id FROM garment_types WHERE name='Elegant cowl neck top'), (SELECT id FROM fabric_block_types WHERE name='4x48'), 2),
-        -- Elegant cowl neck dress
-        ((SELECT id FROM garment_types WHERE name='Elegant cowl neck dress'), (SELECT id FROM fabric_block_types WHERE name='64x40'), 4),
-        ((SELECT id FROM garment_types WHERE name='Elegant cowl neck dress'), (SELECT id FROM fabric_block_types WHERE name='4x48'), 2),
-        -- Wrap Skirt
-        ((SELECT id FROM garment_types WHERE name='Wrap Skirt'), (SELECT id FROM fabric_block_types WHERE name='100x80'), 1),
-        ((SELECT id FROM garment_types WHERE name='Wrap Skirt'), (SELECT id FROM fabric_block_types WHERE name='40x14'), 2),
-        ((SELECT id FROM garment_types WHERE name='Wrap Skirt'), (SELECT id FROM fabric_block_types WHERE name='140x14'), 1),
-        -- Daily dress with pocket
-        ((SELECT id FROM garment_types WHERE name='Daily dress with pocket'), (SELECT id FROM fabric_block_types WHERE name='140x28'), 4),
-        ((SELECT id FROM garment_types WHERE name='Daily dress with pocket'), (SELECT id FROM fabric_block_types WHERE name='140x14'), 2),
-        ((SELECT id FROM garment_types WHERE name='Daily dress with pocket'), (SELECT id FROM fabric_block_types WHERE name='40x14'), 2),
-        -- Cocktail fitted dress
-        ((SELECT id FROM garment_types WHERE name='Cocktail fitted dress'), (SELECT id FROM fabric_block_types WHERE name='100x80'), 2),
-        ((SELECT id FROM garment_types WHERE name='Cocktail fitted dress'), (SELECT id FROM fabric_block_types WHERE name='140x28'), 4),
-        -- Long tabard
-        ((SELECT id FROM garment_types WHERE name='Long tabard'), (SELECT id FROM fabric_block_types WHERE name='140x28'), 4),
-        ((SELECT id FROM garment_types WHERE name='Long tabard'), (SELECT id FROM fabric_block_types WHERE name='40x14'), 1),
-        -- Cocoon jacket
-        ((SELECT id FROM garment_types WHERE name='Cocoon jacket'), (SELECT id FROM fabric_block_types WHERE name='100x80'), 3),
-        ((SELECT id FROM garment_types WHERE name='Cocoon jacket'), (SELECT id FROM fabric_block_types WHERE name='40x14'), 6),
-        -- Orka jacket
-        ((SELECT id FROM garment_types WHERE name='Orka jacket'), (SELECT id FROM fabric_block_types WHERE name='100x80'), 1),
-        -- Nordlys Dress
-        ((SELECT id FROM garment_types WHERE name='Nordlys Dress'), (SELECT id FROM fabric_block_types WHERE name='160x100'), 1),
-        ((SELECT id FROM garment_types WHERE name='Nordlys Dress'), (SELECT id FROM fabric_block_types WHERE name='100x80'), 1),
-        -- Mangata Dress
-        ((SELECT id FROM garment_types WHERE name='Mangata Dress'), (SELECT id FROM fabric_block_types WHERE name='160x100'), 1),
-        ((SELECT id FROM garment_types WHERE name='Mangata Dress'), (SELECT id FROM fabric_block_types WHERE name='100x80'), 1),
-        ((SELECT id FROM garment_types WHERE name='Mangata Dress'), (SELECT id FROM fabric_block_types WHERE name='4x48'), 1),
-        -- Måne top
-        ((SELECT id FROM garment_types WHERE name='Måne top'), (SELECT id FROM fabric_block_types WHERE name='100x80'), 1),
-        ((SELECT id FROM garment_types WHERE name='Måne top'), (SELECT id FROM fabric_block_types WHERE name='4x48'), 2),
-        -- Sommar Skirt
-        ((SELECT id FROM garment_types WHERE name='Sommar Skirt'), (SELECT id FROM fabric_block_types WHERE name='160x100'), 1),
-        -- Basic Unisex Shirt with pocket
-        ((SELECT id FROM garment_types WHERE name='Basic Unisex Shirt with pocket'), (SELECT id FROM fabric_block_types WHERE name='80x64'), 1),
-        ((SELECT id FROM garment_types WHERE name='Basic Unisex Shirt with pocket'), (SELECT id FROM fabric_block_types WHERE name='64x40'), 4),
-        ((SELECT id FROM garment_types WHERE name='Basic Unisex Shirt with pocket'), (SELECT id FROM fabric_block_types WHERE name='40x14'), 3),
-        -- Basic Crop Top
-        ((SELECT id FROM garment_types WHERE name='Basic Crop Top'), (SELECT id FROM fabric_block_types WHERE name='80x64'), 1),
-        ((SELECT id FROM garment_types WHERE name='Basic Crop Top'), (SELECT id FROM fabric_block_types WHERE name='40x14'), 3);
-
-        INSERT OR IGNORE INTO garment_recipe_materials (garment_type, material_id) VALUES
-        -- Basic Trousers (Hemp, Cotton)
-        ((SELECT id FROM garment_types WHERE name='Basic Trousers'), (SELECT id FROM materials WHERE name='hemp')),
-        ((SELECT id FROM garment_types WHERE name='Basic Trousers'), (SELECT id FROM materials WHERE name='cotton')),
-        -- Full Trousers (Hemp, Cotton)
-        ((SELECT id FROM garment_types WHERE name='Full Trousers'), (SELECT id FROM materials WHERE name='hemp')),
-        ((SELECT id FROM garment_types WHERE name='Full Trousers'), (SELECT id FROM materials WHERE name='cotton')),
-        -- Basic Jumpsuit short sleeves (Hemp, Cotton)
-        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit short sleeves'), (SELECT id FROM materials WHERE name='hemp')),
-        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit short sleeves'), (SELECT id FROM materials WHERE name='cotton')),
-        -- Basic Jumpsuit long sleeves (Hemp, Cotton)
-        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit long sleeves'), (SELECT id FROM materials WHERE name='hemp')),
-        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit long sleeves'), (SELECT id FROM materials WHERE name='cotton')),
-        -- Elegant cowl neck top (Silk)
-        ((SELECT id FROM garment_types WHERE name='Elegant cowl neck top'), (SELECT id FROM materials WHERE name='silk')),
-        -- Elegant cowl neck dress (Silk)
-        ((SELECT id FROM garment_types WHERE name='Elegant cowl neck dress'), (SELECT id FROM materials WHERE name='silk')),
-        -- Wrap Skirt (Hemp)
-        ((SELECT id FROM garment_types WHERE name='Wrap Skirt'), (SELECT id FROM materials WHERE name='hemp')),
-        -- Daily dress with pocket (Hemp, Cotton)
-        ((SELECT id FROM garment_types WHERE name='Daily dress with pocket'), (SELECT id FROM materials WHERE name='hemp')),
-        ((SELECT id FROM garment_types WHERE name='Daily dress with pocket'), (SELECT id FROM materials WHERE name='cotton')),
-        -- Cocktail fitted dress (Silk)
-        ((SELECT id FROM garment_types WHERE name='Cocktail fitted dress'), (SELECT id FROM materials WHERE name='silk')),
-        -- Long tabard (Hemp)
-        ((SELECT id FROM garment_types WHERE name='Long tabard'), (SELECT id FROM materials WHERE name='hemp')),
-        -- Cocoon jacket (Hemp)
-        ((SELECT id FROM garment_types WHERE name='Cocoon jacket'), (SELECT id FROM materials WHERE name='hemp')),
-        -- Orka jacket (Cotton)
-        ((SELECT id FROM garment_types WHERE name='Orka jacket'), (SELECT id FROM materials WHERE name='cotton')),
-        -- Nordlys Dress (Cotton)
-        ((SELECT id FROM garment_types WHERE name='Nordlys Dress'), (SELECT id FROM materials WHERE name='cotton')),
-        -- Mangata Dress (Cotton)
-        ((SELECT id FROM garment_types WHERE name='Mangata Dress'), (SELECT id FROM materials WHERE name='cotton')),
-        -- Basic Crop Top (Hemp)
-        ((SELECT id FROM garment_types WHERE name='Basic Crop Top'), (SELECT id FROM materials WHERE name='hemp'));
-       
-        INSERT OR IGNORE INTO garment_recipe_processes (garment_type, process_id, amount) VALUES
-        ((SELECT id FROM garment_types WHERE name='Basic Trousers'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),  -- Assuming 1 hour of sewing with a machine of 42 W
-        ((SELECT id FROM garment_types WHERE name='Basic Trousers'), (SELECT id FROM process_types WHERE name='steaming'), 0.22), -- Assuming 10 minutes of steaming with a machine of 2200 W
-        ((SELECT id FROM garment_types WHERE name='Full Trousers'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
-        ((SELECT id FROM garment_types WHERE name='Full Trousers'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
-        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit short sleeves'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
-        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit short sleeves'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
-        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit long sleeves'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
-        ((SELECT id FROM garment_types WHERE name='Basic Jumpsuit long sleeves'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
-        ((SELECT id FROM garment_types WHERE name='Elegant cowl neck top'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
-        ((SELECT id FROM garment_types WHERE name='Elegant cowl neck top'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
-        ((SELECT id FROM garment_types WHERE name='Elegant cowl neck dress'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
-        ((SELECT id FROM garment_types WHERE name='Elegant cowl neck dress'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
-        ((SELECT id FROM garment_types WHERE name='Wrap Skirt'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
-        ((SELECT id FROM garment_types WHERE name='Wrap Skirt'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
-        ((SELECT id FROM garment_types WHERE name='Daily dress with pocket'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
-        ((SELECT id FROM garment_types WHERE name='Daily dress with pocket'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
-        ((SELECT id FROM garment_types WHERE name='Cocktail fitted dress'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
-        ((SELECT id FROM garment_types WHERE name='Cocktail fitted dress'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
-        ((SELECT id FROM garment_types WHERE name='Long tabard'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
-        ((SELECT id FROM garment_types WHERE name='Long tabard'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
-        ((SELECT id FROM garment_types WHERE name='Cocoon jacket'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
-        ((SELECT id FROM garment_types WHERE name='Cocoon jacket'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
-        ((SELECT id FROM garment_types WHERE name='Orka jacket'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
-        ((SELECT id FROM garment_types WHERE name='Orka jacket'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
-        ((SELECT id FROM garment_types WHERE name='Nordlys Dress'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
-        ((SELECT id FROM garment_types WHERE name='Nordlys Dress'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
-        ((SELECT id FROM garment_types WHERE name='Mangata Dress'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
-        ((SELECT id FROM garment_types WHERE name='Mangata Dress'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
-        ((SELECT id FROM garment_types WHERE name='Måne top'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
-        ((SELECT id FROM garment_types WHERE name='Måne top'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
-        ((SELECT id FROM garment_types WHERE name='Sommar Skirt'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
-        ((SELECT id FROM garment_types WHERE name='Sommar Skirt'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
-        ((SELECT id FROM garment_types WHERE name='Basic Unisex Shirt with pocket'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
-        ((SELECT id FROM garment_types WHERE name='Basic Unisex Shirt with pocket'), (SELECT id FROM process_types WHERE name='steaming'), 0.22),
-        ((SELECT id FROM garment_types WHERE name='Basic Crop Top'), (SELECT id FROM process_types WHERE name='sewing'), 0.042),
-        ((SELECT id FROM garment_types WHERE name='Basic Crop Top'), (SELECT id FROM process_types WHERE name='steaming'), 0.22);
-
-        INSERT OR IGNORE INTO fabric_block_recipe_processes (fabric_block_type, process_id, amount) VALUES
-        -- transport to Cristina is calculated: Distance from Istanbul to Roermond to Bucharest: 4570 km / 1000 (because transport emission is per tkm) * weight of the fabric block (kg). This calculation might need to be automated.
-        -- ((SELECT id FROM fabric_block_types WHERE name='80x64'), (SELECT id FROM process_types WHERE name='transport'), 0.49),
-        ((SELECT id FROM fabric_block_types WHERE name='80x64'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
-        -- ((SELECT id FROM fabric_block_types WHERE name='40x14'), (SELECT id FROM process_types WHERE name='transport'), 0.054),
-        ((SELECT id FROM fabric_block_types WHERE name='40x14'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
-        ((SELECT id FROM fabric_block_types WHERE name='20x15'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
-        -- ((SELECT id FROM fabric_block_types WHERE name='64x40'), (SELECT id FROM process_types WHERE name='transport'), 0.246),
-        ((SELECT id FROM fabric_block_types WHERE name='64x40'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
-        ((SELECT id FROM fabric_block_types WHERE name='100x64'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
-        ((SELECT id FROM fabric_block_types WHERE name='100x80'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
-        ((SELECT id FROM fabric_block_types WHERE name='140x14'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
-        ((SELECT id FROM fabric_block_types WHERE name='140x28'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
-        ((SELECT id FROM fabric_block_types WHERE name='160x100'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01),
-        ((SELECT id FROM fabric_block_types WHERE name='4x48'), (SELECT id FROM process_types WHERE name='dyeing'), 0.01);
-    """
+    cursor.execute(
+        "SELECT id, role, role_group FROM manufacturers ORDER BY id"
     )
-    cursor.execute("UPDATE seed_meta SET seeded = 1 WHERE id = 1;")
+    for manufacturer_id, role, role_group in cursor.fetchall():
+        if _resource_event_exists(cursor, "manufacturer_id", manufacturer_id):
+            continue
+        template = seed_data["manufacturer_roles"].get(role_group)
+        if template is None:
+            continue
+        _insert_resource_event(
+            cursor,
+            {
+                **defaults,
+                **template,
+                "resource_type": role,
+                "manufacturer_id": manufacturer_id,
+            },
+            f"-{manufacturer_id} minutes",
+        )
 
+    lifecycle_nodes = seed_data["lifecycle_nodes"]
+    for lifecycle_node in lifecycle_nodes["values"]:
+        if _resource_event_exists(cursor, "lifecycle_node", lifecycle_node):
+            continue
+        _insert_resource_event(
+            cursor,
+            {
+                **defaults,
+                "event_trigger": lifecycle_node,
+                "resource_type": lifecycle_nodes["resource_type"],
+                "lifecycle_node": lifecycle_node,
+            },
+        )
 
-def seed_demo_sales_data(cursor):
-    cursor.execute("SELECT COUNT(*) FROM garments_inventory")
-    existing_garments = cursor.fetchone()[0]
-    if existing_garments > 0:
-        return
+    lifecycle_edges = seed_data["lifecycle_edges"]
+    for lifecycle_edge in lifecycle_edges["values"]:
+        if _resource_event_exists(cursor, "lifecycle_edge", lifecycle_edge):
+            continue
+        _insert_resource_event(
+            cursor,
+            {
+                **defaults,
+                "event_trigger": lifecycle_edge,
+                "resource_type": lifecycle_edges["resource_type"],
+                "lifecycle_edge": lifecycle_edge,
+            },
+        )
 
-    cursor.executescript(
+    materials = seed_data["materials"]
+    cursor.execute("SELECT id, name FROM materials ORDER BY id")
+    for material_id, material_name in cursor.fetchall():
+        if (
+            material_name not in materials["names"]
+            or _resource_event_exists(cursor, "material_id", material_id)
+        ):
+            continue
+        _insert_resource_event(
+            cursor,
+            {
+                **defaults,
+                "event_trigger": materials["event_trigger"],
+                "resource_type": material_name,
+                "lifecycle_node": materials["lifecycle_node"],
+                "material_id": material_id,
+            },
+            f"-{200 + material_id} minutes",
+        )
+
+    material_transport = seed_data["material_transport"]
+    cursor.execute("SELECT id FROM material_manufacturer_distances ORDER BY id")
+    for (distance_id,) in cursor.fetchall():
+        if _resource_event_exists(
+            cursor, "material_manufacturer_distance_id", distance_id
+        ):
+            continue
+        _insert_resource_event(
+            cursor,
+            {
+                **defaults,
+                **material_transport,
+                "material_manufacturer_distance_id": distance_id,
+            },
+            f"-{300 + distance_id} minutes",
+        )
+
+    manufacturer_transport = seed_data["manufacturer_transport"]
+    cursor.execute(
         """
-        INSERT INTO garments_inventory (type_id, co2eq, price, sold) VALUES
-        ((SELECT id FROM garment_types WHERE name='Basic Crop Top'), NULL, 100, 1),
-        ((SELECT id FROM garment_types WHERE name='Wrap Skirt'), NULL, 100, 1),
-        ((SELECT id FROM garment_types WHERE name='Basic Trousers'), NULL, 100, 1),
-        ((SELECT id FROM garment_types WHERE name='Elegant cowl neck top'), NULL, 100, 0);
-
-        INSERT INTO fabric_blocks_inventory (type_id, co2eq, garment_id, location_id, material_id, quality, second_life) VALUES
-        -- Basic Crop Top: 80x64 x1, 40x14 x3
-        ((SELECT id FROM fabric_block_types WHERE name='80x64'), NULL, 1, (SELECT id FROM locations WHERE name='St. Gallen'), (SELECT id FROM materials WHERE name='hemp'), 87, 1),
-        ((SELECT id FROM fabric_block_types WHERE name='40x14'), NULL, 1, (SELECT id FROM locations WHERE name='Dornbirn'), (SELECT id FROM materials WHERE name='hemp'), 93, 1),
-        ((SELECT id FROM fabric_block_types WHERE name='40x14'), NULL, 1, (SELECT id FROM locations WHERE name='St. Gallen'), (SELECT id FROM materials WHERE name='hemp'), 100, 0),
-        ((SELECT id FROM fabric_block_types WHERE name='40x14'), NULL, 1, (SELECT id FROM locations WHERE name='Sigmaringen'), (SELECT id FROM materials WHERE name='hemp'), 100, 0),
-        -- Wrap Skirt: 100x80 x1, 40x14 x2, 140x14 x1
-        ((SELECT id FROM fabric_block_types WHERE name='100x80'), NULL, 2, (SELECT id FROM locations WHERE name='St. Gallen'), (SELECT id FROM materials WHERE name='hemp'), 89, 1),
-        ((SELECT id FROM fabric_block_types WHERE name='40x14'), NULL, 2, (SELECT id FROM locations WHERE name='Ravensburg'), (SELECT id FROM materials WHERE name='hemp'), 100, 0),
-        ((SELECT id FROM fabric_block_types WHERE name='40x14'), NULL, 2, (SELECT id FROM locations WHERE name='Dornbirn'), (SELECT id FROM materials WHERE name='hemp'), 100, 0),
-        ((SELECT id FROM fabric_block_types WHERE name='140x14'), NULL, 2, (SELECT id FROM locations WHERE name='Ravensburg'), (SELECT id FROM materials WHERE name='hemp'), 100, 0),
-        -- Basic Trousers: 100x64 x2, 64x40 x2, 20x15 x4
-        ((SELECT id FROM fabric_block_types WHERE name='100x64'), NULL, 3, (SELECT id FROM locations WHERE name='Sigmaringen'), (SELECT id FROM materials WHERE name='cotton'), 88, 1),
-        ((SELECT id FROM fabric_block_types WHERE name='100x64'), NULL, 3, (SELECT id FROM locations WHERE name='St. Gallen'), (SELECT id FROM materials WHERE name='cotton'), 100, 0),
-        ((SELECT id FROM fabric_block_types WHERE name='64x40'), NULL, 3, (SELECT id FROM locations WHERE name='St. Gallen'), (SELECT id FROM materials WHERE name='cotton'), 100, 0),
-        ((SELECT id FROM fabric_block_types WHERE name='64x40'), NULL, 3, (SELECT id FROM locations WHERE name='Dornbirn'), (SELECT id FROM materials WHERE name='cotton'), 100, 0),
-        ((SELECT id FROM fabric_block_types WHERE name='20x15'), NULL, 3, (SELECT id FROM locations WHERE name='St. Gallen'), (SELECT id FROM materials WHERE name='cotton'), 100, 0),
-        ((SELECT id FROM fabric_block_types WHERE name='20x15'), NULL, 3, (SELECT id FROM locations WHERE name='Sigmaringen'), (SELECT id FROM materials WHERE name='cotton'), 100, 0),
-        ((SELECT id FROM fabric_block_types WHERE name='20x15'), NULL, 3, (SELECT id FROM locations WHERE name='Ravensburg'), (SELECT id FROM materials WHERE name='cotton'), 100, 0),
-        ((SELECT id FROM fabric_block_types WHERE name='20x15'), NULL, 3, (SELECT id FROM locations WHERE name='Dornbirn'), (SELECT id FROM materials WHERE name='cotton'), 100, 0),
-        -- Elegant cowl neck top: 64x40 x2, 4x48 x2
-        ((SELECT id FROM fabric_block_types WHERE name='64x40'), NULL, 4, (SELECT id FROM locations WHERE name='St. Gallen'), (SELECT id FROM materials WHERE name='silk'), 86, 1),
-        ((SELECT id FROM fabric_block_types WHERE name='64x40'), NULL, 4, (SELECT id FROM locations WHERE name='Ravensburg'), (SELECT id FROM materials WHERE name='silk'), 100, 0),
-        ((SELECT id FROM fabric_block_types WHERE name='4x48'), NULL, 4, (SELECT id FROM locations WHERE name='Dornbirn'), (SELECT id FROM materials WHERE name='silk'), 100, 0),
-        ((SELECT id FROM fabric_block_types WHERE name='4x48'), NULL, 4, (SELECT id FROM locations WHERE name='Sigmaringen'), (SELECT id FROM materials WHERE name='silk'), 100, 0),
-        ((SELECT id FROM fabric_block_types WHERE name='64x40'), NULL, NULL, (SELECT id FROM locations WHERE name='St. Gallen'), (SELECT id FROM materials WHERE name='silk'), 91, 1);
+        SELECT id, source_company, destination_company, source_role_group
+        FROM manufacturer_distances
+        ORDER BY id
         """
     )
+    for distance_id, source, destination, source_role_group in cursor.fetchall():
+        if (
+            source == destination
+            or _resource_event_exists(
+                cursor, "manufacturer_distance_id", distance_id
+            )
+        ):
+            continue
+        lifecycle_edge = (
+            manufacturer_transport["fabric_lifecycle_edge"]
+            if source_role_group == "fabric"
+            else manufacturer_transport["default_lifecycle_edge"]
+        )
+        _insert_resource_event(
+            cursor,
+            {
+                **defaults,
+                "event_trigger": manufacturer_transport["event_trigger"],
+                "resource_type": manufacturer_transport["resource_type"],
+                "lifecycle_edge": lifecycle_edge,
+                "manufacturer_distance_id": distance_id,
+            },
+            f"-{100 + distance_id} minutes",
+        )
 
 
 def init_sqlite_db():
@@ -509,6 +665,8 @@ def init_sqlite_db():
     create_tables(cursor)
     seed_data(cursor)
     seed_demo_sales_data(cursor)
+    seed_material_supply_chain(cursor)
+    seed_resource_events(cursor)
 
     conn.commit()
     conn.close()
@@ -527,3 +685,11 @@ def init_sqlite_db():
         # Distance sync is best-effort and must not block DB startup.
         print("Manufacturer distance sync failed unexpectedly.")
         return
+
+    # A fresh database receives manufacturers during sync, so seed graph events after it.
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    seed_material_supply_chain(cursor)
+    seed_resource_events(cursor)
+    conn.commit()
+    conn.close()

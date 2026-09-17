@@ -221,20 +221,29 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
         Input("add-material", "n_clicks"),
         State("material-name", "value"),
         State("material-kg-per-sqm", "value"),
+        State("material-cost-per-sqm-chf", "value"),
         State("material-activity-id", "value"),
         prevent_initial_call=True,
     )
-    def add_or_update_material(n_clicks, name, kg_per_sqm, activity_id):
+    def add_or_update_material(
+        n_clicks, name, kg_per_sqm, cost_per_sqm_chf, activity_id
+    ):
         if not name:
             return "Please enter a material name."
         if kg_per_sqm is None:
             return "Please enter kg per sqm."
+        if cost_per_sqm_chf is None:
+            return "Please enter cost per m²."
         if activity_id is None:
             return "Please enter an activity id."
         try:
             kg_per_sqm_value = float(kg_per_sqm)
         except (TypeError, ValueError):
             return "kg per sqm must be a valid number."
+        try:
+            cost_per_sqm_chf_value = float(cost_per_sqm_chf)
+        except (TypeError, ValueError):
+            return "Cost per m² must be a valid number."
         try:
             activity_id_value = int(activity_id)
         except (TypeError, ValueError):
@@ -247,6 +256,7 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
         payload = {
             "name": name,
             "kg_per_sqm": kg_per_sqm_value,
+            "cost_per_sqm_chf": cost_per_sqm_chf_value,
             "activity_id": activity_id_value,
         }
         try:
@@ -257,6 +267,7 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
                 return (
                     f"Material '{data.get('name', name)}' {action} "
                     f"({data.get('kg_per_sqm', kg_per_sqm_value)} kg/sqm, "
+                    f"CHF {data.get('cost_per_sqm_chf', cost_per_sqm_chf_value):.2f}/m², "
                     f"activity {data.get('activity_id', activity_id_value)})."
                 )
             return f"Error saving material: {resp.status_code}"
@@ -437,7 +448,10 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
                     data = resp.json()
                     material_options = [
                         {
-                            "label": f"{m['name']} ({m['kg_per_sqm']} kg/sqm)",
+                            "label": (
+                                f"{m['name']} ({m['kg_per_sqm']} kg/sqm, "
+                                f"CHF {float(m['cost_per_sqm_chf']):.2f}/m²)"
+                            ),
                             "value": m["id"],
                         }
                         for m in data

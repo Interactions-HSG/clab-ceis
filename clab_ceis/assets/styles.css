@@ -732,6 +732,17 @@ ul {
     text-align: center;
 }
 
+.dashboard-graph-grid {
+    align-items: stretch;
+    display: grid;
+    gap: 24px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.dash-debug-menu__outer {
+    display: none !important;
+}
+
 @media (max-width: 760px) {
     .wrapper,
     .product-detail {
@@ -762,6 +773,10 @@ ul {
     }
 
     .product-content {
+        grid-template-columns: 1fr;
+    }
+
+    .dashboard-graph-grid {
         grid-template-columns: 1fr;
     }
 

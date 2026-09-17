@@ -57,7 +57,16 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
             if resp.status_code == 200:
                 data = resp.json()
 
-                return [{"label": mat["name"], "value": mat["id"]} for mat in data]
+                return [
+                    {
+                        "label": (
+                            f"{mat['name']} "
+                            f"(CHF {float(mat['cost_per_sqm_chf']):.2f}/m²)"
+                        ),
+                        "value": mat["id"],
+                    }
+                    for mat in data
+                ]
 
         except Exception:
             pass

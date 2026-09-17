@@ -1,9 +1,11 @@
 import sqlite3
 from unittest.mock import MagicMock
 
+import pytest
 from fastapi.testclient import TestClient
 
 from ceis_backend.db_init import init_sqlite_db
+from ceis_backend.designer_balance import _process_cost, load_designer_balance_mock_data
 from ceis_backend.main import app
 
 
@@ -33,7 +35,6 @@ def _insert_manufacturer_data() -> None:
                 "garment",
                 "Burladingen",
             ),
-            ("Finish Lab", "finishing", "finishing", "Ravensburg"),
         ],
     )
 
@@ -69,15 +70,6 @@ def _insert_manufacturer_data() -> None:
                 "Burladingen",
                 260.0,
             ),
-            (
-                "Garment Works",
-                "garment",
-                "Burladingen",
-                "Finish Lab",
-                "finishing",
-                "Ravensburg",
-                80.0,
-            ),
         ],
     )
 
@@ -110,6 +102,7 @@ def test_designer_balance_endpoint_returns_balanced_scenario(tmp_path, monkeypat
             role["company"] == "Fabric Alpha"
             for role in options_payload["suppliers"]["fabric"]
         )
+        assert set(options_payload["suppliers"]) == {"fabric", "garment"}
 
         garment_types = client.get("/garment-types").json()
         basic_trousers = next(
@@ -127,7 +120,6 @@ def test_designer_balance_endpoint_returns_balanced_scenario(tmp_path, monkeypat
                 "material_id": hemp["id"],
                 "fabric_supplier": "Fabric Alpha",
                 "garment_supplier": "Garment Works",
-                "finishing_supplier": "Finish Lab",
             },
         )
 
@@ -137,10 +129,24 @@ def test_designer_balance_endpoint_returns_balanced_scenario(tmp_path, monkeypat
     assert payload["garment"]["name"] == "Basic Trousers"
     assert payload["material"]["name"] == "hemp"
     assert payload["selection"]["fabric_supplier"] == "Fabric Alpha"
-    assert len(payload["supply_chain"]["legs"]) == 2
+    assert set(payload["selection"]) == {"fabric_supplier", "garment_supplier"}
+    assert len(payload["supply_chain"]["legs"]) == 1
     assert payload["summary"]["economic_total_chf"] > 0
     assert payload["summary"]["co2eq_total_kg"] > 0
     assert payload["summary"]["average_lifetime_wears"] == 130
+    assert payload["material"]["cost_per_sqm_chf"] == 5.04
+    for row in payload["bill_of_materials"]:
+        assert row["economic_cost_chf"] == round(row["total_sqm"] * 5.04, 2)
+    material_transport_rows = [
+        row
+        for row in payload["bill_of_processes"]
+        if row["process"] == "material transport to manufacturer"
+    ]
+    assert material_transport_rows
+    assert sum(
+        row["economic_cost_chf"] for row in material_transport_rows
+    ) == pytest.approx(0.76)
+    assert all(row["economic_cost_chf"] < 1 for row in material_transport_rows)
     assert any(row["process_type"] == "transport" for row in payload["process_table"])
 
 
@@ -179,7 +185,6 @@ def test_designer_balance_supplier_switch_changes_transport_balance(
                 "material_id": hemp["id"],
                 "fabric_supplier": "Fabric Alpha",
                 "garment_supplier": "Garment Works",
-                "finishing_supplier": "Finish Lab",
             },
         )
         beta_response = client.get(
@@ -188,7 +193,6 @@ def test_designer_balance_supplier_switch_changes_transport_balance(
                 "material_id": hemp["id"],
                 "fabric_supplier": "Fabric Beta",
                 "garment_supplier": "Garment Works",
-                "finishing_supplier": "Finish Lab",
             },
         )
 
@@ -246,6 +250,7 @@ def test_designer_garment_reference_endpoint_returns_design_inputs(
         material for material in payload["materials"] if material["name"] == "hemp"
     )
     assert hemp_material["co2eq_per_kg"] == 8.0
+    assert hemp_material["cost_per_sqm_chf"] == 5.04
 
     hemp_block = next(
         fabric_block
@@ -255,6 +260,19 @@ def test_designer_garment_reference_endpoint_returns_design_inputs(
     assert hemp_block["sqm"] == 0.512
     assert hemp_block["weight_kg"] == 0.108
     assert hemp_block["material_cost_chf"] == 2.58
-    assert hemp_block["block_process_cost_chf"] == 0.09
+    assert hemp_block["block_process_cost_chf"] == 0.3
+    transport_process = next(
+        process
+        for process in hemp_block["processes"]
+        if process["process"] == "material transport to manufacturer"
+    )
+    assert transport_process["economic_cost_chf"] == 0.21
     assert hemp_block["co2eq_kg"] == 0.929
     assert hemp_block["processes"]
+
+
+def test_unknown_process_cost_has_no_default():
+    with pytest.raises(KeyError, match="No economic cost configured"):
+        _process_cost(
+            "unconfigured process", 1, load_designer_balance_mock_data()
+        )

@@ -10,6 +10,7 @@ from ceis_backend.models import Process
 from ceis_backend.main import delete_fabric_block_type
 from fastapi.testclient import TestClient
 from ceis_backend.main import app
+from ceis_backend.wiser_bridge import WiserClientError
 
 
 @pytest.fixture
@@ -195,6 +196,21 @@ class TestStrategistProgress:
 
             second_response = client.get("/strategy-progress")
             assert second_response.status_code == 200
+
+    def test_strategy_progress_returns_stored_data_when_wiser_fails(self, test_db):
+        with TestClient(app) as client:
+            failing_wiser_client = MagicMock()
+            failing_wiser_client.get_emission_per_unit.side_effect = WiserClientError(
+                "Wiser unavailable"
+            )
+            client.app.state.wiser_client = failing_wiser_client
+
+            response = client.get("/strategy-progress")
+
+            assert response.status_code == 200
+            payload = response.json()
+            assert payload["aggregates"]["sold_garments"] >= 3
+            assert len(payload["sold_garments"]) >= 3
 
     def test_sold_garment_co2_includes_recipe_and_inventory_processes(self, clean_db):
         conn = sqlite3.connect("ceis_backend.db")

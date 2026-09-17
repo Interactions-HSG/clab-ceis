@@ -29,6 +29,9 @@ build-backend = "setuptools.build_meta"
 where = [".."]
 include = ["ceis_backend*"]
 
+[tool.setuptools.package-data]
+ceis_backend = ["data/seed_data.json"]
+
 [tool.pytest.ini_options]
 # Best practice: Configure pytest to find modules without sys.path manipulation
 # pythonpath adds the current directory to Python's import path during test discovery
