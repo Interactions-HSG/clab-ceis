@@ -12,6 +12,7 @@ from ceis_backend.models import (
     GarmentRecipe,
     Process,
 )
+from ceis_backend.process_quantities import resolve_process_amount
 
 STRATEGIST_CIRCULARITY_THRESHOLD = 30.0
 
@@ -539,10 +540,10 @@ def db_create_fabric_block_type(name: str, sqm: float, processes: list) -> dict:
                 raise HTTPException(status_code=400, detail="Invalid process type")
 
         for proc in processes:
-            if proc.amount <= 0:
+            if proc.rate <= 0:
                 raise HTTPException(
                     status_code=400,
-                    detail="Process amount must be greater than 0",
+                    detail="Process rate must be greater than 0",
                 )
 
         cursor.execute(
@@ -558,11 +559,16 @@ def db_create_fabric_block_type(name: str, sqm: float, processes: list) -> dict:
             cursor.executemany(
                 """
                 INSERT INTO fabric_block_recipe_processes
-                (fabric_block_type, process_id, amount)
-                VALUES (?, ?, ?)
+                (fabric_block_type, process_id, rate, quantity_basis)
+                VALUES (?, ?, ?, ?)
                 """,
                 [
-                    (fabric_block_type_id, proc.process_id, proc.amount)
+                    (
+                        fabric_block_type_id,
+                        proc.process_id,
+                        proc.rate,
+                        proc.quantity_basis.value,
+                    )
                     for proc in processes
                 ],
             )
@@ -982,7 +988,7 @@ def get_fabric_block_recipe(
     # Get processes for this fabric block type
     cursor.execute(
         """
-        SELECT pt.name, fbrp.amount, pt.activity_id
+        SELECT pt.name, fbrp.rate, fbrp.quantity_basis, pt.activity_id
         FROM fabric_block_recipe_processes fbrp
         JOIN process_types pt ON fbrp.process_id = pt.id
         WHERE fbrp.fabric_block_type = ?
@@ -990,10 +996,20 @@ def get_fabric_block_recipe(
         (fabric_block_type_id,),
     )
     processes_data = cursor.fetchall()
+    fabric_block_weight_kg = selected_kg_per_sqm * fabric_block_sqm
     processes: list[Process] = []
-    for proc_name, proc_amount, activity_id_process in processes_data:
+    for proc_name, proc_rate, quantity_basis, activity_id_process in processes_data:
         processes.append(
-            Process(name=proc_name, amount=proc_amount, activity_id=activity_id_process)
+            Process(
+                name=proc_name,
+                amount=resolve_process_amount(
+                    proc_rate,
+                    quantity_basis,
+                    fabric_weight_kg=fabric_block_weight_kg,
+                    fabric_area_sqm=fabric_block_sqm,
+                ),
+                activity_id=activity_id_process,
+            )
         )
 
     conn.close()
@@ -1001,7 +1017,7 @@ def get_fabric_block_recipe(
         id=fabric_block_type_id,
         name=fabric_block_name,
         material=selected_material_name,
-        weight_kg=selected_kg_per_sqm * fabric_block_sqm,
+        weight_kg=fabric_block_weight_kg,
         activity_id=selected_activity_id,
         processes=processes,
     )
@@ -1233,43 +1249,14 @@ def db_get_supply_chain_graph() -> dict:
             if manufacturer_ids.get((row[1], row[2])) is not None
             and manufacturer_ids.get((row[3], row[4])) is not None
         ]
-        cursor.execute(
-            """
-            SELECT DISTINCT m.id, m.name
-            FROM material_manufacturer_distances mmd
-            JOIN materials m ON m.id = mmd.material_id
-            ORDER BY m.name
-            """
-        )
+        cursor.execute("SELECT id, name FROM materials ORDER BY name")
         material_nodes = [
             {"id": row[0], "name": row[1]} for row in cursor.fetchall()
-        ]
-        cursor.execute(
-            """
-            SELECT mmd.id, mmd.material_id, mmd.destination_manufacturer_id,
-                   m.name, mf.company, mmd.distance_km
-            FROM material_manufacturer_distances mmd
-            JOIN materials m ON m.id = mmd.material_id
-            JOIN manufacturers mf ON mf.id = mmd.destination_manufacturer_id
-            ORDER BY mmd.id
-            """
-        )
-        material_edges = [
-            {
-                "id": row[0],
-                "material_id": row[1],
-                "destination_manufacturer_id": row[2],
-                "material": row[3],
-                "destination_company": row[4],
-                "distance_km": float(row[5]),
-            }
-            for row in cursor.fetchall()
         ]
         return {
             "nodes": nodes,
             "edges": edges,
             "material_nodes": material_nodes,
-            "material_edges": material_edges,
         }
     finally:
         conn.close()
@@ -1279,7 +1266,6 @@ def db_get_resource_events(
     manufacturer_id: int | None = None,
     manufacturer_distance_id: int | None = None,
     material_id: int | None = None,
-    material_manufacturer_distance_id: int | None = None,
     lifecycle_node: str | None = None,
     lifecycle_edge: str | None = None,
     supply_chain_only: bool = False,
@@ -1306,12 +1292,10 @@ def db_get_resource_events(
                         SELECT role_group FROM manufacturers WHERE id = ?
                     )
                 )
-                OR mmd.destination_manufacturer_id = ?
             )"""
         )
         parameters.extend(
             [
-                manufacturer_id,
                 manufacturer_id,
                 manufacturer_id,
                 manufacturer_id,
@@ -1322,10 +1306,6 @@ def db_get_resource_events(
     for column, value in (
         ("re.manufacturer_distance_id", manufacturer_distance_id),
         ("re.material_id", material_id),
-        (
-            "re.material_manufacturer_distance_id",
-            material_manufacturer_distance_id,
-        ),
         ("re.lifecycle_node", lifecycle_node),
         ("re.lifecycle_edge", lifecycle_edge),
     ):
@@ -1337,8 +1317,7 @@ def db_get_resource_events(
         supply_filter = """(
             re.manufacturer_id IS NOT NULL OR
             re.manufacturer_distance_id IS NOT NULL OR
-            re.material_id IS NOT NULL OR
-            re.material_manufacturer_distance_id IS NOT NULL
+            re.material_id IS NOT NULL
         )"""
         where_clause = (
             f"{where_clause} AND {supply_filter}"
@@ -1355,21 +1334,15 @@ def db_get_resource_events(
                    re.resource_type, re.co2eq, re.status, re.order_id,
                    re.lifecycle_node, re.lifecycle_edge,
                    re.manufacturer_id, re.manufacturer_distance_id,
-                   re.material_id, re.material_manufacturer_distance_id,
+                   re.material_id,
                    m.company,
                    md.source_company, md.destination_company, md.distance_km,
-                   material.name, source_material.name,
-                   destination.company, mmd.distance_km
+                   material.name
             FROM resource_events re
             LEFT JOIN manufacturers m ON m.id = re.manufacturer_id
             LEFT JOIN manufacturer_distances md
                    ON md.id = re.manufacturer_distance_id
             LEFT JOIN materials material ON material.id = re.material_id
-            LEFT JOIN material_manufacturer_distances mmd
-                   ON mmd.id = re.material_manufacturer_distance_id
-            LEFT JOIN materials source_material ON source_material.id = mmd.material_id
-            LEFT JOIN manufacturers destination
-                   ON destination.id = mmd.destination_manufacturer_id
             {where_clause}
             ORDER BY re.timestamp DESC, re.id DESC
             """,
@@ -1381,12 +1354,12 @@ def db_get_resource_events(
             timestamp_parts = timestamp.replace("T", " ").split(" ", 1)
             event_date = timestamp_parts[0] if timestamp_parts else None
             event_time = timestamp_parts[1] if len(timestamp_parts) > 1 else None
-            if row[15] or row[19]:
+            if row[14]:
                 event_at = None
-                source = row[15] or row[19]
-                destination = row[16] or row[20]
+                source = row[14]
+                destination = row[15]
             else:
-                event_at = row[14] or row[18]
+                event_at = row[13] or row[17]
                 source = None
                 destination = None
             events.append(
@@ -1404,13 +1377,12 @@ def db_get_resource_events(
                     "manufacturer_id": row[10],
                     "manufacturer_distance_id": row[11],
                     "material_id": row[12],
-                    "material_manufacturer_distance_id": row[13],
                     "at": event_at,
                     "from": source,
                     "to": destination,
                     "status": row[6],
                     "order_id": row[7],
-                    "distance_km": row[17] or row[21],
+                    "distance_km": row[16],
                 }
             )
         return events
@@ -1659,6 +1631,7 @@ def get_fabric_block_type_for_emission(
 
 def get_fabric_block_processes_for_emission(
     fabric_block_type_id: int,
+    fabric_block_weight_kg: float,
 ) -> list[tuple[str, float, int]]:
     """Get fabric block processes for emission calculation.
 
@@ -1669,13 +1642,32 @@ def get_fabric_block_processes_for_emission(
     try:
         cursor.execute(
             """
-            SELECT pt.name, fbrp.amount, pt.activity_id
+            SELECT pt.name, fbrp.rate, fbrp.quantity_basis, pt.activity_id, fbt.sqm
             FROM fabric_block_recipe_processes fbrp
             JOIN process_types pt ON fbrp.process_id = pt.id
+            JOIN fabric_block_types fbt ON fbrp.fabric_block_type = fbt.id
             WHERE fbrp.fabric_block_type = ?
             """,
             (fabric_block_type_id,),
         )
-        return cursor.fetchall()
+        return [
+            (
+                process_name,
+                resolve_process_amount(
+                    rate,
+                    quantity_basis,
+                    fabric_weight_kg=fabric_block_weight_kg,
+                    fabric_area_sqm=fabric_area_sqm,
+                ),
+                activity_id,
+            )
+            for (
+                process_name,
+                rate,
+                quantity_basis,
+                activity_id,
+                fabric_area_sqm,
+            ) in cursor.fetchall()
+        ]
     finally:
         conn.close()

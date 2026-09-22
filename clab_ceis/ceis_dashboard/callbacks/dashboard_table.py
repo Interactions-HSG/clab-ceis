@@ -92,15 +92,10 @@ def _event_matches_value_chain_node(event: dict, node_data: dict) -> bool:
 
 def _event_matches_value_chain_edge(event: dict, edge_data: dict) -> bool:
     manufacturer_distance_id = event.get("manufacturer_distance_id")
-    material_distance_id = event.get("material_manufacturer_distance_id")
     return (
         manufacturer_distance_id is not None
         and int(manufacturer_distance_id)
         in _ids(edge_data, "manufacturer_distance_ids")
-    ) or (
-        material_distance_id is not None
-        and int(material_distance_id)
-        in _ids(edge_data, "material_manufacturer_distance_ids")
     )
 
 
@@ -117,10 +112,7 @@ def _filter_events_for_value_chain_element(
             for event in events
             if _event_matches_value_chain_edge(event, element_data)
         ]
-        if _ids(element_data, "manufacturer_distance_ids") or _ids(
-            element_data,
-            "material_manufacturer_distance_ids",
-        ):
+        if _ids(element_data, "manufacturer_distance_ids"):
             return raw_matches
         lifecycle_edge = VALUE_CHAIN_EDGE_TO_LIFECYCLE_EDGE.get(element_data.get("id"))
         return [

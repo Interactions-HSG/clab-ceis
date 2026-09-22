@@ -1,7 +1,7 @@
 {
   "materials": [
     {"name": "cotton", "kg_per_sqm": 0.14, "cost_per_sqm_chf": 2.52, "activity_id": 6756},
-    {"name": "hemp", "kg_per_sqm": 0.21, "cost_per_sqm_chf": 5.04, "activity_id": 276186},
+    {"name": "hemp", "kg_per_sqm": 0.21, "cost_per_sqm_chf": 5.04, "activity_id": 4358},
     {"name": "silk", "kg_per_sqm": 0.082, "cost_per_sqm_chf": 3.444, "activity_id": 20936},
     {"name": "mikado silk", "kg_per_sqm": 0.13, "cost_per_sqm_chf": 6.37, "activity_id": 20936}
   ],
@@ -24,10 +24,10 @@
     {"name": "4x48", "sqm": 0.0192}
   ],
   "process_types": [
-    {"name": "sewing", "unit": "kWh", "activity_id": 6566},
-    {"name": "steaming", "unit": "kWh", "activity_id": 6566},
-    {"name": "washing", "unit": "kWh", "activity_id": 6566},
-    {"name": "dyeing", "unit": "kg", "activity_id": 21893},
+    {"name": "sewing", "unit": "kWh", "activity_id": 2660},
+    {"name": "steaming", "unit": "kWh", "activity_id": 2660},
+    {"name": "washing", "unit": "kWh", "activity_id": 2660},
+    {"name": "dyeing", "unit": "kg", "activity_id": 276385},
     {"name": "transport", "unit": "tkm", "activity_id": 17901}
   ],
   "garment_types": [
@@ -145,16 +145,16 @@
     {"process": "steaming", "amount": 0.22}
   ],
   "fabric_block_processes": [
-    {"fabric_block": "80x64", "process": "dyeing", "amount": 0.01},
-    {"fabric_block": "40x14", "process": "dyeing", "amount": 0.01},
-    {"fabric_block": "20x15", "process": "dyeing", "amount": 0.01},
-    {"fabric_block": "64x40", "process": "dyeing", "amount": 0.01},
-    {"fabric_block": "100x64", "process": "dyeing", "amount": 0.01},
-    {"fabric_block": "100x80", "process": "dyeing", "amount": 0.01},
-    {"fabric_block": "140x14", "process": "dyeing", "amount": 0.01},
-    {"fabric_block": "140x28", "process": "dyeing", "amount": 0.01},
-    {"fabric_block": "160x100", "process": "dyeing", "amount": 0.01},
-    {"fabric_block": "4x48", "process": "dyeing", "amount": 0.01}
+    {"fabric_block": "80x64", "process": "dyeing", "rate": 1.0, "quantity_basis": "fabric_weight_kg"},
+    {"fabric_block": "40x14", "process": "dyeing", "rate": 1.0, "quantity_basis": "fabric_weight_kg"},
+    {"fabric_block": "20x15", "process": "dyeing", "rate": 1.0, "quantity_basis": "fabric_weight_kg"},
+    {"fabric_block": "64x40", "process": "dyeing", "rate": 1.0, "quantity_basis": "fabric_weight_kg"},
+    {"fabric_block": "100x64", "process": "dyeing", "rate": 1.0, "quantity_basis": "fabric_weight_kg"},
+    {"fabric_block": "100x80", "process": "dyeing", "rate": 1.0, "quantity_basis": "fabric_weight_kg"},
+    {"fabric_block": "140x14", "process": "dyeing", "rate": 1.0, "quantity_basis": "fabric_weight_kg"},
+    {"fabric_block": "140x28", "process": "dyeing", "rate": 1.0, "quantity_basis": "fabric_weight_kg"},
+    {"fabric_block": "160x100", "process": "dyeing", "rate": 1.0, "quantity_basis": "fabric_weight_kg"},
+    {"fabric_block": "4x48", "process": "dyeing", "rate": 1.0, "quantity_basis": "fabric_weight_kg"}
   ],
   "demo_garments": [
     {
@@ -213,11 +213,6 @@
   "loose_demo_fabric_blocks": [
     {"type": "64x40", "location": "St. Gallen", "material": "silk", "quality": 91, "second_life": 1}
   ],
-  "material_supply_chain": [
-    {"material": "hemp", "distance_km": 4570},
-    {"material": "cotton", "distance_km": 4570},
-    {"material": "silk", "distance_km": 4570}
-  ],
   "resource_events": {
     "defaults": {"request_type": "Seed", "status": "Done", "co2eq": null},
     "manufacturer_roles": {
@@ -237,11 +232,6 @@
       "names": ["hemp", "cotton", "silk"],
       "event_trigger": "Extraction",
       "lifecycle_node": "Extraction"
-    },
-    "material_transport": {
-      "event_trigger": "Supply",
-      "resource_type": "Material transport",
-      "lifecycle_edge": "Supply"
     },
     "manufacturer_transport": {
       "event_trigger": "Transport",

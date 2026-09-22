@@ -319,7 +319,7 @@ def _build_dynamic_designer_panel(reference: dict, scenario: dict):
                 [
                     html.H3("Current Bill of Materials"),
                     html.P(
-                        "Fabric block CO2 includes material, the fabric block recipe processes, and material transport to the manufacturer."
+                        "Fabric block CO2 includes the material and the fabric block recipe processes."
                     ),
                     html.Div(id="garment-designer-custom-bom-container"),
                 ],
@@ -634,7 +634,7 @@ def register_garment_designer_callbacks(app: Dash, data: ceis_data.CeisData) -> 
                     [
                         html.H2("Fabric Block Catalog"),
                         html.P(
-                            "CO2eq includes the material itself, the fabric block recipe processes, and material transport to the manufacturer."
+                            "CO2eq includes the material itself and the fabric block recipe processes."
                         ),
                         _table(
                             [
@@ -648,7 +648,7 @@ def register_garment_designer_callbacks(app: Dash, data: ceis_data.CeisData) -> 
                                     "id": "material_cost_chf",
                                 },
                                 {
-                                    "name": "CO2eq (kg, material + block processes + transport)",
+                                    "name": "CO2eq (kg, material + block processes)",
                                     "id": "co2eq_kg",
                                 },
                             ],

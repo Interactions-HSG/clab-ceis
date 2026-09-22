@@ -81,7 +81,6 @@ def test_value_chain_links_repair_shops_to_local_service_provider():
             ],
             "edges": [],
             "material_nodes": [],
-            "material_edges": [],
         }
     )
     nodes_by_id = {
@@ -145,7 +144,6 @@ def test_value_chain_matches_reference_actor_and_labeled_recovery_flow():
             ],
             "edges": [],
             "material_nodes": [{"id": 5, "name": "cotton"}],
-            "material_edges": [],
         }
     )
     node_positions = {
@@ -197,9 +195,6 @@ def test_value_chain_matches_reference_actor_and_labeled_recovery_flow():
     assert edges_by_id["value-chain-brand-to-customer"]["data"]["target"] == (
         VALUE_CHAIN_CUSTOMER_ID
     )
-    assert edges_by_id["value-chain-material-to-fabric"]["data"][
-        "material_manufacturer_distance_ids"
-    ] == []
     assert edges_by_id["value-chain-brand-to-material"]["data"]["target"] == (
         VALUE_CHAIN_STEP_IDS["material"]
     )

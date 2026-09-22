@@ -83,18 +83,25 @@ class TestFabricBlockRecipeProcessesTableCreation:
         assert "id" in column_names
         assert "fabric_block_type" in column_names
         assert "process_id" in column_names
-        assert "amount" in column_names
+        assert "rate" in column_names
+        assert "quantity_basis" in column_names
 
     def test_table_seeded_with_data(self, test_db):
         """Verify the table is seeded with initial data."""
         conn = sqlite3.connect("ceis_backend.db")
         cursor = conn.cursor()
 
-        cursor.execute("SELECT COUNT(*) FROM fabric_block_recipe_processes")
-        count = cursor.fetchone()[0]
+        cursor.execute(
+            "SELECT rate, quantity_basis FROM fabric_block_recipe_processes"
+        )
+        seeded_processes = cursor.fetchall()
         conn.close()
 
-        assert count > 0
+        assert seeded_processes
+        assert all(
+            rate == 1.0 and basis == "fabric_weight_kg"
+            for rate, basis in seeded_processes
+        )
 
 
 class TestInventoryProcessTables:
@@ -145,9 +152,9 @@ class TestStrategistProgress:
         with TestClient(app) as client:
             client.app.state.wiser_client = _build_mock_wiser_client(
                 {
-                    276186: 5.0,
+                    4358: 5.0,
                     6756: 4.0,
-                    6566: 0.5,
+                    2660: 0.5,
                     17901: 0.1,
                 }
             )
@@ -177,11 +184,11 @@ class TestStrategistProgress:
         with TestClient(app) as client:
             client.app.state.wiser_client = _build_mock_wiser_client(
                 {
-                    276186: 5.0,
+                    4358: 5.0,
                     6756: 4.0,
-                    6566: 0.5,
+                    2660: 0.5,
                     17901: 0.1,
-                    21893: 0.2,
+                    276385: 0.2,
                 }
             )
             first_response = client.get("/strategy-progress")
@@ -267,7 +274,7 @@ class TestStrategistProgress:
             (garment_type_id, fabric_block_type_id, 1),
         )
         cursor.execute(
-            "INSERT INTO fabric_block_recipe_processes (fabric_block_type, process_id, amount) VALUES (?, ?, ?)",
+            "INSERT INTO fabric_block_recipe_processes (fabric_block_type, process_id, rate) VALUES (?, ?, ?)",
             (fabric_block_type_id, block_recipe_process_id, 3),
         )
         cursor.execute(
@@ -343,7 +350,7 @@ class TestGetRecipeForFabricBlock:
 
         assert fabric_block is not None
         assert fabric_block.material == "hemp"
-        assert fabric_block.activity_id == 276186
+        assert fabric_block.activity_id == 4358
         assert len(fabric_block.processes) > 0
         assert all(isinstance(p, Process) for p in fabric_block.processes)
 
@@ -414,7 +421,30 @@ class TestUsedFabricBlockSelection:
             (p for p in fabric_block.processes if p.name == "dyeing"), None
         )
         assert dyeing_process is not None
-        assert dyeing_process.amount == 0.01
+        assert dyeing_process.amount == pytest.approx(0.512 * 0.21)
+
+    def test_dyeing_amount_tracks_selected_material_weight(self, test_db):
+        conn = sqlite3.connect("ceis_backend.db")
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT name, id FROM materials WHERE name IN ('cotton', 'hemp')"
+        )
+        material_ids = dict(cursor.fetchall())
+        conn.close()
+
+        cotton_block = get_fabric_block_recipe("80x64", material_ids["cotton"])
+        hemp_block = get_fabric_block_recipe("80x64", material_ids["hemp"])
+
+        assert cotton_block is not None
+        assert hemp_block is not None
+        cotton_dyeing = next(
+            process for process in cotton_block.processes if process.name == "dyeing"
+        )
+        hemp_dyeing = next(
+            process for process in hemp_block.processes if process.name == "dyeing"
+        )
+        assert cotton_dyeing.amount == pytest.approx(0.512 * 0.14)
+        assert hemp_dyeing.amount == pytest.approx(0.512 * 0.21)
 
     def test_excludes_blocks_already_assigned_to_a_garment(self, clean_db):
         conn = sqlite3.connect("ceis_backend.db")
@@ -490,7 +520,7 @@ class TestUsedFabricBlockSelection:
         assert fabric_block is not None
 
         assert fabric_block.material == "hemp"
-        assert fabric_block.activity_id == 276186
+        assert fabric_block.activity_id == 4358
 
         process_names = [p.name for p in fabric_block.processes]
         assert "dyeing" in process_names
@@ -519,7 +549,7 @@ class TestDeleteFabricBlockType:
         process_id = cursor.lastrowid
 
         cursor.execute(
-            "INSERT INTO fabric_block_recipe_processes (fabric_block_type, process_id, amount) VALUES (?, ?, ?)",
+            "INSERT INTO fabric_block_recipe_processes (fabric_block_type, process_id, rate) VALUES (?, ?, ?)",
             (fb_type_id, process_id, 5),
         )
         conn.commit()
@@ -573,7 +603,7 @@ class TestDeleteFabricBlockType:
             )
             process_id = cursor.lastrowid
             cursor.execute(
-                "INSERT INTO fabric_block_recipe_processes (fabric_block_type, process_id, amount) VALUES (?, ?, ?)",
+                "INSERT INTO fabric_block_recipe_processes (fabric_block_type, process_id, rate) VALUES (?, ?, ?)",
                 (fb_type_id, process_id, i + 1),
             )
         conn.commit()
@@ -618,7 +648,13 @@ class TestCreateFabricBlockTypeWithProcesses:
             json={
                 "name": "LinkedFB",
                 "sqm": 1.5,
-                "processes": [{"process_id": process_id, "amount": 2.5}],
+                "processes": [
+                    {
+                        "process_id": process_id,
+                        "rate": 2.5,
+                        "quantity_basis": "fabric_area_sqm",
+                    }
+                ],
             },
         )
 
@@ -629,7 +665,7 @@ class TestCreateFabricBlockTypeWithProcesses:
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT process_id, amount
+            SELECT process_id, rate, quantity_basis
             FROM fabric_block_recipe_processes
             WHERE fabric_block_type = ?
             """,
@@ -638,7 +674,7 @@ class TestCreateFabricBlockTypeWithProcesses:
         rows = cursor.fetchall()
         conn.close()
 
-        assert rows == [(process_id, 2.5)]
+        assert rows == [(process_id, 2.5, "fabric_area_sqm")]
 
     def test_rejects_invalid_process_type(self, clean_db):
         client = TestClient(app)
@@ -647,7 +683,7 @@ class TestCreateFabricBlockTypeWithProcesses:
             json={
                 "name": "BadFB",
                 "sqm": 1.0,
-                "processes": [{"process_id": 999999, "amount": 1.0}],
+                "processes": [{"process_id": 999999, "rate": 1.0}],
             },
         )
 
@@ -1412,7 +1448,7 @@ class TestGetCo2FabricBlockProductionEmissions:
 
         # Link fabric block to process (production recipe)
         cursor.execute(
-            "INSERT INTO fabric_block_recipe_processes (fabric_block_type, process_id, amount) VALUES (?, ?, ?)",
+            "INSERT INTO fabric_block_recipe_processes (fabric_block_type, process_id, rate) VALUES (?, ?, ?)",
             (fb_type_id, process_id, 3),
         )
 
@@ -1611,13 +1647,13 @@ class TestGetCo2FabricBlockProductionEmissions:
 
         # Link fabric block to first process
         cursor.execute(
-            "INSERT INTO fabric_block_recipe_processes (fabric_block_type, process_id, amount) VALUES (?, ?, ?)",
+            "INSERT INTO fabric_block_recipe_processes (fabric_block_type, process_id, rate) VALUES (?, ?, ?)",
             (fb_type_id, process_id_1, 2.0),
         )
 
         # Link fabric block to second process
         cursor.execute(
-            "INSERT INTO fabric_block_recipe_processes (fabric_block_type, process_id, amount) VALUES (?, ?, ?)",
+            "INSERT INTO fabric_block_recipe_processes (fabric_block_type, process_id, rate) VALUES (?, ?, ?)",
             (fb_type_id, process_id_2, 5.0),
         )
 

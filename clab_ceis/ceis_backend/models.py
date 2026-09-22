@@ -2,6 +2,8 @@ from typing import Any, Optional
 from pydantic import BaseModel
 from enum import Enum
 
+from ceis_backend.process_quantities import ProcessQuantityBasis
+
 
 class Material(str, Enum):
     COTTON = "cotton"
@@ -76,7 +78,8 @@ class GarmentTypeCreate(BaseModel):
 
 class FabricBlockTypeProcessCreate(BaseModel):
     process_id: int
-    amount: float
+    rate: float
+    quantity_basis: ProcessQuantityBasis = ProcessQuantityBasis.FIXED
 
 
 class FabricBlockTypeCreate(BaseModel):

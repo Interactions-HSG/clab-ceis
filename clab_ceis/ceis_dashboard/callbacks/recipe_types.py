@@ -112,15 +112,40 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
                             [
                                 dcc.Input(
                                     id={
-                                        "type": "fabric-block-type-process-amount",
+                                        "type": "fabric-block-type-process-rate",
                                         "index": new_id,
                                     },
-                                    placeholder="Amount",
+                                    placeholder="Rate",
                                     type="number",
                                     min=0,
-                                    step=0.5,
+                                    step="any",
                                     value=1,
                                     style={"width": "120px"},
+                                ),
+                            ],
+                            style={"marginLeft": "12px"},
+                        ),
+                        html.Div(
+                            [
+                                dcc.Dropdown(
+                                    id={
+                                        "type": "fabric-block-type-process-basis",
+                                        "index": new_id,
+                                    },
+                                    options=[
+                                        {"label": "Fixed amount", "value": "fixed"},
+                                        {
+                                            "label": "Per kg of fabric",
+                                            "value": "fabric_weight_kg",
+                                        },
+                                        {
+                                            "label": "Per sqm of fabric",
+                                            "value": "fabric_area_sqm",
+                                        },
+                                    ],
+                                    value="fixed",
+                                    clearable=False,
+                                    style={"width": "210px"},
                                 ),
                             ],
                             style={"marginLeft": "12px"},
@@ -146,28 +171,39 @@ def register_recipe_type_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
         State("fabric-block-type-name", "value"),
         State("fabric-block-type-sqm", "value"),
         State({"type": "fabric-block-type-process", "index": ALL}, "value"),
-        State({"type": "fabric-block-type-process-amount", "index": ALL}, "value"),
+        State({"type": "fabric-block-type-process-rate", "index": ALL}, "value"),
+        State({"type": "fabric-block-type-process-basis", "index": ALL}, "value"),
         prevent_initial_call=True,
     )
-    def add_fabric_block_type(n_clicks, name, sqm, process_ids, process_amounts):
+    def add_fabric_block_type(
+        n_clicks, name, sqm, process_ids, process_rates, process_bases
+    ):
         if not name:
             return "Please enter a fabric block type name."
         if sqm is None or sqm <= 0:
             return "Please enter a valid sqm value greater than 0."
 
         processes = []
-        for proc_id, amount in zip(process_ids, process_amounts):
+        for proc_id, rate, quantity_basis in zip(
+            process_ids, process_rates, process_bases
+        ):
             if proc_id is None:
                 continue
-            if amount is None:
-                return "Please provide an amount for each selected process step."
+            if rate is None:
+                return "Please provide a rate for each selected process step."
             try:
-                proc_amount = float(amount)
+                process_rate = float(rate)
             except (TypeError, ValueError):
-                return "Process step amount must be a valid number."
-            if proc_amount <= 0:
-                return "Process step amount must be greater than 0."
-            processes.append({"process_id": proc_id, "amount": proc_amount})
+                return "Process step rate must be a valid number."
+            if process_rate <= 0:
+                return "Process step rate must be greater than 0."
+            processes.append(
+                {
+                    "process_id": proc_id,
+                    "rate": process_rate,
+                    "quantity_basis": quantity_basis or "fixed",
+                }
+            )
 
         payload = {
             "name": name,

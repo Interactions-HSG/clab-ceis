@@ -5,7 +5,6 @@ import pytest
 
 from ceis_backend.db_init import (
     create_tables,
-    seed_material_supply_chain,
     seed_resource_events,
 )
 from ceis_backend.queries import (
@@ -42,7 +41,7 @@ def clean_db(tmp_path, monkeypatch):
     conn.close()
 
 
-def test_seeded_events_cover_every_supply_chain_node_and_edge(clean_db):
+def test_seeded_events_cover_active_supply_chain_entities(clean_db):
     conn = _connect()
     cursor = conn.cursor()
     cursor.executemany(
@@ -79,14 +78,12 @@ def test_seeded_events_cover_every_supply_chain_node_and_edge(clean_db):
                   'Fabric Co', 'fabric', 'Fabric town', 0)
         """
     )
-    seed_material_supply_chain(cursor)
     seed_resource_events(cursor)
     conn.commit()
 
     for target_column, source_table in (
         ("manufacturer_id", "manufacturers"),
         ("material_id", "materials"),
-        ("material_manufacturer_distance_id", "material_manufacturer_distances"),
     ):
         cursor.execute(f"SELECT COUNT(*) FROM {source_table}")
         source_count = cursor.fetchone()[0]
@@ -125,7 +122,6 @@ def test_seeded_events_cover_every_supply_chain_node_and_edge(clean_db):
     assert len(graph["nodes"]) == 2
     assert len(graph["edges"]) == 1
     assert len(graph["material_nodes"]) == 3
-    assert len(graph["material_edges"]) == 3
     conn.close()
 
 
@@ -319,53 +315,31 @@ def test_order_delivers_stock_then_requests_production(clean_db):
     }
 
 
-def test_resource_event_emissions_calculate_material_and_material_transport(
-    clean_db,
-):
+def test_resource_event_emissions_use_material_activity_only(clean_db):
     conn = _connect()
     cursor = conn.cursor()
     cursor.execute(
         "INSERT INTO materials (name, kg_per_sqm, activity_id) VALUES ('hemp', 2, 101)"
     )
     material_id = cursor.lastrowid
-    cursor.execute(
-        """
-        INSERT INTO manufacturers (company, role, role_group, location)
-        VALUES ('Fabric Co', 'fabric manufacturer', 'fabric', 'Fabric town')
-        """
-    )
-    manufacturer_id = cursor.lastrowid
-    cursor.execute(
-        """
-        INSERT INTO material_manufacturer_distances (
-            material_id, destination_manufacturer_id, distance_km
-        ) VALUES (?, ?, 50)
-        """,
-        (material_id, manufacturer_id),
-    )
-    material_distance_id = cursor.lastrowid
     seed_resource_events(cursor)
     conn.commit()
     conn.close()
 
     events = enrich_resource_events_with_co2(
         db_get_resource_events(),
-        _build_mock_wiser_client({101: 3.0, 17901: 0.5}),
+        _build_mock_wiser_client({101: 3.0}),
     )
 
     material_event = next(
         event for event in events if event["material_id"] == material_id
     )
-    transport_event = next(
-        event
-        for event in events
-        if event["material_manufacturer_distance_id"] == material_distance_id
-    )
-
     assert material_event["co2eq"] == 6.0
     assert material_event["co2eq_calculation_status"] == "calculated"
-    assert transport_event["co2eq"] == 0.05
-    assert transport_event["co2eq_calculation_status"] == "calculated"
+    assert all(
+        "material transport" not in event["resource_type"].lower()
+        for event in events
+    )
 
 
 def test_resource_event_emissions_require_wiser_factor_when_wiser_is_unavailable(
@@ -376,7 +350,7 @@ def test_resource_event_emissions_require_wiser_factor_when_wiser_is_unavailable
     cursor.execute(
         """
         INSERT INTO materials (name, kg_per_sqm, activity_id)
-        VALUES ('hemp', 0.21, 276186)
+        VALUES ('hemp', 0.21, 4358)
         """
     )
     material_id = cursor.lastrowid
