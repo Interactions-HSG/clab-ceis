@@ -17,7 +17,7 @@ def test_material_area_price_is_persisted_and_editable(tmp_path, monkeypatch):
                 "name": "hemp",
                 "kg_per_sqm": 0.21,
                 "cost_per_sqm_chf": 8.75,
-                "activity_id": 276186,
+                "activity_id": 4358,
             },
         )
         updated_materials = client.get("/materials")

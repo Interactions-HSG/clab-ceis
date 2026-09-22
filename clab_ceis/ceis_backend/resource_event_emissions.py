@@ -8,10 +8,8 @@ from typing import Any
 from fastapi import HTTPException
 
 from ceis_backend.config import DB_PATH
-from ceis_backend.data.location_details import ACTIVITY_ID_LONG_DISTANCE_TRANSPORT
 from ceis_backend.queries import db_update_garment_inventory_co2
 from ceis_backend.utils import (
-    calculate_transport_emission,
     get_co2_for_garment,
     get_co2_for_sold_garment,
 )
@@ -67,14 +65,6 @@ def enrich_resource_events_with_co2(
             if event.get("material_id") is not None
         }
     )
-    material_distance_details = _get_material_distance_details(
-        {
-            int(event["material_manufacturer_distance_id"])
-            for event in events
-            if event.get("material_manufacturer_distance_id") is not None
-        }
-    )
-
     emission_client = _ResourceEventEmissionClient(wiser_client)
     enriched_events = []
     for event in events:
@@ -90,7 +80,6 @@ def enrich_resource_events_with_co2(
             emission_client,
             order_details,
             material_details,
-            material_distance_details,
         )
         enriched.update(result)
         if (
@@ -111,7 +100,6 @@ def _calculate_event_co2(
     emission_client: _ResourceEventEmissionClient,
     order_details: dict[int, dict[str, Any]],
     material_details: dict[int, dict[str, Any]],
-    material_distance_details: dict[int, dict[str, Any]],
 ) -> dict[str, Any]:
     order_id = event.get("order_id")
     if order_id is not None:
@@ -123,14 +111,6 @@ def _calculate_event_co2(
     if material_id is not None:
         return _calculate_material_event_co2(
             int(material_id), emission_client, material_details
-        )
-
-    material_distance_id = event.get("material_manufacturer_distance_id")
-    if material_distance_id is not None:
-        return _calculate_material_transport_event_co2(
-            int(material_distance_id),
-            emission_client,
-            material_distance_details,
         )
 
     if event.get("manufacturer_distance_id") is not None:
@@ -257,43 +237,6 @@ def _calculate_material_event_co2(
     }
 
 
-def _calculate_material_transport_event_co2(
-    material_distance_id: int,
-    emission_client: _ResourceEventEmissionClient,
-    material_distance_details: dict[int, dict[str, Any]],
-) -> dict[str, Any]:
-    material_distance = material_distance_details.get(material_distance_id)
-    if material_distance is None:
-        return {
-            "co2eq_calculation_status": "missing_inputs",
-            "co2eq_calculation_note": (
-                "Material transport distance record was not found."
-            ),
-        }
-
-    emission_per_unit = emission_client.get_emission_per_unit(
-        ACTIVITY_ID_LONG_DISTANCE_TRANSPORT
-    )
-    if emission_per_unit is None:
-        return {
-            "co2eq_calculation_status": "missing_factor",
-            "co2eq_calculation_note": "No transport emission factor is available.",
-        }
-
-    co2eq = calculate_transport_emission(
-        float(material_distance["distance_km"]),
-        float(material_distance["kg_per_sqm"]),
-        emission_per_unit,
-    )
-    return {
-        "co2eq": round(float(co2eq or 0), 6),
-        "co2eq_calculation_status": "calculated",
-        "co2eq_calculation_note": (
-            "Calculated per square meter of material transported."
-        ),
-    }
-
-
 def _total_garment_co2(emission_details: Any) -> float:
     return float(emission_details.fabric_blocks.total_emission) + float(
         emission_details.processes.total_emission
@@ -350,33 +293,6 @@ def _get_material_details(material_ids: set[int]) -> dict[int, dict[str, Any]]:
             row[0]: {
                 "kg_per_sqm": row[1],
                 "activity_id": row[2],
-            }
-            for row in cursor.fetchall()
-        }
-
-
-def _get_material_distance_details(
-    material_distance_ids: set[int],
-) -> dict[int, dict[str, Any]]:
-    if not material_distance_ids:
-        return {}
-
-    placeholders = ",".join("?" for _ in material_distance_ids)
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            f"""
-            SELECT mmd.id, mmd.distance_km, m.kg_per_sqm
-            FROM material_manufacturer_distances mmd
-            JOIN materials m ON m.id = mmd.material_id
-            WHERE mmd.id IN ({placeholders})
-            """,
-            sorted(material_distance_ids),
-        )
-        return {
-            row[0]: {
-                "distance_km": row[1],
-                "kg_per_sqm": row[2],
             }
             for row in cursor.fetchall()
         }

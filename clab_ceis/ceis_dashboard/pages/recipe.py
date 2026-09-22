@@ -149,6 +149,11 @@ def get_recipe_layout():
                                 placeholder="e.g., 1.2",
                             ),
                             html.H3("Processes (optional)"),
+                            html.P(
+                                "Choose whether each rate is a fixed activity amount, "
+                                "or scales with the selected fabric's weight or area.",
+                                style={"maxWidth": "720px"},
+                            ),
                             html.Div(
                                 id="fabric-block-type-processes-container",
                                 children=[],
@@ -228,7 +233,7 @@ def get_recipe_layout():
                                 type="number",
                                 min=0,
                                 step=1,
-                                placeholder="e.g., 6566",
+                                placeholder="e.g., 2660",
                             ),
                             html.Button(
                                 "Add Process Type",
@@ -272,7 +277,7 @@ def get_recipe_layout():
                                 type="number",
                                 min=0,
                                 step=1,
-                                placeholder="e.g., 276186",
+                                placeholder="e.g., 4358",
                             ),
                             html.Button(
                                 "Save Material",

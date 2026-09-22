@@ -7,14 +7,7 @@ from fastapi import HTTPException
 
 from ceis_backend.config import BASE_DIR
 from ceis_backend.costing import calculate_material_cost_chf
-from ceis_backend.data.location_details import (
-    ACTIVITY_ID_LONG_DISTANCE_TRANSPORT,
-    ACTIVITY_ID_TRANSPORT,
-    COTTON_DISTANCE_TO_MANUFACTURER_KM,
-    HEMP_DISTANCE_TO_MANUFACTURER_KM,
-    MATERIAL_TRANSPORT_PROCESS_NAME,
-    SILK_DISTANCE_TO_MANUFACTURER_KM,
-)
+from ceis_backend.data.location_details import ACTIVITY_ID_TRANSPORT
 from ceis_backend.queries import (
     db_get_fabric_block_types,
     db_get_garment_types,
@@ -129,18 +122,9 @@ def _get_emission_per_unit(
     return emission_per_unit
 
 
-def _get_material_distance_to_manufacturer_km(material_name: str) -> float | None:
-    material_distances = {
-        "hemp": HEMP_DISTANCE_TO_MANUFACTURER_KM,
-        "cotton": COTTON_DISTANCE_TO_MANUFACTURER_KM,
-        "silk": SILK_DISTANCE_TO_MANUFACTURER_KM,
-        "mikado silk": SILK_DISTANCE_TO_MANUFACTURER_KM,
-    }
-    return material_distances.get(material_name.lower())
-
-
 def _build_fabric_block_process_breakdown(
     fabric_block_type: dict,
+    fabric_block_weight_kg: float,
     wiser_client: WiserClient,
     emission_cache: dict[int, float | None],
     mock_data: dict,
@@ -150,7 +134,7 @@ def _build_fabric_block_process_breakdown(
     total_process_co2 = 0.0
 
     for process_name, process_amount, process_activity_id in get_fabric_block_processes_for_emission(
-        fabric_block_type["id"]
+        fabric_block_type["id"], fabric_block_weight_kg
     ):
         process_emission_per_unit = _get_emission_per_unit(
             wiser_client, process_activity_id, emission_cache
@@ -206,40 +190,17 @@ def _build_fabric_block_reference_row(
 
     block_processes, block_process_cost, block_process_co2 = (
         _build_fabric_block_process_breakdown(
-            fabric_block_type, wiser_client, emission_cache, mock_data
+            fabric_block_type,
+            block_weight_kg,
+            wiser_client,
+            emission_cache,
+            mock_data,
         )
     )
-
-    distance_km = _get_material_distance_to_manufacturer_km(material["name"])
-    material_transport_cost = _transport_cost(distance_km, block_weight_kg, mock_data)
-    transport_emission = calculate_transport_emission(
-        float(distance_km or 0),
-        block_weight_kg,
-        _get_emission_per_unit(
-            wiser_client, ACTIVITY_ID_LONG_DISTANCE_TRANSPORT, emission_cache
-        ),
-    )
-    if distance_km is not None:
-        block_processes.append(
-            {
-                "process": MATERIAL_TRANSPORT_PROCESS_NAME,
-                "amount": _safe_round(distance_km, 3),
-                "economic_cost_chf": _safe_round(material_transport_cost),
-                "co2eq_kg": (
-                    _safe_round(transport_emission, 3)
-                    if transport_emission is not None
-                    else None
-                ),
-            }
-        )
 
     total_co2 = None
-    if (
-        material_emission is not None
-        and block_process_co2 is not None
-        and transport_emission is not None
-    ):
-        total_co2 = material_emission + block_process_co2 + transport_emission
+    if material_emission is not None and block_process_co2 is not None:
+        total_co2 = material_emission + block_process_co2
 
     return {
         "id": fabric_block_type["id"],
@@ -248,21 +209,12 @@ def _build_fabric_block_reference_row(
         "material": material["name"],
         "weight_kg": _safe_round(block_weight_kg, 3),
         "material_cost_chf": _safe_round(material_cost),
-        "block_process_cost_chf": _safe_round(
-            block_process_cost + material_transport_cost
-        ),
-        "total_cost_chf": _safe_round(
-            material_cost + block_process_cost + material_transport_cost
-        ),
+        "block_process_cost_chf": block_process_cost,
+        "total_cost_chf": _safe_round(material_cost + block_process_cost),
         "material_co2eq_kg": (
             _safe_round(material_emission, 3) if material_emission is not None else None
         ),
         "block_process_co2eq_kg": block_process_co2,
-        "transport_co2eq_kg": (
-            _safe_round(transport_emission, 3)
-            if transport_emission is not None
-            else None
-        ),
         "co2eq_kg": _safe_round(total_co2, 3) if total_co2 is not None else None,
         "processes": block_processes,
     }
@@ -579,18 +531,9 @@ def get_designer_balance_scenario(
             process_name = process_detail.get("process", "Unknown")
             process_amount = float(process_detail.get("amount", 0))
             process_emission = float(process_detail.get("emission", 0))
-            if process_name == MATERIAL_TRANSPORT_PROCESS_NAME:
-                process_cost = _transport_cost(
-                    process_amount, float(fabric_block.weight_kg or 0), mock_data
-                )
-                process_key = "transport"
-                process_usage_amount = (
-                    process_amount * float(fabric_block.weight_kg or 0) / 1000.0
-                )
-            else:
-                process_cost = _process_cost(process_name, process_amount, mock_data)
-                process_key = process_name.lower()
-                process_usage_amount = process_amount
+            process_cost = _process_cost(process_name, process_amount, mock_data)
+            process_key = process_name.lower()
+            process_usage_amount = process_amount
             bop_rows.append(
                 {
                     "source": f"Fabric block {fabric_block.name}",

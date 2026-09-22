@@ -94,7 +94,6 @@ def test_filter_events_for_value_chain_edge_uses_aggregate_distance_ids():
     events = [
         {"event_id": 1, "manufacturer_distance_id": 11},
         {"event_id": 2, "manufacturer_distance_id": 12},
-        {"event_id": 3, "material_manufacturer_distance_id": 4},
     ]
 
     filtered = _filter_events_for_value_chain_element(
@@ -104,7 +103,6 @@ def test_filter_events_for_value_chain_edge_uses_aggregate_distance_ids():
             "source": "value-chain-fabric",
             "target": "value-chain-garment",
             "manufacturer_distance_ids": [11],
-            "material_manufacturer_distance_ids": [],
         },
     )
 
@@ -125,7 +123,6 @@ def test_filter_events_for_deliver_edge_uses_lifecycle_deliver_events():
             "source": "value-chain-brand",
             "target": "value-chain-customer",
             "manufacturer_distance_ids": [],
-            "material_manufacturer_distance_ids": [],
         },
     )
 

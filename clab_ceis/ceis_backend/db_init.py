@@ -132,7 +132,8 @@ def seed_data(cursor):
                 "process_id": _id_for_name(
                     cursor, "process_types", process["process"]
                 ),
-                "amount": process["amount"],
+                "rate": process["rate"],
+                "quantity_basis": process["quantity_basis"],
             },
             ("fabric_block_type", "process_id"),
         )
@@ -275,7 +276,9 @@ def create_tables(cursor):
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             fabric_block_type INTEGER NOT NULL,
             process_id INTEGER NOT NULL,
-            amount REAL,
+            rate REAL NOT NULL,
+            quantity_basis TEXT NOT NULL DEFAULT 'fixed'
+                CHECK (quantity_basis IN ('fixed', 'fabric_weight_kg', 'fabric_area_sqm')),
             FOREIGN KEY (fabric_block_type) REFERENCES fabric_block_types(id) ON DELETE CASCADE,
             FOREIGN KEY (process_id) REFERENCES process_types(id) ON DELETE CASCADE
         )
@@ -397,20 +400,6 @@ def create_tables(cursor):
 
     cursor.execute(
         """
-        CREATE TABLE IF NOT EXISTS material_manufacturer_distances (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            material_id INTEGER NOT NULL,
-            destination_manufacturer_id INTEGER NOT NULL,
-            distance_km REAL NOT NULL,
-            FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE,
-            FOREIGN KEY (destination_manufacturer_id) REFERENCES manufacturers(id) ON DELETE CASCADE,
-            UNIQUE(material_id, destination_manufacturer_id)
-        )
-    """
-    )
-
-    cursor.execute(
-        """
         CREATE TABLE IF NOT EXISTS resource_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             event_trigger TEXT NOT NULL,
@@ -424,18 +413,15 @@ def create_tables(cursor):
             manufacturer_id INTEGER,
             manufacturer_distance_id INTEGER,
             material_id INTEGER,
-            material_manufacturer_distance_id INTEGER,
             order_id INTEGER,
             FOREIGN KEY (manufacturer_id) REFERENCES manufacturers(id) ON DELETE CASCADE,
             FOREIGN KEY (manufacturer_distance_id) REFERENCES manufacturer_distances(id) ON DELETE CASCADE,
             FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE,
-            FOREIGN KEY (material_manufacturer_distance_id) REFERENCES material_manufacturer_distances(id) ON DELETE CASCADE,
             FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
             CHECK (
                 (manufacturer_id IS NOT NULL) +
                 (manufacturer_distance_id IS NOT NULL) +
-                (material_id IS NOT NULL) +
-                (material_manufacturer_distance_id IS NOT NULL) <= 1
+                (material_id IS NOT NULL) <= 1
             )
         )
     """
@@ -471,26 +457,10 @@ def create_tables(cursor):
     )
 
 
-def seed_material_supply_chain(cursor):
-    for distance in load_seed_data()["material_supply_chain"]:
-        cursor.execute(
-            """
-            INSERT OR IGNORE INTO material_manufacturer_distances (
-                material_id, destination_manufacturer_id, distance_km
-            )
-            SELECT materials.id, manufacturers.id, ?
-            FROM materials CROSS JOIN manufacturers
-            WHERE materials.name = ? AND manufacturers.role_group = 'fabric'
-            """,
-            (distance["distance_km"], distance["material"]),
-        )
-
-
 RESOURCE_EVENT_LINK_COLUMNS = {
     "manufacturer_id",
     "manufacturer_distance_id",
     "material_id",
-    "material_manufacturer_distance_id",
 }
 
 
@@ -513,9 +483,8 @@ def _insert_resource_event(cursor, event, timestamp_offset="0 minutes"):
         INSERT INTO resource_events (
             event_trigger, timestamp, request_type, resource_type, co2eq, status,
             lifecycle_node, lifecycle_edge, manufacturer_id,
-            manufacturer_distance_id, material_id,
-            material_manufacturer_distance_id
-        ) VALUES (?, datetime('now', ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            manufacturer_distance_id, material_id
+        ) VALUES (?, datetime('now', ?), ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             event["event_trigger"],
@@ -529,7 +498,6 @@ def _insert_resource_event(cursor, event, timestamp_offset="0 minutes"):
             event.get("manufacturer_id"),
             event.get("manufacturer_distance_id"),
             event.get("material_id"),
-            event.get("material_manufacturer_distance_id"),
         ),
     )
 
@@ -607,23 +575,6 @@ def seed_resource_events(cursor):
             f"-{200 + material_id} minutes",
         )
 
-    material_transport = seed_data["material_transport"]
-    cursor.execute("SELECT id FROM material_manufacturer_distances ORDER BY id")
-    for (distance_id,) in cursor.fetchall():
-        if _resource_event_exists(
-            cursor, "material_manufacturer_distance_id", distance_id
-        ):
-            continue
-        _insert_resource_event(
-            cursor,
-            {
-                **defaults,
-                **material_transport,
-                "material_manufacturer_distance_id": distance_id,
-            },
-            f"-{300 + distance_id} minutes",
-        )
-
     manufacturer_transport = seed_data["manufacturer_transport"]
     cursor.execute(
         """
@@ -665,7 +616,6 @@ def init_sqlite_db():
     create_tables(cursor)
     seed_data(cursor)
     seed_demo_sales_data(cursor)
-    seed_material_supply_chain(cursor)
     seed_resource_events(cursor)
 
     conn.commit()
@@ -689,7 +639,6 @@ def init_sqlite_db():
     # A fresh database receives manufacturers during sync, so seed graph events after it.
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    seed_material_supply_chain(cursor)
     seed_resource_events(cursor)
     conn.commit()
     conn.close()

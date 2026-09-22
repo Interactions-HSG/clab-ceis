@@ -456,7 +456,6 @@ def _value_chain_edge(
     *,
     label: str = "",
     manufacturer_distance_ids: list[int] | None = None,
-    material_distance_ids: list[int] | None = None,
 ) -> dict:
     return {
         "data": {
@@ -465,7 +464,6 @@ def _value_chain_edge(
             "target": target,
             "label": label,
             "manufacturer_distance_ids": manufacturer_distance_ids or [],
-            "material_manufacturer_distance_ids": material_distance_ids or [],
         },
         "classes": classes,
     }
@@ -549,9 +547,6 @@ def get_supply_chain_elements(supply_chain: dict) -> list[dict]:
                 "value-chain-material-to-fabric",
                 VALUE_CHAIN_STEP_IDS["material"],
                 VALUE_CHAIN_STEP_IDS["fabric"],
-                material_distance_ids=[
-                    edge["id"] for edge in supply_chain.get("material_edges", [])
-                ],
             ),
             _value_chain_edge(
                 "value-chain-fabric-to-garment",
