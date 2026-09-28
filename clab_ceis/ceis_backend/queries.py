@@ -238,6 +238,64 @@ def db_get_sold_garments_for_co2() -> list[dict]:
     return [{"id": row[0], "type_id": row[1], "name": row[2]} for row in rows]
 
 
+def db_get_sold_garments() -> list[dict]:
+    """Return sold garment instances available for circular scenarios."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT gi.id,
+               gi.type_id,
+               gt.name,
+               gi.co2eq,
+               COUNT(fbi.id) AS fabric_block_count
+        FROM garments_inventory gi
+        JOIN garment_types gt ON gt.id = gi.type_id
+        LEFT JOIN fabric_blocks_inventory fbi ON fbi.garment_id = gi.id
+        WHERE gi.sold = 1
+        GROUP BY gi.id, gi.type_id, gt.name, gi.co2eq
+        ORDER BY gt.name, gi.id
+        """
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [
+        {
+            "id": row[0],
+            "type_id": row[1],
+            "name": row[2],
+            "co2eq": float(row[3]) if row[3] is not None else None,
+            "fabric_block_count": int(row[4] or 0),
+        }
+        for row in rows
+    ]
+
+
+def db_get_sold_garment(garment_id: int) -> dict | None:
+    """Return one sold garment instance or ``None`` when it is unavailable."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT gi.id, gi.type_id, gt.name, gi.co2eq
+        FROM garments_inventory gi
+        JOIN garment_types gt ON gt.id = gi.type_id
+        WHERE gi.id = ? AND gi.sold = 1
+        """,
+        (garment_id,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    if row is None:
+        return None
+    return {
+        "id": row[0],
+        "type_id": row[1],
+        "name": row[2],
+        "co2eq": float(row[3]) if row[3] is not None else None,
+    }
+
+
 def db_get_inventory_fabric_blocks_for_garment(garment_id: int) -> list[dict]:
     """Return actual fabric blocks linked to a garment inventory record."""
     conn = sqlite3.connect(DB_PATH)

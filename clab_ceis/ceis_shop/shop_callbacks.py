@@ -11,6 +11,10 @@ from ceis_shop.layouts.garment import (
     render_co2_content,
     render_waiting_for_material_co2_content,
 )
+from ceis_shop.layouts.scenarios import (
+    render_scenario_explorer,
+    render_scenario_results,
+)
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "ceis_dashboard"))
 
@@ -55,7 +59,7 @@ def get_callbacks(app):
         Output("customer-repair-content", "children"),
         Input("url", "pathname"),
     )
-    def load_customer_repair_content(pathname):
+    def load_end_of_life_content(pathname):
         if pathname != "/scenarios":
             return html.Div()
 
@@ -64,59 +68,106 @@ def get_callbacks(app):
                 f"{config.BACKEND_API_URL}/scenarios",
             )
             response.raise_for_status()
-            body = response.json()
-            scenarios = body
-        except Exception as e:
-            print(f"Error fetching repair CO2 data: {e}")
+            scenarios = response.json()
+        except Exception as exc:
+            print(f"Error fetching repair CO2 data: {exc}")
             return html.Div("Unable to load repair CO2 comparison.")
 
-        # Extract all unique activities across all scenarios
         all_activities = set()
         scenario_activity_map = {}
-
         for scenario in scenarios:
             scenario_label = scenario.get("label", "Scenario")
-            activities = scenario.get("activities", [])
             scenario_activity_map[scenario_label] = {}
-
-            for activity in activities:
+            for activity in scenario.get("activities", []):
                 activity_name = activity.get("name", "Unknown Activity")
                 emission = activity.get("costs", {}).get("co2_kg", 0)
                 scenario_activity_map[scenario_label][activity_name] = emission
                 all_activities.add(activity_name)
 
-        # Sort scenario labels to maintain consistent order
-        scenario_labels = [s.get("label", "Scenario") for s in scenarios]
-
-        # Create bar chart with activities as separate traces
-        fig = go.Figure()
-
+        scenario_labels = [
+            scenario.get("label", "Scenario") for scenario in scenarios
+        ]
+        figure = go.Figure()
         for activity_name in sorted(all_activities):
-            activity_values = []
-            for scenario_label in scenario_labels:
-                emission = scenario_activity_map.get(scenario_label, {}).get(
-                    activity_name, 0
-                )
-                activity_values.append(emission)
-
-            fig.add_bar(
+            figure.add_bar(
                 name=activity_name,
                 x=scenario_labels,
-                y=activity_values,
+                y=[
+                    scenario_activity_map.get(label, {}).get(activity_name, 0)
+                    for label in scenario_labels
+                ],
             )
 
-        fig.update_layout(
+        figure.update_layout(
             barmode="stack",
-            title="CO2 Comparison: Different Repairing Options (replacement of the fabric block 64x40) vs Buying new 'Basic Crop Top'",
+            title=(
+                "CO2 Comparison: Different Repairing Options (replacement of "
+                "the fabric block 64x40) vs Buying new 'Basic Crop Top'"
+            ),
             xaxis_title="Scenario",
             yaxis_title="CO2 (kg CO2eq)",
-            # legend_title_text="Emissions",
-            margin=dict(l=20, r=20, t=40, b=20),
+            margin={"l": 20, "r": 20, "t": 40, "b": 20},
         )
+        return html.Div(dcc.Graph(figure=figure))
 
-        return html.Div(
-            dcc.Graph(figure=fig),
+    @app.callback(
+        Output("customer-circular-content", "children"),
+        Input("url", "pathname"),
+    )
+    def load_customer_circular_content(pathname):
+        if pathname != "/repair-return":
+            return html.Div()
+
+        try:
+            response = requests.get(
+                f"{config.BACKEND_API_URL}/circular-scenarios/options",
+                timeout=30,
+            )
+            response.raise_for_status()
+            return render_scenario_explorer(response.json())
+        except Exception as exc:
+            print(f"Error fetching circular scenario options: {exc}")
+            return html.Div("Unable to load repair and return comparisons.")
+
+    @app.callback(
+        Output("circular-scenario-results", "children"),
+        Input("circular-garment", "value"),
+        Input("circular-distance", "value"),
+        Input("circular-damage", "value"),
+    )
+    def update_customer_circular_scenarios(garment_id, distance_km, damage_code):
+        if garment_id is None or distance_km is None or damage_code is None:
+            return html.P("Select a garment, distance, and damage type.")
+
+        try:
+            response = requests.get(
+                f"{config.BACKEND_API_URL}/circular-scenarios/{garment_id}",
+                params={
+                    "distance_km": distance_km,
+                    "damage_code": damage_code,
+                },
+                timeout=30,
+            )
+            response.raise_for_status()
+            return render_scenario_results(response.json())
+        except Exception as exc:
+            print(f"Error fetching circular scenario calculation: {exc}")
+            return html.Div("Unable to calculate the selected scenarios.")
+
+    @app.callback(
+        Output("circular-detailed-charts", "hidden"),
+        Output("toggle-circular-charts", "children"),
+        Input("toggle-circular-charts", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def toggle_circular_charts(n_clicks):
+        charts_are_open = bool(n_clicks and n_clicks % 2)
+        button_label = (
+            "Hide detailed bar charts"
+            if charts_are_open
+            else "View detailed bar charts"
         )
+        return not charts_are_open, button_label
 
     @app.callback(
         Output("garment-co2-content", "children"),

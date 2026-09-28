@@ -14,6 +14,10 @@ from ceis_backend.utils import (
     refresh_sold_garment_co2_values,
 )
 from ceis_backend.resource_event_emissions import enrich_resource_events_with_co2
+from ceis_backend.circular_scenarios import (
+    calculate_circular_scenarios,
+    get_circular_scenario_options,
+)
 from ceis_backend.designer_balance import (
     get_designer_garment_reference_data,
     get_designer_balance_options,
@@ -443,6 +447,29 @@ def get_co2_scenarios(
         )
 
         return scenarios
+    except WiserClientError as error:
+        _raise_wiser_http_exception(error)
+
+
+@app.get("/circular-scenarios/options")
+def get_customer_circular_scenario_options():
+    return get_circular_scenario_options()
+
+
+@app.get("/circular-scenarios/{garment_id}")
+def get_customer_circular_scenarios(
+    garment_id: int,
+    distance_km: float,
+    damage_code: str,
+    wiser_client: WiserClient = Depends(get_wiser_client),
+):
+    try:
+        return calculate_circular_scenarios(
+            garment_id,
+            distance_km,
+            damage_code,
+            wiser_client,
+        )
     except WiserClientError as error:
         _raise_wiser_http_exception(error)
 
