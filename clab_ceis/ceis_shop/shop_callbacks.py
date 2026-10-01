@@ -134,8 +134,11 @@ def get_callbacks(app):
         Input("circular-garment", "value"),
         Input("circular-distance", "value"),
         Input("circular-damage", "value"),
+        Input("circular-use-higher-electricity-factor", "value"),
     )
-    def update_customer_circular_scenarios(garment_id, distance_km, damage_code):
+    def update_customer_circular_scenarios(
+        garment_id, distance_km, damage_code, electricity_mode
+    ):
         if garment_id is None or distance_km is None or damage_code is None:
             return html.P("Select a garment, distance, and damage type.")
 
@@ -145,6 +148,8 @@ def get_callbacks(app):
                 params={
                     "distance_km": distance_km,
                     "damage_code": damage_code,
+                    "use_higher_electricity_factor": "higher_factor"
+                    in (electricity_mode or []),
                 },
                 timeout=30,
             )

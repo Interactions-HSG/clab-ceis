@@ -183,6 +183,28 @@ def render_scenario_explorer(options_payload: dict) -> html.Div:
                         ],
                         className="field-panel",
                     ),
+                    html.Div(
+                        [
+                            html.Div("Electricity factor", className="field-label"),
+                            dcc.Checklist(
+                                id="circular-use-higher-electricity-factor",
+                                options=[
+                                    {
+                                        "label": "Use higher electricity emission factor",
+                                        "value": "higher_factor",
+                                    }
+                                ],
+                                value=[],
+                                className="circular-factor-switch",
+                            ),
+                            html.P(
+                                "1.2525767471944982 kg CO2eq/kWh (activity 6566). "
+                                "Applies only to calculations on this page.",
+                                className="field-help",
+                            ),
+                        ],
+                        className="field-panel higher-electricity-factor-control",
+                    ),
                 ],
                 className="form-grid scenario-controls",
             ),

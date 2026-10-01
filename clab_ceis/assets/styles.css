@@ -446,6 +446,74 @@ ul {
     margin-top: 0;
 }
 
+.field-label {
+    color: var(--muted);
+    font-size: 0.85rem;
+    font-weight: 800;
+    margin-bottom: 7px;
+}
+
+.higher-electricity-factor-control {
+    align-content: center;
+}
+
+.circular-factor-switch label {
+    align-items: center;
+    color: var(--ink);
+    cursor: pointer;
+    display: flex;
+    font-size: 0.92rem;
+    gap: 10px;
+    margin: 0;
+}
+
+.circular-factor-switch input[type="checkbox"] {
+    appearance: none;
+    background: var(--line-strong);
+    border: 0 !important;
+    border-radius: 999px !important;
+    box-shadow: inset 0 0 0 1px rgba(29, 36, 32, 0.12);
+    cursor: pointer;
+    flex: 0 0 44px;
+    height: 24px;
+    margin: 0;
+    min-height: 24px;
+    padding: 2px;
+    position: relative;
+    transition: background 160ms ease;
+    width: 44px;
+}
+
+.circular-factor-switch input[type="checkbox"]::before {
+    background: #ffffff;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(29, 36, 32, 0.3);
+    content: "";
+    display: block;
+    height: 20px;
+    transition: transform 160ms ease;
+    width: 20px;
+}
+
+.circular-factor-switch input[type="checkbox"]:checked {
+    background: var(--accent);
+}
+
+.circular-factor-switch input[type="checkbox"]:checked::before {
+    transform: translateX(20px);
+}
+
+.circular-factor-switch input[type="checkbox"]:focus-visible {
+    outline: 3px solid var(--accent-soft);
+    outline-offset: 2px;
+}
+
+.field-help {
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin: 8px 0 0;
+}
+
 .scenario-summary {
     align-items: center;
     display: flex;

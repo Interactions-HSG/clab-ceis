@@ -90,6 +90,8 @@ def test_scenario_explorer_uses_sold_garment_and_damage_options():
     assert "circular-distance" in text
     assert "circular-damage" in text
     assert "Small hole or puncture" in text
+    assert "circular-use-higher-electricity-factor" in text
+    assert "Use higher electricity emission factor" in text
 
 
 def test_scenario_results_show_alternatives_without_recommendation():

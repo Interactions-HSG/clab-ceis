@@ -461,6 +461,7 @@ def get_customer_circular_scenarios(
     garment_id: int,
     distance_km: float,
     damage_code: str,
+    use_higher_electricity_factor: bool = False,
     wiser_client: WiserClient = Depends(get_wiser_client),
 ):
     try:
@@ -469,6 +470,7 @@ def get_customer_circular_scenarios(
             distance_km,
             damage_code,
             wiser_client,
+            use_higher_electricity_factor,
         )
     except WiserClientError as error:
         _raise_wiser_http_exception(error)

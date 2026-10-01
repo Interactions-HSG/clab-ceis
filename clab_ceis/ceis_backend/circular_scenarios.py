@@ -154,6 +154,37 @@ DAMAGE_PROFILE_BY_CODE = {profile.code: profile for profile in DAMAGE_PROFILES}
 
 # A light kit is still transported when no replacement panel is required.
 MINIMUM_REPAIR_KIT_WEIGHT_KG = 0.05
+HIGHER_ELECTRICITY_FACTOR_ACTIVITY_ID = 6566
+
+
+def _electricity_process_names() -> set[str]:
+    """Return process names whose configured unit is electricity (kWh)."""
+    return {
+        str(process_type["name"])
+        for process_type in db_get_process_types()
+        if str(process_type.get("unit") or "").strip().lower() == "kwh"
+    }
+
+
+def _processes_for_electricity_mode(
+    processes: list[Process], use_higher_electricity_factor: bool
+) -> list[Process]:
+    if not use_higher_electricity_factor:
+        return processes
+
+    electricity_processes = _electricity_process_names()
+    return [
+        Process(
+            name=process.name,
+            amount=process.amount,
+            activity_id=(
+                HIGHER_ELECTRICITY_FACTOR_ACTIVITY_ID
+                if process.name in electricity_processes
+                else process.activity_id
+            ),
+        )
+        for process in processes
+    ]
 
 
 def get_circular_scenario_options() -> dict:
@@ -176,6 +207,7 @@ def get_circular_scenario_options() -> dict:
 
 def _resolve_processes(
     requirements: tuple[ProcessRequirement, ...],
+    use_higher_electricity_factor: bool,
 ) -> list[Process]:
     process_types = {item["name"]: item for item in db_get_process_types()}
     missing = sorted(
@@ -188,7 +220,7 @@ def _resolve_processes(
             status_code=500,
             detail=f"Missing process types: {', '.join(missing)}",
         )
-    return [
+    processes = [
         Process(
             name=requirement.name,
             amount=requirement.amount,
@@ -196,13 +228,17 @@ def _resolve_processes(
         )
         for requirement in requirements
     ]
+    return _processes_for_electricity_mode(
+        processes, use_higher_electricity_factor
+    )
 
 
 def _process_result(
     wiser_client: WiserClient,
     requirements: tuple[ProcessRequirement, ...],
+    use_higher_electricity_factor: bool,
 ) -> dict:
-    processes = _resolve_processes(requirements)
+    processes = _resolve_processes(requirements, use_higher_electricity_factor)
     total, details = calculate_process_emissions(wiser_client, processes)
     for requirement, detail in zip(requirements, details):
         detail["label"] = requirement.label or requirement.name
@@ -213,7 +249,9 @@ def _process_result(
 
 
 def _new_equivalent_block_data(
-    wiser_client: WiserClient, blocks: list[dict]
+    wiser_client: WiserClient,
+    blocks: list[dict],
+    use_higher_electricity_factor: bool,
 ) -> dict:
     details: list[dict] = []
     total_co2eq = 0.0
@@ -249,7 +287,10 @@ def _new_equivalent_block_data(
             else 0.0
         )
         process_co2eq, process_details = calculate_process_emissions(
-            wiser_client, block_recipe.processes
+            wiser_client,
+            _processes_for_electricity_mode(
+                block_recipe.processes, use_higher_electricity_factor
+            ),
         )
         block_total = material_co2eq + process_co2eq
         total_co2eq += block_total
@@ -357,10 +398,19 @@ def calculate_circular_scenarios(
     distance_km: float,
     damage_code: str,
     wiser_client: WiserClient,
+    use_higher_electricity_factor: bool = False,
 ) -> dict:
     """Calculate alternatives without choosing or ranking a preferred route."""
     if distance_km < 0:
         raise HTTPException(status_code=422, detail="distance_km must be non-negative")
+
+    higher_electricity_factor = (
+        wiser_client.get_emission_per_unit(
+            HIGHER_ELECTRICITY_FACTOR_ACTIVITY_ID
+        )
+        if use_higher_electricity_factor
+        else None
+    )
 
     garment = db_get_sold_garment(garment_id)
     if garment is None:
@@ -377,8 +427,13 @@ def calculate_circular_scenarios(
             detail="Selected garment has no linked fabric blocks",
         )
 
-    block_reference = _new_equivalent_block_data(wiser_client, blocks)
-    garment_processes = db_get_garment_processes(int(garment["type_id"]))
+    block_reference = _new_equivalent_block_data(
+        wiser_client, blocks, use_higher_electricity_factor
+    )
+    garment_processes = _processes_for_electricity_mode(
+        db_get_garment_processes(int(garment["type_id"])),
+        use_higher_electricity_factor,
+    )
     assembly_co2eq, assembly_details = calculate_process_emissions(
         wiser_client, garment_processes
     )
@@ -421,7 +476,9 @@ def calculate_circular_scenarios(
         ]
     )
 
-    repair_process = _process_result(wiser_client, damage.repair_processes)
+    repair_process = _process_result(
+        wiser_client, damage.repair_processes, use_higher_electricity_factor
+    )
     replacement_count = min(damage.replacement_block_count, block_count)
     replacement_share = replacement_count / block_count
     replacement_material_co2eq = (
@@ -487,8 +544,12 @@ def calculate_circular_scenarios(
         garment_weight_kg,
         transport_factor,
     )
-    whole_preparation = _process_result(wiser_client, _STEAMING)
-    block_preparation = _process_result(wiser_client, _BLOCK_PREPARATION)
+    whole_preparation = _process_result(
+        wiser_client, _STEAMING, use_higher_electricity_factor
+    )
+    block_preparation = _process_result(
+        wiser_client, _BLOCK_PREPARATION, use_higher_electricity_factor
+    )
 
     if damage.whole_garment_available and damage.repair_available:
         whole_total = (
@@ -595,7 +656,32 @@ def calculate_circular_scenarios(
             "whole_garment": whole_garment,
             "fabric_blocks": fabric_blocks,
         },
+        "calculation": {
+            "electricity_mode": (
+                "higher_factor" if use_higher_electricity_factor else "current"
+            ),
+            "electricity_activity_id": (
+                HIGHER_ELECTRICITY_FACTOR_ACTIVITY_ID
+                if use_higher_electricity_factor
+                else next(
+                    (
+                        int(process_type["activity_id"])
+                        for process_type in db_get_process_types()
+                        if str(process_type.get("unit") or "").strip().lower()
+                        == "kwh"
+                    ),
+                    None,
+                )
+            ),
+            "electricity_emission_factor": higher_electricity_factor,
+        },
         "assumptions": [
+            (
+                "Electricity-based processes use the higher emission factor "
+                "from activity 6566."
+                if use_higher_electricity_factor
+                else "Electricity-based processes use the currently configured activity."
+            ),
             "Self and professional repair use the same repair processes.",
             "Repair sewing is scaled from 10% to 100% of the seeded garment "
             "sewing amount.",

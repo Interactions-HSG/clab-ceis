@@ -20,6 +20,7 @@ def _mock_wiser_client():
     client = MagicMock()
     client.get_emission_per_unit.side_effect = {
         2660: 0.5,
+        6566: 1.2525767471944982,
         4358: 5.0,
         6756: 4.0,
         20936: 8.0,
@@ -107,6 +108,66 @@ def test_repair_process_is_shared_but_transport_differs(seeded_db):
     assert payload["return"]["whole_garment"]["available"] is True
     assert payload["return"]["fabric_blocks"]["available"] is True
     assert "recommendation" not in payload
+
+
+def test_higher_electricity_factor_mode_changes_page_calculations(seeded_db):
+    garment_id = get_circular_scenario_options()["garments"][0]["id"]
+
+    current = calculate_circular_scenarios(
+        garment_id,
+        100,
+        "small_hole",
+        _mock_wiser_client(),
+    )
+    higher_factor = calculate_circular_scenarios(
+        garment_id,
+        100,
+        "small_hole",
+        _mock_wiser_client(),
+        use_higher_electricity_factor=True,
+    )
+
+    assert current["calculation"] == {
+        "electricity_mode": "current",
+        "electricity_activity_id": 2660,
+        "electricity_emission_factor": None,
+    }
+    assert higher_factor["calculation"] == {
+        "electricity_mode": "higher_factor",
+        "electricity_activity_id": 6566,
+        "electricity_emission_factor": 1.2525767471944982,
+    }
+    assert higher_factor["repair"]["self_repair"][
+        "shared_repair_co2eq"
+    ] > current["repair"]["self_repair"]["shared_repair_co2eq"]
+    assert {
+        detail["activity_id"]
+        for detail in higher_factor["repair"]["new_garment"]["assembly_processes"]
+    } == {6566}
+    assert {
+        detail["activity_id"]
+        for detail in higher_factor["return"]["fabric_blocks"]["preparation"][
+            "details"
+        ]
+    } == {6566}
+
+
+def test_higher_electricity_factor_mode_requests_configured_activity(seeded_db):
+    garment_id = get_circular_scenario_options()["garments"][0]["id"]
+    wiser_client = _mock_wiser_client()
+
+    calculate_circular_scenarios(
+        garment_id,
+        100,
+        "small_hole",
+        wiser_client,
+        use_higher_electricity_factor=True,
+    )
+
+    assert any(
+        call.args[0] == 6566
+        for call in wiser_client.get_emission_per_unit.call_args_list
+    )
 
 
 def test_chart_components_reconcile_with_scenario_totals(seeded_db):
