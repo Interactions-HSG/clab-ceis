@@ -1,3 +1,4 @@
+import sqlite3
 from unittest.mock import MagicMock
 
 import pytest
@@ -72,6 +73,87 @@ def test_shop_repair_request_is_visible_in_repair_queue(seeded_db):
     assert queue.json()[0]["action"] == "professional_repair"
     assert queue.json()[0]["action_label"] == "Perform professional repair"
     assert queue.json()[0]["damage_code"] == "small_hole"
+
+
+def test_garment_return_copies_blocks_with_processes_only_on_garment(seeded_db):
+    source_garment_id = get_circular_scenario_options()["garments"][0]["id"]
+    conn = sqlite3.connect("ceis_backend.db")
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT COUNT(*) FROM fabric_blocks_inventory WHERE garment_id = ?",
+        (source_garment_id,),
+    )
+    source_block_count = cursor.fetchone()[0]
+    conn.close()
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/garment-returns",
+            json={
+                "garment_id": source_garment_id,
+                "damage_code": "small_hole",
+            },
+        )
+        duplicate = client.post(
+            "/garment-returns",
+            json={
+                "garment_id": source_garment_id,
+                "damage_code": "small_hole",
+            },
+        )
+
+    assert response.status_code == 201
+    assert duplicate.status_code == 409
+    returned = response.json()
+    assert returned["source_garment_id"] == source_garment_id
+    assert returned["fabric_block_count"] == source_block_count
+    assert source_garment_id not in {
+        garment["id"] for garment in get_circular_scenario_options()["garments"]
+    }
+
+    conn = sqlite3.connect("ceis_backend.db")
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT sold, returned_from_garment_id
+        FROM garments_inventory
+        WHERE id = ?
+        """,
+        (returned["garment_id"],),
+    )
+    assert cursor.fetchone() == (0, source_garment_id)
+    cursor.execute(
+        "SELECT COUNT(*) FROM fabric_blocks_inventory WHERE garment_id = ?",
+        (returned["garment_id"],),
+    )
+    assert cursor.fetchone()[0] == source_block_count
+    cursor.execute(
+        """
+        SELECT pt.name, SUM(pgi.amount)
+        FROM processes_garments_inventory pgi
+        JOIN process_types pt ON pt.id = pgi.process_id
+        WHERE pgi.garment_id = ?
+        GROUP BY pt.name
+        """,
+        (returned["garment_id"],),
+    )
+    garment_processes = dict(cursor.fetchall())
+    assert garment_processes["sewing"] == pytest.approx(0.0042)
+    assert garment_processes["steaming"] == pytest.approx(0.11)
+    cursor.execute(
+        """
+        SELECT pt.name, SUM(pfbi.amount)
+        FROM processes_fabric_blocks_inventory pfbi
+        JOIN process_types pt ON pt.id = pfbi.process_id
+        JOIN fabric_blocks_inventory fbi ON fbi.id = pfbi.fabric_block_id
+        WHERE fbi.garment_id = ?
+        GROUP BY pt.name
+        """,
+        (returned["garment_id"],),
+    )
+    block_processes = dict(cursor.fetchall())
+    conn.close()
+    assert block_processes == {}
 
 
 def test_mock_repair_amounts_are_scaled_to_garment_assembly():

@@ -18,6 +18,7 @@ from ceis_backend.circular_scenarios import (
     DAMAGE_PROFILE_BY_CODE,
     calculate_circular_scenarios,
     get_circular_scenario_options,
+    get_return_inventory_processes,
 )
 from ceis_backend.designer_balance import (
     get_designer_garment_reference_data,
@@ -37,6 +38,7 @@ from ceis_backend.queries import (
     db_get_supply_chain_graph,
     db_create_order,
     db_create_repair,
+    db_create_garment_return,
     db_get_repairs,
     db_upsert_material,
     db_delete_garment_recipe,
@@ -66,6 +68,7 @@ from ceis_backend.models import (
     ProcessTypeCreate,
     OrderCreate,
     RepairCreate,
+    GarmentReturnCreate,
 )
 
 
@@ -176,6 +179,12 @@ def create_repair(payload: RepairCreate):
 @app.get("/repairs")
 def get_repairs():
     return db_get_repairs()
+
+
+@app.post("/garment-returns", status_code=201)
+def create_garment_return(payload: GarmentReturnCreate):
+    processes = get_return_inventory_processes(payload.damage_code)
+    return db_create_garment_return(payload.garment_id, processes)
 
 
 @app.get("/garment-types/{garment_type_id}/materials")

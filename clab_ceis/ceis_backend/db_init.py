@@ -302,9 +302,29 @@ def create_tables(cursor):
             co2eq INTEGER,
             price INTEGER,
             sold INTEGER NOT NULL DEFAULT 0,
-            FOREIGN KEY (type_id) REFERENCES garment_types (id) ON DELETE CASCADE
+            returned_from_garment_id INTEGER,
+            FOREIGN KEY (type_id) REFERENCES garment_types (id) ON DELETE CASCADE,
+            FOREIGN KEY (returned_from_garment_id)
+                REFERENCES garments_inventory (id) ON DELETE SET NULL
         )
     """
+    )
+    cursor.execute("PRAGMA table_info(garments_inventory)")
+    garment_inventory_columns = {row[1] for row in cursor.fetchall()}
+    if "returned_from_garment_id" not in garment_inventory_columns:
+        cursor.execute(
+            """
+            ALTER TABLE garments_inventory
+            ADD COLUMN returned_from_garment_id INTEGER
+                REFERENCES garments_inventory (id) ON DELETE SET NULL
+            """
+        )
+    cursor.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS one_return_per_garment
+        ON garments_inventory (returned_from_garment_id)
+        WHERE returned_from_garment_id IS NOT NULL
+        """
     )
 
     cursor.execute(

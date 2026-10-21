@@ -205,6 +205,22 @@ def get_circular_scenario_options() -> dict:
     }
 
 
+def get_return_inventory_processes(damage_code: str) -> list[dict]:
+    """Return whole-garment process amounts for returned inventory."""
+    damage = DAMAGE_PROFILE_BY_CODE.get(damage_code)
+    if damage is None:
+        raise HTTPException(status_code=404, detail="Damage type not found")
+    if not damage.repair_available or not damage.whole_garment_available:
+        raise HTTPException(
+            status_code=422,
+            detail="Garment return is not available for this damage type",
+        )
+    return [
+        {"name": requirement.name, "amount": requirement.amount}
+        for requirement in (*damage.repair_processes, *_STEAMING)
+    ]
+
+
 def _resolve_processes(
     requirements: tuple[ProcessRequirement, ...],
     use_higher_electricity_factor: bool,

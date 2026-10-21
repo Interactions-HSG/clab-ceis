@@ -2,7 +2,7 @@ from urllib.parse import quote
 
 from dash import html, dcc, dash_table
 
-from ceis_dashboard.callbacks.api import fetch_garment_types
+from ceis_dashboard.callbacks.api import fetch_garment_types, fetch_repairs
 from pages.ui import app_topbar, page_hero
 
 GARMENT_IMAGE_MAP = {
@@ -17,6 +17,16 @@ GARMENT_IMAGE_MAP = {
     "Mangata Dress": "14. Mångata dress Refashion by SOLVE (1).jpg",
     "Måne top": "15. Måne top Refashion SOLVE (2).jpg",
 }
+
+REPAIR_COLUMNS = [
+    {"name": "Request", "id": "id"},
+    {"name": "Garment", "id": "garment"},
+    {"name": "Garment ID", "id": "garment_id"},
+    {"name": "Required action", "id": "action_label"},
+    {"name": "Damage", "id": "damage_code"},
+    {"name": "Status", "id": "status"},
+    {"name": "Created", "id": "created_at"},
+]
 
 
 def get_index_layout():
@@ -152,6 +162,23 @@ def get_index_layout():
         className="fabric-add-form",
     )
 
+    repair_actions = html.Div(
+        [
+            html.H2("Pending Repair Actions"),
+            html.P("Repair requests placed by customers in the shop."),
+            dash_table.DataTable(
+                id="repairs-table",
+                columns=REPAIR_COLUMNS,
+                data=fetch_repairs(),
+                page_size=10,
+                style_table={"overflowX": "auto"},
+                style_cell={"textAlign": "center", "padding": "10px"},
+                style_header={"fontWeight": "bold"},
+            ),
+        ],
+        className="panel table-panel",
+    )
+
     garment_types = fetch_garment_types()
     co2_cards = [
         dcc.Link(
@@ -196,6 +223,7 @@ def get_index_layout():
             ),
             inventory_form,
             fabric_form,
+            repair_actions,
             co2_form,
         ],
         className="wrapper inventory-page",

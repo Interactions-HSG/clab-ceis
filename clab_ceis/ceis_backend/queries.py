@@ -230,6 +230,11 @@ def db_get_sold_garments_for_co2() -> list[dict]:
         FROM garments_inventory gi
         JOIN garment_types gt ON gt.id = gi.type_id
         WHERE gi.sold = 1
+          AND NOT EXISTS (
+              SELECT 1
+              FROM garments_inventory returned
+              WHERE returned.returned_from_garment_id = gi.id
+          )
           AND gi.co2eq IS NULL
         ORDER BY gi.id
         """)
@@ -253,6 +258,11 @@ def db_get_sold_garments() -> list[dict]:
         JOIN garment_types gt ON gt.id = gi.type_id
         LEFT JOIN fabric_blocks_inventory fbi ON fbi.garment_id = gi.id
         WHERE gi.sold = 1
+          AND NOT EXISTS (
+              SELECT 1
+              FROM garments_inventory returned
+              WHERE returned.returned_from_garment_id = gi.id
+          )
         GROUP BY gi.id, gi.type_id, gt.name, gi.co2eq
         ORDER BY gt.name, gi.id
         """
@@ -281,6 +291,11 @@ def db_get_sold_garment(garment_id: int) -> dict | None:
         FROM garments_inventory gi
         JOIN garment_types gt ON gt.id = gi.type_id
         WHERE gi.id = ? AND gi.sold = 1
+          AND NOT EXISTS (
+              SELECT 1
+              FROM garments_inventory returned
+              WHERE returned.returned_from_garment_id = gi.id
+          )
         """,
         (garment_id,),
     )
@@ -388,6 +403,169 @@ def db_get_repairs() -> list[dict]:
         }
         for row in rows
     ]
+
+
+def db_create_garment_return(
+    garment_id: int,
+    garment_processes: list[dict],
+) -> dict:
+    """Copy a bought garment and its blocks into returned inventory."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")
+    cursor = conn.cursor()
+    try:
+        cursor.execute("BEGIN IMMEDIATE")
+        cursor.execute(
+            """
+            SELECT type_id, co2eq, price
+            FROM garments_inventory
+            WHERE id = ? AND sold = 1
+            """,
+            (garment_id,),
+        )
+        source_garment = cursor.fetchone()
+        if source_garment is None:
+            raise HTTPException(status_code=404, detail="Bought garment not found")
+
+        cursor.execute(
+            """
+            SELECT id
+            FROM garments_inventory
+            WHERE returned_from_garment_id = ?
+            """,
+            (garment_id,),
+        )
+        if cursor.fetchone() is not None:
+            raise HTTPException(
+                status_code=409,
+                detail="This garment has already been returned",
+            )
+
+        cursor.execute(
+            """
+            SELECT type_id, co2eq, location_id, material_id, quality,
+                   second_life
+            FROM fabric_blocks_inventory
+            WHERE garment_id = ?
+            ORDER BY id
+            """,
+            (garment_id,),
+        )
+        source_blocks = cursor.fetchall()
+        if not source_blocks:
+            raise HTTPException(
+                status_code=400,
+                detail="Selected garment has no linked fabric blocks",
+            )
+
+        process_names = {
+            str(process["name"])
+            for process in garment_processes
+        }
+        placeholders = ", ".join("?" for _ in process_names)
+        cursor.execute(
+            f"SELECT id, name FROM process_types WHERE name IN ({placeholders})",
+            tuple(sorted(process_names)),
+        )
+        process_ids = {name: process_id for process_id, name in cursor.fetchall()}
+        missing_processes = sorted(process_names - set(process_ids))
+        if missing_processes:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Missing process types: {', '.join(missing_processes)}",
+            )
+
+        type_id, co2eq, price = source_garment
+        cursor.execute(
+            """
+            INSERT INTO garments_inventory (
+                type_id, co2eq, price, sold, returned_from_garment_id
+            ) VALUES (?, ?, ?, 0, ?)
+            """,
+            (type_id, co2eq, price, garment_id),
+        )
+        returned_garment_id = cursor.lastrowid
+
+        cursor.execute(
+            """
+            INSERT INTO processes_garments_inventory (
+                process_id, amount, garment_id
+            )
+            SELECT process_id, amount, ?
+            FROM processes_garments_inventory
+            WHERE garment_id = ?
+            """,
+            (returned_garment_id, garment_id),
+        )
+        cursor.executemany(
+            """
+            INSERT INTO processes_garments_inventory (
+                process_id, amount, garment_id
+            ) VALUES (?, ?, ?)
+            """,
+            [
+                (
+                    process_ids[str(process["name"])],
+                    float(process["amount"]),
+                    returned_garment_id,
+                )
+                for process in garment_processes
+            ],
+        )
+
+        cursor.execute("SELECT id FROM locations WHERE name = 'St. Gallen'")
+        return_location = cursor.fetchone()
+        return_location_id = return_location[0] if return_location else None
+        returned_block_ids: list[int] = []
+        block_count = len(source_blocks)
+        for source_block in source_blocks:
+            (
+                block_type_id,
+                block_co2eq,
+                source_location_id,
+                material_id,
+                quality,
+                _second_life,
+            ) = source_block
+            cursor.execute(
+                """
+                INSERT INTO fabric_blocks_inventory (
+                    type_id, co2eq, garment_id, location_id, material_id,
+                    quality, second_life
+                ) VALUES (?, ?, ?, ?, ?, ?, 1)
+                """,
+                (
+                    block_type_id,
+                    block_co2eq,
+                    returned_garment_id,
+                    return_location_id or source_location_id,
+                    material_id,
+                    quality,
+                ),
+            )
+            returned_block_id = cursor.lastrowid
+            returned_block_ids.append(returned_block_id)
+
+        conn.commit()
+        return {
+            "source_garment_id": garment_id,
+            "garment_id": returned_garment_id,
+            "fabric_block_ids": returned_block_ids,
+            "fabric_block_count": block_count,
+            "garment_processes": garment_processes,
+            "status": "in_inventory",
+        }
+    except sqlite3.IntegrityError as error:
+        conn.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="This garment has already been returned",
+        ) from error
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def db_get_inventory_fabric_blocks_for_garment(garment_id: int) -> list[dict]:

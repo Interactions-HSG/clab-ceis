@@ -135,3 +135,8 @@ class RepairCreate(BaseModel):
     garment_id: int
     action: Literal["self_repair_kit", "professional_repair"]
     damage_code: str
+
+
+class GarmentReturnCreate(BaseModel):
+    garment_id: int
+    damage_code: str

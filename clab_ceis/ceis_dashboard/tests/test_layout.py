@@ -14,6 +14,7 @@ from pages.flow import (
     get_supply_chain_stylesheet,
     get_dashboard_layout,
 )
+from pages.home import get_index_layout
 from pages.ui import page_hero
 
 
@@ -39,9 +40,12 @@ def test_page_hero_home_link_is_opt_in_for_subpages():
     assert "page-hero-with-action" in str(subpage_hero)
 
 
-def test_dashboard_shows_pending_repair_actions():
-    layout = get_dashboard_layout(
-        repairs=[
+def test_homepage_shows_pending_repairs_below_fabric_block_form():
+    with (
+        patch("pages.home.fetch_garment_types", return_value=[]),
+        patch(
+            "pages.home.fetch_repairs",
+            return_value=[
             {
                 "id": 3,
                 "garment": "Basic Crop Top",
@@ -51,13 +55,19 @@ def test_dashboard_shows_pending_repair_actions():
                 "status": "pending",
                 "created_at": "2026-10-21 12:00:00",
             }
-        ]
-    )
+            ],
+        ),
+    ):
+        layout = get_index_layout()
     text = str(layout)
 
     assert "Pending Repair Actions" in text
     assert "repairs-table" in text
     assert "Prepare self-repair kit" in text
+    assert text.index("Add Second-hand Fabric Blocks to inventory") < text.index(
+        "Pending Repair Actions"
+    )
+    assert "Pending Repair Actions" not in str(get_dashboard_layout())
 
 
 def test_product_lifecycle_uses_top_to_bottom_flow():

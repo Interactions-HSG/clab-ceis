@@ -161,7 +161,7 @@ def render_scenario_explorer(options_payload: dict) -> html.Div:
                                 type="number",
                                 min=0,
                                 step=10,
-                                value=100,
+                                value=1000,
                             ),
                         ],
                         className="field-panel",
@@ -462,6 +462,19 @@ def render_scenario_results(payload: dict) -> html.Div:
                     ),
                 ],
                 className="co2-metric-grid return-scenario-grid",
+            ),
+            html.Div(
+                html.Button(
+                    "Return garment",
+                    id="return-garment-button",
+                    n_clicks=0,
+                ),
+                className="scenario-chart-actions",
+            ),
+            html.Div(
+                id="circular-garment-return-result",
+                className="repair-order-result",
+                role="status",
             ),
             html.Div(
                 html.Button(

@@ -205,6 +205,44 @@ def get_callbacks(app):
         )
 
     @app.callback(
+        Output("circular-garment-return-result", "children"),
+        Input("return-garment-button", "n_clicks"),
+        State("circular-garment", "value"),
+        State("circular-damage", "value"),
+        prevent_initial_call=True,
+    )
+    def return_garment(n_clicks, garment_id, damage_code):
+        if not n_clicks or garment_id is None or damage_code is None:
+            return html.P("Select a garment and damage type before returning it.")
+
+        try:
+            response = requests.post(
+                f"{config.BACKEND_API_URL}/garment-returns",
+                json={
+                    "garment_id": garment_id,
+                    "damage_code": damage_code,
+                },
+                timeout=30,
+            )
+            response.raise_for_status()
+            returned = response.json()
+        except Exception as exc:
+            return html.P(f"Unable to return garment: {exc}")
+
+        return html.Div(
+            [
+                html.Strong(
+                    f"Returned garment #{returned['garment_id']} added to inventory"
+                ),
+                html.P(
+                    f"{returned['fabric_block_count']} corresponding fabric blocks "
+                    "were added with the whole-garment processes."
+                ),
+            ],
+            className="panel-muted",
+        )
+
+    @app.callback(
         Output("circular-detailed-charts", "hidden"),
         Output("toggle-circular-charts", "children"),
         Input("toggle-circular-charts", "n_clicks"),

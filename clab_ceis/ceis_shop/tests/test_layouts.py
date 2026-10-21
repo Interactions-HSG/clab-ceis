@@ -90,6 +90,7 @@ def test_scenario_explorer_uses_bought_garment_and_damage_options():
     assert "Sold garment" not in text
     assert "Basic Crop Top · garment #7" in text
     assert "circular-distance" in text
+    assert "value=1000" in text
     assert "circular-damage" in text
     assert "Small hole or puncture" in text
     assert "circular-use-higher-electricity-factor" in text
@@ -144,7 +145,12 @@ def test_scenario_results_show_alternatives_without_recommendation():
     assert "request-professional-repair" in text
     assert "circular-repair-order-result" in text
     assert "Reuse whole garment" in text
+    assert "Return garment" in text
+    assert "return-garment-button" in text
+    assert "circular-garment-return-result" in text
     assert "Recover fabric blocks" in text
+    assert text.index("Reuse whole garment") < text.index("return-garment-button")
+    assert text.index("Recover fabric blocks") < text.index("return-garment-button")
     assert "Blocks to replace: 1" in text
     assert "View detailed bar charts" in text
     assert "circular-detailed-charts" in text
