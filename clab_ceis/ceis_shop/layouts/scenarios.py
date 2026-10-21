@@ -90,8 +90,8 @@ def repair_return_page():
                                 className="header-title",
                             ),
                             html.P(
-                                "Compare the CO2 impact of repair, whole-garment "
-                                "reuse, and replacement without selecting a winner.",
+                                "Compare the CO2 impact of repair and replacement "
+                                "with the expected saving from whole-garment reuse.",
                                 className="shop-intro",
                             ),
                         ],
@@ -305,6 +305,11 @@ def _expected_return_saving_card(scenario: dict) -> html.Div:
                 f"{_format_number(scenario.get('saving_co2eq'))} kg CO2eq",
                 className="co2-metric-value",
             ),
+            html.Div(
+                f"{_format_number(scenario.get('total_co2eq'))} kg CO2eq "
+                "needed for transport, repair, and preparation",
+                className="co2-metric-subtitle",
+            ),
         ],
         className="co2-metric-card",
     )
@@ -365,6 +370,16 @@ def _component_bar_chart(
     return figure
 
 
+def _saved_components(components: list[dict]) -> list[dict]:
+    return [
+        {
+            "name": f"Saved: {component['name']}",
+            "co2eq": -float(component.get("co2eq", 0)),
+        }
+        for component in components
+    ]
+
+
 def render_scenario_results(payload: dict) -> html.Div:
     garment = payload.get("garment", {})
     damage = payload.get("damage", {})
@@ -390,6 +405,21 @@ def render_scenario_results(payload: dict) -> html.Div:
             ),
             ("New garment", new_garment.get("components", [])),
         ],
+    )
+    return_figure = _component_bar_chart(
+        "Return alternative: CO2 needed (+) and CO2 saved (-)",
+        [
+            (
+                "Expected CO2 saving",
+                [
+                    *whole_garment.get("components", []),
+                    *_saved_components(
+                        whole_garment.get("reference_components", [])
+                    ),
+                ],
+            ),
+        ],
+        barmode="relative",
     )
     return html.Div(
         [
@@ -476,6 +506,21 @@ def render_scenario_results(payload: dict) -> html.Div:
                             dcc.Graph(
                                 id="repair-component-chart",
                                 figure=repair_figure,
+                                config={"displayModeBar": False},
+                            ),
+                        ],
+                        className="co2-detail-panel",
+                    ),
+                    html.Div(
+                        [
+                            html.P(
+                                "Positive sections are the CO2 needed for return, "
+                                "repair, and preparation. Negative sections are "
+                                "the new-garment production CO2 saved.",
+                            ),
+                            dcc.Graph(
+                                id="return-component-chart",
+                                figure=return_figure,
                                 config={"displayModeBar": False},
                             ),
                         ],
