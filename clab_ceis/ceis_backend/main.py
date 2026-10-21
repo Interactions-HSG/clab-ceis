@@ -43,6 +43,9 @@ from ceis_backend.queries import (
     db_create_repair,
     db_create_garment_return,
     db_get_available_returned_garments,
+    db_get_returned_garments,
+    db_get_returned_garment,
+    db_disassemble_returned_garment,
     db_get_repairs,
     db_upsert_material,
     db_delete_garment_recipe,
@@ -225,7 +228,44 @@ def get_repairs():
 @app.post("/garment-returns", status_code=201)
 def create_garment_return(payload: GarmentReturnCreate):
     processes = get_return_inventory_processes(payload.damage_code)
-    return db_create_garment_return(payload.garment_id, processes)
+    return db_create_garment_return(
+        payload.garment_id,
+        processes,
+        payload.damage_code,
+    )
+
+
+@app.get("/returned-garments")
+def get_returned_garments():
+    return db_get_returned_garments()
+
+
+@app.get("/returned-garments/{garment_id}/return-alternatives")
+def get_returned_garment_alternatives(
+    garment_id: int,
+    distance_km: float,
+    use_higher_electricity_factor: bool = False,
+    wiser_client: WiserClient = Depends(get_wiser_client),
+):
+    garment = db_get_returned_garment(garment_id)
+    if garment is None:
+        raise HTTPException(status_code=404, detail="Returned garment not found")
+    try:
+        return calculate_circular_scenarios(
+            garment_id,
+            distance_km,
+            garment["damage_code"],
+            wiser_client,
+            use_higher_electricity_factor,
+            returned_garment=True,
+        )
+    except WiserClientError as error:
+        _raise_wiser_http_exception(error)
+
+
+@app.post("/returned-garments/{garment_id}/disassemble")
+def disassemble_returned_garment(garment_id: int):
+    return db_disassemble_returned_garment(garment_id)
 
 
 @app.get("/garment-types/{garment_type_id}/materials")

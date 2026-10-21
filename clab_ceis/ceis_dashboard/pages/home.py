@@ -6,8 +6,9 @@ from ceis_dashboard.callbacks.api import (
     fetch_garment_types,
     fetch_orders,
     fetch_repairs,
+    fetch_returned_garments,
 )
-from pages.order_table import render_orders_table
+from pages.order_table import render_orders_table, render_returned_garments_table
 from pages.ui import app_topbar, page_hero
 
 GARMENT_IMAGE_MAP = {
@@ -47,6 +48,86 @@ def get_index_layout():
                 children=render_orders_table(fetch_orders()),
             ),
             html.Div(id="order-action-status", className="order-action-status"),
+            html.H2("Returned Garments"),
+            html.P(
+                "Disassemble a returned garment to release all of its fabric "
+                "blocks into second-hand inventory."
+            ),
+            html.Div(
+                id="returned-garments-table-container",
+                children=render_returned_garments_table(fetch_returned_garments()),
+            ),
+            html.Div(
+                id="returned-garment-action-status",
+                className="order-action-status",
+            ),
+            dcc.Store(id="selected-returned-garment", data=None),
+            html.Div(
+                [
+                    html.H3(id="returned-alternatives-title"),
+                    html.Div(
+                        [
+                            html.Div(
+                                [
+                                    html.Label(
+                                        "Transport distance (km, one way)",
+                                        htmlFor="returned-alternatives-distance",
+                                    ),
+                                    dcc.Input(
+                                        id="returned-alternatives-distance",
+                                        type="number",
+                                        min=0,
+                                        step=10,
+                                        value=1000,
+                                    ),
+                                ],
+                                className="field-panel",
+                            ),
+                            html.Div(
+                                [
+                                    html.Div(
+                                        "Electricity factor",
+                                        className="field-label",
+                                    ),
+                                    dcc.Checklist(
+                                        id=(
+                                            "returned-alternatives-higher-"
+                                            "electricity-factor"
+                                        ),
+                                        options=[
+                                            {
+                                                "label": (
+                                                    "Use higher electricity "
+                                                    "emission factor"
+                                                ),
+                                                "value": "higher_factor",
+                                            }
+                                        ],
+                                        value=[],
+                                        className="circular-factor-switch",
+                                    ),
+                                    html.P(
+                                        "1.253 kg CO2eq/kWh (activity 6566).",
+                                        className="field-help",
+                                    ),
+                                ],
+                                className=(
+                                    "field-panel higher-electricity-factor-control"
+                                ),
+                            ),
+                        ],
+                        className="form-grid scenario-controls",
+                    ),
+                    dcc.Loading(
+                        type="circle",
+                        color="green",
+                        children=html.Div(id="returned-alternatives-chart"),
+                    ),
+                ],
+                id="returned-alternatives-panel",
+                className="returned-alternatives-panel",
+                hidden=True,
+            ),
         ],
         className="panel table-panel orders-panel",
     )
@@ -236,6 +317,7 @@ def get_index_layout():
 
     return html.Div(
         [
+            dcc.Store(id="fabric-inventory-version", data=0),
             app_topbar(),
             page_hero(
                 "Operations",

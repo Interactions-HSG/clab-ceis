@@ -112,6 +112,49 @@ def test_fetch_orders_returns_payload(monkeypatch):
     assert api.fetch_orders() == payload
 
 
+def test_fetch_returned_garments_returns_payload(monkeypatch):
+    payload = [{"id": 31, "garment": "Coat", "fabric_block_count": 4}]
+
+    def fake_get(url, timeout):
+        assert url.endswith("/returned-garments")
+        assert timeout == 30
+        return _Response(200, payload)
+
+    monkeypatch.setattr(api.requests, "get", fake_get)
+
+    assert api.fetch_returned_garments() == payload
+
+
+def test_disassemble_returned_garment_posts_action(monkeypatch):
+    payload = {"garment_id": 31, "fabric_block_count": 4, "status": "disassembled"}
+
+    def fake_post(url, timeout):
+        assert url.endswith("/returned-garments/31/disassemble")
+        assert timeout == 30
+        return _Response(200, payload)
+
+    monkeypatch.setattr(api.requests, "post", fake_post)
+
+    assert api.disassemble_returned_garment(31) == payload
+
+
+def test_fetch_returned_garment_alternatives_passes_controls(monkeypatch):
+    payload = {"garment": {"id": 31}, "return": {}}
+
+    def fake_get(url, params, timeout):
+        assert url.endswith("/returned-garments/31/return-alternatives")
+        assert params == {
+            "distance_km": 275,
+            "use_higher_electricity_factor": True,
+        }
+        assert timeout == 30
+        return _Response(200, payload)
+
+    monkeypatch.setattr(api.requests, "get", fake_get)
+
+    assert api.fetch_returned_garment_alternatives(31, 275, True) == payload
+
+
 def test_ship_order_posts_action(monkeypatch):
     payload = {"id": 8, "garment_inventory_id": 21, "status": "Completed"}
 

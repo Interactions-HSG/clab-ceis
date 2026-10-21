@@ -408,6 +408,7 @@ def db_get_repairs() -> list[dict]:
 def db_create_garment_return(
     garment_id: int,
     garment_processes: list[dict],
+    damage_code: str,
 ) -> dict:
     """Copy a bought garment and its blocks into returned inventory."""
     conn = sqlite3.connect(DB_PATH)
@@ -481,10 +482,11 @@ def db_create_garment_return(
         cursor.execute(
             """
             INSERT INTO garments_inventory (
-                type_id, co2eq, price, sold, returned_from_garment_id
-            ) VALUES (?, ?, ?, 0, ?)
+                type_id, co2eq, price, sold, returned_from_garment_id,
+                damage_code
+            ) VALUES (?, ?, ?, 0, ?, ?)
             """,
-            (type_id, co2eq, discounted_price, garment_id),
+            (type_id, co2eq, discounted_price, garment_id, damage_code),
         )
         returned_garment_id = cursor.lastrowid
 
@@ -546,6 +548,7 @@ def db_create_garment_return(
             "garment_processes": garment_processes,
             "price_chf": discounted_price,
             "discount_percent": 50,
+            "damage_code": damage_code,
             "status": "in_inventory",
         }
     except sqlite3.IntegrityError as error:
@@ -1726,6 +1729,7 @@ def db_get_available_returned_garments(garment_type_id: int) -> list[dict]:
         LEFT JOIN fabric_blocks_inventory fbi ON fbi.garment_id = gi.id
         WHERE gi.type_id = ?
           AND gi.sold = 0
+          AND gi.disassembled = 0
           AND gi.returned_from_garment_id IS NOT NULL
         GROUP BY gi.id, gi.returned_from_garment_id, gt.name, gt.price_chf
         ORDER BY gi.id
@@ -1748,6 +1752,130 @@ def db_get_available_returned_garments(garment_type_id: int) -> list[dict]:
         }
         for row in rows
     ]
+
+
+def db_get_returned_garments() -> list[dict]:
+    """Return whole returned garments that are available for disassembly."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT gi.id, gi.returned_from_garment_id, gt.name, gi.price,
+               COUNT(fbi.id), gi.disassembled, gi.damage_code
+        FROM garments_inventory gi
+        JOIN garment_types gt ON gt.id = gi.type_id
+        LEFT JOIN fabric_blocks_inventory fbi ON fbi.garment_id = gi.id
+        WHERE gi.returned_from_garment_id IS NOT NULL
+          AND gi.sold = 0
+          AND gi.disassembled = 0
+        GROUP BY gi.id, gi.returned_from_garment_id, gt.name, gi.price,
+                 gi.disassembled, gi.damage_code
+        ORDER BY gi.id DESC
+        """
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [
+        {
+            "id": row[0],
+            "returned_from_garment_id": row[1],
+            "garment": row[2],
+            "price_chf": float(row[3]) if row[3] is not None else None,
+            "fabric_block_count": int(row[4] or 0),
+            "damage_code": row[6] or "small_hole",
+            "status": "Returned",
+        }
+        for row in rows
+    ]
+
+
+def db_get_returned_garment(garment_id: int) -> dict | None:
+    """Return one intact returned garment for dashboard scenario calculations."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT gi.id, gi.type_id, gt.name, gi.co2eq, gi.damage_code
+        FROM garments_inventory gi
+        JOIN garment_types gt ON gt.id = gi.type_id
+        WHERE gi.id = ?
+          AND gi.returned_from_garment_id IS NOT NULL
+          AND gi.sold = 0
+          AND gi.disassembled = 0
+        """,
+        (garment_id,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    if row is None:
+        return None
+    return {
+        "id": row[0],
+        "type_id": row[1],
+        "name": row[2],
+        "co2eq": float(row[3]) if row[3] is not None else None,
+        "damage_code": row[4] or "small_hole",
+    }
+
+
+def db_disassemble_returned_garment(garment_id: int) -> dict:
+    """Detach every block from an available returned garment atomically."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")
+    cursor = conn.cursor()
+    try:
+        cursor.execute("BEGIN IMMEDIATE")
+        cursor.execute(
+            """
+            SELECT gt.name
+            FROM garments_inventory gi
+            JOIN garment_types gt ON gt.id = gi.type_id
+            WHERE gi.id = ?
+              AND gi.returned_from_garment_id IS NOT NULL
+              AND gi.sold = 0
+              AND gi.disassembled = 0
+            """,
+            (garment_id,),
+        )
+        garment = cursor.fetchone()
+        if garment is None:
+            raise HTTPException(
+                status_code=409,
+                detail="Returned garment is no longer available for disassembly",
+            )
+
+        cursor.execute(
+            "SELECT id FROM fabric_blocks_inventory WHERE garment_id = ? ORDER BY id",
+            (garment_id,),
+        )
+        fabric_block_ids = [row[0] for row in cursor.fetchall()]
+        if not fabric_block_ids:
+            raise HTTPException(
+                status_code=409,
+                detail="Returned garment has no linked fabric blocks",
+            )
+
+        cursor.execute(
+            "UPDATE fabric_blocks_inventory SET garment_id = NULL WHERE garment_id = ?",
+            (garment_id,),
+        )
+        cursor.execute(
+            "UPDATE garments_inventory SET disassembled = 1 WHERE id = ?",
+            (garment_id,),
+        )
+        conn.commit()
+        return {
+            "garment_id": garment_id,
+            "garment": garment[0],
+            "fabric_block_ids": fabric_block_ids,
+            "fabric_block_count": len(fabric_block_ids),
+            "status": "disassembled",
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def db_create_order(
@@ -1788,6 +1916,7 @@ def db_create_order(
                 SELECT id, co2eq FROM garments_inventory
                 WHERE id = ? AND type_id = ? AND sold = 0
                   AND returned_from_garment_id IS NOT NULL
+                  AND disassembled = 0
                 """,
                 (garment_inventory_id, garment_type_id),
             )

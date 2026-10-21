@@ -15,6 +15,7 @@ from pages.flow import (
     get_dashboard_layout,
 )
 from pages.home import get_index_layout
+from pages.order_table import render_return_alternative_details
 from pages.ui import page_hero
 
 
@@ -44,6 +45,7 @@ def test_homepage_shows_pending_repairs_below_fabric_block_form():
     with (
         patch("pages.home.fetch_garment_types", return_value=[]),
         patch("pages.home.fetch_orders", return_value=[]),
+        patch("pages.home.fetch_returned_garments", return_value=[]),
         patch(
             "pages.home.fetch_repairs",
             return_value=[
@@ -76,6 +78,19 @@ def test_homepage_shows_orders_at_top_with_ship_action():
         patch("pages.home.fetch_garment_types", return_value=[]),
         patch("pages.home.fetch_repairs", return_value=[]),
         patch(
+            "pages.home.fetch_returned_garments",
+            return_value=[
+                {
+                    "id": 18,
+                    "returned_from_garment_id": 7,
+                    "garment": "Returned coat",
+                    "fabric_block_count": 4,
+                    "damage_code": "small_hole",
+                    "status": "Returned",
+                }
+            ],
+        ),
+        patch(
             "pages.home.fetch_orders",
             return_value=[
                 {
@@ -96,7 +111,50 @@ def test_homepage_shows_orders_at_top_with_ship_action():
     assert "orders-table-container" in text
     assert "Made coat" in text
     assert "ship-order" in text
+    assert "Returned Garments" in text
+    assert "Returned coat" in text
+    assert "disassemble-returned-garment" in text
+    assert "view-return-alternatives" in text
+    assert "returned-alternatives-distance" in text
+    assert "returned-alternatives-higher-electricity-factor" in text
+    assert "Use higher electricity emission factor" in text
     assert text.index("Orders") < text.index("Second-hand Fabric Block Inventory")
+    assert text.index("Orders") < text.index("Returned Garments")
+    assert text.index("Returned Garments") < text.index(
+        "Second-hand Fabric Block Inventory"
+    )
+
+
+def test_return_alternative_details_match_shop_chart_structure():
+    scenario = {
+        "components": [{"name": "Transport", "co2eq": 0.2}],
+        "reference_components": [
+            {"name": "Material production avoided", "co2eq": 1.4}
+        ],
+    }
+    layout = render_return_alternative_details(
+        {
+            "garment": {
+                "id": 18,
+                "name": "Returned coat",
+                "fabric_block_count": 4,
+            },
+            "damage": {"label": "Small hole"},
+            "return": {
+                "whole_garment": scenario,
+                "fabric_blocks": scenario,
+            },
+            "calculation": {"electricity_mode": "higher_factor"},
+        }
+    )
+    text = str(layout)
+
+    assert "dashboard-return-component-chart" in text
+    assert "Return alternatives: impact (+) and CO2 saved (-)" in text
+    assert "Reuse whole garment" in text
+    assert "Recover fabric blocks" in text
+    assert "Saved: Material production avoided" in text
+    assert "Higher electricity factor" in text
 
 
 def test_product_lifecycle_uses_top_to_bottom_flow():

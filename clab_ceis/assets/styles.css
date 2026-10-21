@@ -660,6 +660,27 @@ ul {
     padding: 7px 12px;
 }
 
+.garment-disassemble-button {
+    min-height: 36px;
+    padding: 7px 12px;
+}
+
+.returned-garment-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.returned-alternatives-panel {
+    border-top: 1px solid var(--line);
+    margin-top: 22px;
+    padding-top: 18px;
+}
+
+.returned-alternatives-panel[hidden] {
+    display: none;
+}
+
 .order-ship-button:disabled {
     background: var(--surface-soft);
     border-color: var(--line-strong);

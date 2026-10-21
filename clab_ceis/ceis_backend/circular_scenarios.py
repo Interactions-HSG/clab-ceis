@@ -17,6 +17,7 @@ from ceis_backend.models import Process
 from ceis_backend.queries import (
     db_get_garment_processes,
     db_get_inventory_fabric_blocks_for_garment,
+    db_get_returned_garment,
     db_get_process_types,
     db_get_sold_garment,
     db_get_sold_garments,
@@ -415,6 +416,7 @@ def calculate_circular_scenarios(
     damage_code: str,
     wiser_client: WiserClient,
     use_higher_electricity_factor: bool = False,
+    returned_garment: bool = False,
 ) -> dict:
     """Calculate alternatives without choosing or ranking a preferred route."""
     if distance_km < 0:
@@ -428,9 +430,18 @@ def calculate_circular_scenarios(
         else None
     )
 
-    garment = db_get_sold_garment(garment_id)
+    garment = (
+        db_get_returned_garment(garment_id)
+        if returned_garment
+        else db_get_sold_garment(garment_id)
+    )
     if garment is None:
-        raise HTTPException(status_code=404, detail="Sold garment not found")
+        detail = (
+            "Returned garment not found"
+            if returned_garment
+            else "Sold garment not found"
+        )
+        raise HTTPException(status_code=404, detail=detail)
 
     damage = DAMAGE_PROFILE_BY_CODE.get(damage_code)
     if damage is None:

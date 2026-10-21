@@ -303,6 +303,8 @@ def create_tables(cursor):
             price INTEGER,
             sold INTEGER NOT NULL DEFAULT 0,
             returned_from_garment_id INTEGER,
+            disassembled INTEGER NOT NULL DEFAULT 0,
+            damage_code TEXT,
             FOREIGN KEY (type_id) REFERENCES garment_types (id) ON DELETE CASCADE,
             FOREIGN KEY (returned_from_garment_id)
                 REFERENCES garments_inventory (id) ON DELETE SET NULL
@@ -317,6 +319,20 @@ def create_tables(cursor):
             ALTER TABLE garments_inventory
             ADD COLUMN returned_from_garment_id INTEGER
                 REFERENCES garments_inventory (id) ON DELETE SET NULL
+            """
+        )
+    if "disassembled" not in garment_inventory_columns:
+        cursor.execute(
+            """
+            ALTER TABLE garments_inventory
+            ADD COLUMN disassembled INTEGER NOT NULL DEFAULT 0
+            """
+        )
+    if "damage_code" not in garment_inventory_columns:
+        cursor.execute(
+            """
+            ALTER TABLE garments_inventory
+            ADD COLUMN damage_code TEXT
             """
         )
     cursor.execute(

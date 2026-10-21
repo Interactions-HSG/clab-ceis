@@ -79,9 +79,10 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
         Input("refresh-fabric-blocks", "n_clicks"),
         Input("add-fabric-blocks", "n_clicks"),
         Input("delete-fabric-block-button", "n_clicks"),
+        Input("fabric-inventory-version", "data"),
     )
     def load_fabric_block_inventory_options(
-        pathname, refresh_clicks, add_clicks, delete_clicks
+        pathname, refresh_clicks, add_clicks, delete_clicks, inventory_version
     ):
         blocks = fetch_fabric_blocks()
         return [
@@ -182,6 +183,7 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
             Input("refresh-fabric-blocks", "n_clicks"),
             Input("add-fabric-blocks", "n_clicks"),
             Input("delete-fabric-block-button", "n_clicks"),
+            Input("fabric-inventory-version", "data"),
         ],
         [
             State("fabric-type", "value"),
@@ -198,6 +200,7 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
         refresh_clicks,
         add_clicks,
         delete_clicks,
+        inventory_version,
         type_val,
         location_val,
         material_val,
@@ -213,6 +216,8 @@ def register_fabric_block_callbacks(app: Dash, data: ceis_data.CeisData) -> None
         if not triggered:
             return fetch_fabric_blocks(), "", ""
         if triggered == "refresh-fabric-blocks":
+            return fetch_fabric_blocks(), "", ""
+        if triggered == "fabric-inventory-version":
             return fetch_fabric_blocks(), "", ""
 
         if triggered == "add-fabric-blocks":

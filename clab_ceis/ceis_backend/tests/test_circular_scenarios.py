@@ -198,6 +198,70 @@ def test_garment_return_copies_blocks_with_processes_only_on_garment(seeded_db):
     assert block_processes == {}
 
 
+def test_returned_garment_can_be_disassembled_into_fabric_inventory(seeded_db):
+    source_garment_id = get_circular_scenario_options()["garments"][0]["id"]
+
+    with TestClient(app) as client:
+        client.app.state.wiser_client = _mock_wiser_client()
+        returned = client.post(
+            "/garment-returns",
+            json={"garment_id": source_garment_id, "damage_code": "small_hole"},
+        ).json()
+        returned_id = returned["garment_id"]
+
+        queue = client.get("/returned-garments")
+        alternatives = client.get(
+            f"/returned-garments/{returned_id}/return-alternatives",
+            params={
+                "distance_km": 100,
+                "use_higher_electricity_factor": True,
+            },
+        )
+        disassembled = client.post(
+            f"/returned-garments/{returned_id}/disassemble"
+        )
+        queue_after = client.get("/returned-garments")
+        available_blocks = client.get("/fabric-blocks")
+        repeated = client.post(
+            f"/returned-garments/{returned_id}/disassemble"
+        )
+
+    assert queue.status_code == 200
+    assert queue.json()[0]["id"] == returned_id
+    assert queue.json()[0]["fabric_block_count"] == returned["fabric_block_count"]
+    assert queue.json()[0]["damage_code"] == "small_hole"
+    assert alternatives.status_code == 200
+    assert alternatives.json()["garment"]["id"] == returned_id
+    assert alternatives.json()["return"]["whole_garment"]["components"]
+    assert alternatives.json()["return"]["fabric_blocks"]["components"]
+    assert alternatives.json()["calculation"]["electricity_mode"] == "higher_factor"
+    assert disassembled.status_code == 200
+    assert disassembled.json()["fabric_block_ids"] == returned["fabric_block_ids"]
+    assert disassembled.json()["fabric_block_count"] == returned["fabric_block_count"]
+    assert returned_id not in {garment["id"] for garment in queue_after.json()}
+    assert set(returned["fabric_block_ids"]).issubset(
+        {block["id"] for block in available_blocks.json()}
+    )
+    assert repeated.status_code == 409
+
+    conn = sqlite3.connect("ceis_backend.db")
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT disassembled FROM garments_inventory WHERE id = ?",
+        (returned_id,),
+    )
+    assert cursor.fetchone() == (1,)
+    cursor.execute(
+        "SELECT COUNT(*) FROM fabric_blocks_inventory "
+        "WHERE id IN ({}) AND garment_id IS NULL".format(
+            ",".join("?" for _ in returned["fabric_block_ids"])
+        ),
+        returned["fabric_block_ids"],
+    )
+    assert cursor.fetchone()[0] == returned["fabric_block_count"]
+    conn.close()
+
+
 def test_returned_garment_shop_offer_uses_only_preparation_co2(seeded_db):
     source_garment_id = get_circular_scenario_options()["garments"][0]["id"]
     conn = sqlite3.connect("ceis_backend.db")

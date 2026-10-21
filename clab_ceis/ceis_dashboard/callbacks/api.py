@@ -121,6 +121,52 @@ def fetch_orders() -> list[dict]:
         return []
 
 
+def fetch_returned_garments() -> list[dict]:
+    try:
+        resp = requests.get(f"{config.BACKEND_API_URL}/returned-garments", timeout=30)
+        if resp.status_code != 200:
+            return []
+        return resp.json()
+    except Exception:
+        return []
+
+
+def disassemble_returned_garment(garment_id: int) -> dict:
+    try:
+        resp = requests.post(
+            f"{config.BACKEND_API_URL}/returned-garments/{garment_id}/disassemble",
+            timeout=30,
+        )
+        if resp.status_code != 200:
+            payload = resp.json()
+            return {"error": payload.get("detail", "Unable to disassemble garment")}
+        return resp.json()
+    except Exception as error:
+        return {"error": str(error)}
+
+
+def fetch_returned_garment_alternatives(
+    garment_id: int,
+    distance_km: float,
+    use_higher_electricity_factor: bool = False,
+) -> dict:
+    try:
+        resp = requests.get(
+            f"{config.BACKEND_API_URL}/returned-garments/{garment_id}/return-alternatives",
+            params={
+                "distance_km": distance_km,
+                "use_higher_electricity_factor": use_higher_electricity_factor,
+            },
+            timeout=30,
+        )
+        if resp.status_code != 200:
+            payload = resp.json()
+            return {"error": payload.get("detail", "Unable to calculate alternatives")}
+        return resp.json()
+    except Exception as error:
+        return {"error": str(error)}
+
+
 def ship_order(order_id: int) -> dict:
     try:
         resp = requests.post(
