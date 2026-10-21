@@ -296,6 +296,100 @@ def db_get_sold_garment(garment_id: int) -> dict | None:
     }
 
 
+def db_create_repair(garment_id: int, action: str, damage_code: str) -> dict:
+    """Add one pending repair action for a bought garment."""
+    action_labels = {
+        "self_repair_kit": "Prepare self-repair kit",
+        "professional_repair": "Perform professional repair",
+    }
+    if action not in action_labels:
+        raise HTTPException(status_code=422, detail="Unknown repair action")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")
+    cursor = conn.cursor()
+    try:
+        cursor.execute("BEGIN IMMEDIATE")
+        cursor.execute(
+            """
+            SELECT gt.name
+            FROM garments_inventory gi
+            JOIN garment_types gt ON gt.id = gi.type_id
+            WHERE gi.id = ? AND gi.sold = 1
+            """,
+            (garment_id,),
+        )
+        garment = cursor.fetchone()
+        if garment is None:
+            raise HTTPException(status_code=404, detail="Bought garment not found")
+
+        cursor.execute(
+            """
+            INSERT INTO repairs (garment_inventory_id, action, damage_code)
+            VALUES (?, ?, ?)
+            """,
+            (garment_id, action, damage_code),
+        )
+        repair_id = cursor.lastrowid
+        conn.commit()
+        return {
+            "id": repair_id,
+            "garment_id": garment_id,
+            "garment": garment[0],
+            "action": action,
+            "action_label": action_labels[action],
+            "damage_code": damage_code,
+            "status": "pending",
+        }
+    except sqlite3.IntegrityError as error:
+        conn.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="This garment already has a pending repair action",
+        ) from error
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def db_get_repairs() -> list[dict]:
+    """Return repair actions for the operations dashboard."""
+    action_labels = {
+        "self_repair_kit": "Prepare self-repair kit",
+        "professional_repair": "Perform professional repair",
+    }
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT r.id, r.garment_inventory_id, gt.name, r.action,
+               r.damage_code, r.status, r.created_at
+        FROM repairs r
+        JOIN garments_inventory gi ON gi.id = r.garment_inventory_id
+        JOIN garment_types gt ON gt.id = gi.type_id
+        WHERE r.status = 'pending'
+        ORDER BY r.created_at DESC, r.id DESC
+        """
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [
+        {
+            "id": row[0],
+            "garment_id": row[1],
+            "garment": row[2],
+            "action": row[3],
+            "action_label": action_labels.get(row[3], row[3]),
+            "damage_code": row[4],
+            "status": row[5],
+            "created_at": row[6],
+        }
+        for row in rows
+    ]
+
+
 def db_get_inventory_fabric_blocks_for_garment(garment_id: int) -> list[dict]:
     """Return actual fabric blocks linked to a garment inventory record."""
     conn = sqlite3.connect(DB_PATH)

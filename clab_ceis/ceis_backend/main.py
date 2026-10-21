@@ -15,6 +15,7 @@ from ceis_backend.utils import (
 )
 from ceis_backend.resource_event_emissions import enrich_resource_events_with_co2
 from ceis_backend.circular_scenarios import (
+    DAMAGE_PROFILE_BY_CODE,
     calculate_circular_scenarios,
     get_circular_scenario_options,
 )
@@ -35,6 +36,8 @@ from ceis_backend.queries import (
     db_get_resource_events,
     db_get_supply_chain_graph,
     db_create_order,
+    db_create_repair,
+    db_get_repairs,
     db_upsert_material,
     db_delete_garment_recipe,
     db_create_fabric_block_type,
@@ -62,6 +65,7 @@ from ceis_backend.models import (
     MaterialCreate,
     ProcessTypeCreate,
     OrderCreate,
+    RepairCreate,
 )
 
 
@@ -154,6 +158,24 @@ def get_resource_events(
 @app.post("/orders", status_code=201)
 def create_order(payload: OrderCreate):
     return db_create_order(payload.garment_type_id, payload.material_id)
+
+
+@app.post("/repairs", status_code=201)
+def create_repair(payload: RepairCreate):
+    damage = DAMAGE_PROFILE_BY_CODE.get(payload.damage_code)
+    if damage is None:
+        raise HTTPException(status_code=404, detail="Damage type not found")
+    if not damage.repair_available:
+        raise HTTPException(
+            status_code=422,
+            detail="Repair is not available for this damage type",
+        )
+    return db_create_repair(payload.garment_id, payload.action, payload.damage_code)
+
+
+@app.get("/repairs")
+def get_repairs():
+    return db_get_repairs()
 
 
 @app.get("/garment-types/{garment_type_id}/materials")

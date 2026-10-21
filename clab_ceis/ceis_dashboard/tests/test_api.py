@@ -84,3 +84,16 @@ def test_fetch_strategy_progress_returns_payload(monkeypatch):
     result = api.fetch_strategy_progress()
 
     assert result == payload
+
+
+def test_fetch_repairs_returns_payload(monkeypatch):
+    payload = [{"id": 4, "action_label": "Perform professional repair"}]
+
+    def fake_get(url, timeout):
+        assert url.endswith("/repairs")
+        assert timeout == 30
+        return _Response(200, payload)
+
+    monkeypatch.setattr(api.requests, "get", fake_get)
+
+    assert api.fetch_repairs() == payload

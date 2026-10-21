@@ -3,7 +3,7 @@ import requests
 from pathlib import Path
 
 import plotly.graph_objects as go
-from dash import dcc, html
+from dash import ctx, dcc, html
 from dash.dependencies import Input, Output, State
 
 from ceis_shop import config
@@ -158,6 +158,51 @@ def get_callbacks(app):
         except Exception as exc:
             print(f"Error fetching circular scenario calculation: {exc}")
             return html.Div("Unable to calculate the selected scenarios.")
+
+    @app.callback(
+        Output("circular-repair-order-result", "children"),
+        Input("order-self-repair-kit", "n_clicks"),
+        Input("request-professional-repair", "n_clicks"),
+        State("circular-garment", "value"),
+        State("circular-damage", "value"),
+        prevent_initial_call=True,
+    )
+    def create_repair_order(
+        _self_repair_clicks,
+        _professional_repair_clicks,
+        garment_id,
+        damage_code,
+    ):
+        actions = {
+            "order-self-repair-kit": "self_repair_kit",
+            "request-professional-repair": "professional_repair",
+        }
+        action = actions.get(ctx.triggered_id)
+        if action is None or garment_id is None or damage_code is None:
+            return html.P("Select a garment and damage type before ordering.")
+
+        try:
+            response = requests.post(
+                f"{config.BACKEND_API_URL}/repairs",
+                json={
+                    "garment_id": garment_id,
+                    "action": action,
+                    "damage_code": damage_code,
+                },
+                timeout=30,
+            )
+            response.raise_for_status()
+            repair = response.json()
+        except Exception as exc:
+            return html.P(f"Unable to create repair request: {exc}")
+
+        return html.Div(
+            [
+                html.Strong(f"Repair request #{repair['id']}"),
+                html.P(f"{repair['action_label']} · {repair['status']}"),
+            ],
+            className="panel-muted",
+        )
 
     @app.callback(
         Output("circular-detailed-charts", "hidden"),

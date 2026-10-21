@@ -101,6 +101,16 @@ def fetch_resource_events(**filters) -> list[dict]:
         return []
 
 
+def fetch_repairs() -> list[dict]:
+    try:
+        resp = requests.get(f"{config.BACKEND_API_URL}/repairs", timeout=30)
+        if resp.status_code != 200:
+            return []
+        return resp.json()
+    except Exception:
+        return []
+
+
 def fetch_designer_balance_options() -> dict:
     try:
         resp = requests.get(f"{config.BACKEND_API_URL}/designer-balance/options")

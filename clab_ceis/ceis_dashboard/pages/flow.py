@@ -34,6 +34,16 @@ EVENT_COLUMNS = [
     {"name": "Distance (km)", "id": "distance_km"},
 ]
 
+REPAIR_COLUMNS = [
+    {"name": "Request", "id": "id"},
+    {"name": "Garment", "id": "garment"},
+    {"name": "Garment ID", "id": "garment_id"},
+    {"name": "Required action", "id": "action_label"},
+    {"name": "Damage", "id": "damage_code"},
+    {"name": "Status", "id": "status"},
+    {"name": "Created", "id": "created_at"},
+]
+
 
 def _event_table(table_id: str, events: list[dict]):
     return dash_table.DataTable(
@@ -41,6 +51,18 @@ def _event_table(table_id: str, events: list[dict]):
         columns=EVENT_COLUMNS,
         data=events,
         page_size=12,
+        style_table={"overflowX": "auto"},
+        style_cell={"textAlign": "center", "padding": "10px"},
+        style_header={"fontWeight": "bold"},
+    )
+
+
+def _repair_table(repairs: list[dict]):
+    return dash_table.DataTable(
+        id="repairs-table",
+        columns=REPAIR_COLUMNS,
+        data=repairs,
+        page_size=10,
         style_table={"overflowX": "auto"},
         style_cell={"textAlign": "center", "padding": "10px"},
         style_header={"fontWeight": "bold"},
@@ -721,11 +743,13 @@ def get_dashboard_layout(
     progress_data: dict | None = None,
     supply_chain: dict | None = None,
     resource_events: list[dict] | None = None,
+    repairs: list[dict] | None = None,
 ):
     flow_chart_data = get_flow_chart_data()
     progress_data = progress_data or {}
     supply_chain = supply_chain or {"nodes": [], "edges": []}
     resource_events = resource_events or []
+    repairs = repairs or []
     return html.Div(
         children=[
             app_topbar(),
@@ -738,6 +762,16 @@ def get_dashboard_layout(
             html.Div(
                 [
                     _build_strategy_progress_section(progress_data),
+                    html.Section(
+                        [
+                            html.H2("Pending Repair Actions"),
+                            html.P(
+                                "Repair requests placed by customers in the shop."
+                            ),
+                            _repair_table(repairs),
+                        ],
+                        className="panel table-panel",
+                    ),
                     html.Div(
                         [
                             html.Section(

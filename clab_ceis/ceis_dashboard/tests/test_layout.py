@@ -12,6 +12,7 @@ from pages.flow import (
     get_flow_chart_data,
     get_supply_chain_elements,
     get_supply_chain_stylesheet,
+    get_dashboard_layout,
 )
 from pages.ui import page_hero
 
@@ -36,6 +37,27 @@ def test_page_hero_home_link_is_opt_in_for_subpages():
     assert "page-home-link" not in str(home_hero)
     assert "page-home-link" in str(subpage_hero)
     assert "page-hero-with-action" in str(subpage_hero)
+
+
+def test_dashboard_shows_pending_repair_actions():
+    layout = get_dashboard_layout(
+        repairs=[
+            {
+                "id": 3,
+                "garment": "Basic Crop Top",
+                "garment_id": 7,
+                "action_label": "Prepare self-repair kit",
+                "damage_code": "small_hole",
+                "status": "pending",
+                "created_at": "2026-10-21 12:00:00",
+            }
+        ]
+    )
+    text = str(layout)
+
+    assert "Pending Repair Actions" in text
+    assert "repairs-table" in text
+    assert "Prepare self-repair kit" in text
 
 
 def test_product_lifecycle_uses_top_to_bottom_flow():

@@ -354,6 +354,29 @@ def create_tables(cursor):
 
     cursor.execute(
         """
+        CREATE TABLE IF NOT EXISTS repairs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            garment_inventory_id INTEGER NOT NULL,
+            action TEXT NOT NULL
+                CHECK (action IN ('self_repair_kit', 'professional_repair')),
+            damage_code TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (garment_inventory_id)
+                REFERENCES garments_inventory (id) ON DELETE CASCADE
+        )
+    """
+    )
+    cursor.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS one_pending_repair_per_garment
+        ON repairs (garment_inventory_id)
+        WHERE status = 'pending'
+        """
+    )
+
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS manufacturers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             company TEXT NOT NULL,

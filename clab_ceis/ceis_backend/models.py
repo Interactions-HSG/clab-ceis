@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from pydantic import BaseModel
 from enum import Enum
 
@@ -129,3 +129,9 @@ class ActivitySearchRequest(BaseModel):
 class OrderCreate(BaseModel):
     garment_type_id: int
     material_id: Optional[int] = None
+
+
+class RepairCreate(BaseModel):
+    garment_id: int
+    action: Literal["self_repair_kit", "professional_repair"]
+    damage_code: str

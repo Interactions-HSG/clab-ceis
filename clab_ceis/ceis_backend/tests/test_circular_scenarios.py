@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock
 
 import pytest
+from fastapi.testclient import TestClient
 
 from ceis_backend.circular_scenarios import (
     DAMAGE_PROFILE_BY_CODE,
@@ -8,6 +9,7 @@ from ceis_backend.circular_scenarios import (
     get_circular_scenario_options,
 )
 from ceis_backend.db_init import init_sqlite_db
+from ceis_backend.main import app
 
 
 @pytest.fixture
@@ -46,6 +48,30 @@ def test_options_use_actual_sold_garments(seeded_db):
         "zipper",
         "burn",
     }
+
+
+def test_shop_repair_request_is_visible_in_repair_queue(seeded_db):
+    garment_id = get_circular_scenario_options()["garments"][0]["id"]
+
+    with TestClient(app) as client:
+        created = client.post(
+            "/repairs",
+            json={
+                "garment_id": garment_id,
+                "action": "professional_repair",
+                "damage_code": "small_hole",
+            },
+        )
+        queue = client.get("/repairs")
+
+    assert created.status_code == 201
+    assert created.json()["status"] == "pending"
+    assert queue.status_code == 200
+    assert queue.json()[0]["id"] == created.json()["id"]
+    assert queue.json()[0]["garment_id"] == garment_id
+    assert queue.json()[0]["action"] == "professional_repair"
+    assert queue.json()[0]["action_label"] == "Perform professional repair"
+    assert queue.json()[0]["damage_code"] == "small_hole"
 
 
 def test_mock_repair_amounts_are_scaled_to_garment_assembly():

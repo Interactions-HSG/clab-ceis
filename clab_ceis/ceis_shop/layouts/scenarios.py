@@ -121,7 +121,7 @@ def render_scenario_explorer(options_payload: dict) -> html.Div:
     garments = options_payload.get("garments", [])
     damages = options_payload.get("damages", [])
     if not garments:
-        return html.P("No sold garments are available for comparison.")
+        return html.P("No bought garments are available for comparison.")
     if not damages:
         return html.P("No damage types are configured.")
 
@@ -140,7 +140,7 @@ def render_scenario_explorer(options_payload: dict) -> html.Div:
                 [
                     html.Div(
                         [
-                            html.Label("Sold garment", htmlFor="circular-garment"),
+                            html.Label("Bought garment", htmlFor="circular-garment"),
                             dcc.Dropdown(
                                 id="circular-garment",
                                 options=garment_options,
@@ -198,7 +198,7 @@ def render_scenario_explorer(options_payload: dict) -> html.Div:
                                 className="circular-factor-switch",
                             ),
                             html.P(
-                                "1.2525767471944982 kg CO2eq/kWh (activity 6566). "
+                                "1.253 kg CO2eq/kWh (activity 6566). "
                                 "Applies only to calculations on this page.",
                                 className="field-help",
                             ),
@@ -226,6 +226,8 @@ def _scenario_card(
     scenario: dict,
     subtitle: str,
     show_saving_percent: bool = False,
+    action_label: str | None = None,
+    action_id: str | None = None,
 ) -> html.Div:
     if not scenario.get("available"):
         return html.Div(
@@ -245,19 +247,33 @@ def _scenario_card(
     saving_percent = scenario.get("saving_percent")
     if show_saving_percent and saving_percent is not None:
         saving_text += f" vs new garment ({float(saving_percent):.1f}%)"
+    children = [
+        html.Div(title, className="co2-metric-title"),
+        html.Div(
+            f"{_format_number(scenario.get('total_co2eq'))} kg CO2eq",
+            className="co2-metric-value",
+        ),
+        html.Div(
+            f"{subtitle} · {saving_text}",
+            className="co2-metric-subtitle",
+        ),
+    ]
+    if action_label and action_id:
+        children.append(
+            html.Button(
+                action_label,
+                id=action_id,
+                n_clicks=0,
+                className="repair-action-button",
+            )
+        )
     return html.Div(
-        [
-            html.Div(title, className="co2-metric-title"),
-            html.Div(
-                f"{_format_number(scenario.get('total_co2eq'))} kg CO2eq",
-                className="co2-metric-value",
-            ),
-            html.Div(
-                f"{subtitle} · {saving_text}",
-                className="co2-metric-subtitle",
-            ),
-        ],
-        className="co2-metric-card",
+        children,
+        className=(
+            "co2-metric-card repair-action-card"
+            if action_label and action_id
+            else "co2-metric-card"
+        ),
     )
 
 
@@ -406,12 +422,16 @@ def render_scenario_results(payload: dict) -> html.Div:
                         self_repair,
                         "Same repair processes; kit or material transported once",
                         show_saving_percent=True,
+                        action_label="Order self-repair kit",
+                        action_id="order-self-repair-kit",
                     ),
                     _scenario_card(
                         "Professional repair",
                         professional_repair,
                         "Same repair processes; garment transported twice",
                         show_saving_percent=True,
+                        action_label="Send for professional repair",
+                        action_id="request-professional-repair",
                     ),
                     _scenario_card(
                         "New garment",
@@ -421,6 +441,11 @@ def render_scenario_results(payload: dict) -> html.Div:
                     ),
                 ],
                 className="co2-metric-grid",
+            ),
+            html.Div(
+                id="circular-repair-order-result",
+                className="repair-order-result",
+                role="status",
             ),
             html.H2("Return alternatives"),
             html.Div(

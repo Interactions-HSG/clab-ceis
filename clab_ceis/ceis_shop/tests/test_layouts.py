@@ -72,7 +72,7 @@ def test_repair_return_page_is_separate_from_end_of_life_page():
     assert "Manufacturer: Bucharest" not in text
 
 
-def test_scenario_explorer_uses_sold_garment_and_damage_options():
+def test_scenario_explorer_uses_bought_garment_and_damage_options():
     layout = render_scenario_explorer(
         {
             "garments": [
@@ -86,6 +86,8 @@ def test_scenario_explorer_uses_sold_garment_and_damage_options():
     text = str(layout)
 
     assert "circular-garment" in text
+    assert "Bought garment" in text
+    assert "Sold garment" not in text
     assert "Basic Crop Top · garment #7" in text
     assert "circular-distance" in text
     assert "circular-damage" in text
@@ -136,6 +138,11 @@ def test_scenario_results_show_alternatives_without_recommendation():
 
     assert "Self-repair" in text
     assert "Professional repair" in text
+    assert "Order self-repair kit" in text
+    assert "order-self-repair-kit" in text
+    assert "Send for professional repair" in text
+    assert "request-professional-repair" in text
+    assert "circular-repair-order-result" in text
     assert "Reuse whole garment" in text
     assert "Recover fabric blocks" in text
     assert "Blocks to replace: 1" in text

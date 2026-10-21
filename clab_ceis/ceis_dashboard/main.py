@@ -10,6 +10,7 @@ from pages.garment_designer import get_garment_designer_layout
 import ceis_callbacks
 import config
 from callbacks.api import (
+    fetch_repairs,
     fetch_resource_events,
     fetch_strategy_progress,
     fetch_supply_chain,
@@ -66,6 +67,7 @@ class CeisMonitor:
                     fetch_strategy_progress(),
                     fetch_supply_chain(),
                     fetch_resource_events(),
+                    fetch_repairs(),
                 )
             elif pathname == "/add-recipe":
                 return self._add_recipe_layout

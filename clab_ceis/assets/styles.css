@@ -416,6 +416,20 @@ ul {
     border-color: rgba(47, 111, 94, 0.28);
 }
 
+.repair-action-card {
+    display: flex;
+    flex-direction: column;
+}
+
+.repair-action-button {
+    margin-top: auto;
+    width: 100%;
+}
+
+.repair-order-result:not(:empty) {
+    margin-top: 14px;
+}
+
 .co2-metric-title {
     color: var(--muted);
     font-size: 0.78rem;
