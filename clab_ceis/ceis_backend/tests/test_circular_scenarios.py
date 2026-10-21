@@ -11,6 +11,7 @@ from ceis_backend.circular_scenarios import (
 )
 from ceis_backend.db_init import init_sqlite_db
 from ceis_backend.main import app
+from ceis_backend.queries import db_create_order, db_ship_order
 
 
 @pytest.fixture
@@ -49,6 +50,46 @@ def test_options_use_actual_sold_garments(seeded_db):
         "zipper",
         "burn",
     }
+
+
+def test_shipped_production_order_supports_circular_scenarios(seeded_db):
+    conn = sqlite3.connect("ceis_backend.db")
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT gt.id, grm.material_id
+        FROM garment_types gt
+        JOIN garment_recipe_materials grm ON grm.garment_type = gt.id
+        ORDER BY gt.id, grm.id
+        LIMIT 1
+        """
+    )
+    garment_type_id, material_id = cursor.fetchone()
+    cursor.execute(
+        """
+        UPDATE garments_inventory
+        SET sold = 1
+        WHERE type_id = ? AND returned_from_garment_id IS NULL
+        """,
+        (garment_type_id,),
+    )
+    conn.commit()
+    conn.close()
+
+    order = db_create_order(garment_type_id, material_id)
+    assert order["fulfillment_type"] == "production"
+    shipped = db_ship_order(order["id"])
+
+    payload = calculate_circular_scenarios(
+        garment_id=shipped["garment_inventory_id"],
+        distance_km=100,
+        damage_code="small_hole",
+        wiser_client=_mock_wiser_client(),
+    )
+
+    assert payload["garment"]["id"] == shipped["garment_inventory_id"]
+    assert payload["garment"]["fabric_block_count"] > 0
+    assert payload["repair"]["self_repair"]["available"] is True
 
 
 def test_shop_repair_request_is_visible_in_repair_queue(seeded_db):
@@ -378,10 +419,17 @@ def test_chart_components_reconcile_with_scenario_totals(seeded_db):
         )
 
     whole_garment = payload["return"]["whole_garment"]
+    assert all(
+        component["name"] != "Transport"
+        for component in whole_garment["reference_components"]
+    )
     assert sum(
         component["co2eq"]
         for component in whole_garment["reference_components"]
     ) == pytest.approx(whole_garment["avoided_new_garment_co2eq"], abs=1e-5)
+    assert whole_garment["avoided_new_garment_co2eq"] == pytest.approx(
+        payload["repair"]["new_garment"]["production_co2eq"], abs=1e-5
+    )
 
     fabric_blocks = payload["return"]["fabric_blocks"]
     assert sum(

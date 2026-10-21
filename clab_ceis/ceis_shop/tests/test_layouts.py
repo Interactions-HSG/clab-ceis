@@ -18,6 +18,7 @@ from ceis_shop.layouts.garment import (
 )
 from ceis_shop.layouts.home import home_page
 from ceis_shop.main import app as shop_app
+from ceis_shop.shop_callbacks import _remove_returned_garment_option
 
 
 def test_app_shell_does_not_render_global_home_link():
@@ -96,6 +97,30 @@ def test_scenario_explorer_uses_bought_garment_and_damage_options():
     assert "Small hole or puncture" in text
     assert "circular-use-higher-electricity-factor" in text
     assert "Use higher electricity emission factor" in text
+    assert "circular-garment-return-result" in text
+
+
+def test_returned_garment_is_removed_from_scenario_selector():
+    remaining, selected = _remove_returned_garment_option(
+        [
+            {"label": "Garment #8", "value": 8},
+            {"label": "Garment #9", "value": 9},
+        ],
+        8,
+    )
+
+    assert remaining == [{"label": "Garment #9", "value": 9}]
+    assert selected == 9
+
+
+def test_returning_last_garment_clears_scenario_selector():
+    remaining, selected = _remove_returned_garment_option(
+        [{"label": "Garment #8", "value": 8}],
+        8,
+    )
+
+    assert remaining == []
+    assert selected is None
 
 
 def test_scenario_results_show_alternatives_without_recommendation():
@@ -148,7 +173,7 @@ def test_scenario_results_show_alternatives_without_recommendation():
     assert "Reuse whole garment" in text
     assert "Return garment" in text
     assert "return-garment-button" in text
-    assert "circular-garment-return-result" in text
+    assert "circular-garment-return-result" not in text
     assert "Recover fabric blocks" in text
     assert text.index("Reuse whole garment") < text.index("return-garment-button")
     assert text.index("Recover fabric blocks") < text.index("return-garment-button")

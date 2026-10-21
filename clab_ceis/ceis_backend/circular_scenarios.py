@@ -468,7 +468,7 @@ def calculate_circular_scenarios(
     new_garment_co2eq = (
         new_garment_production_co2eq + new_garment_transport["co2eq"]
     )
-    new_garment_components = _aggregate_components(
+    new_garment_production_components = _aggregate_components(
         [
             {
                 "name": "New material",
@@ -485,6 +485,11 @@ def calculate_circular_scenarios(
                 }
                 for detail in assembly_details
             ],
+        ]
+    )
+    new_garment_components = _aggregate_components(
+        [
+            *new_garment_production_components,
             {
                 "name": "Transport",
                 "co2eq": new_garment_transport["co2eq"],
@@ -575,14 +580,14 @@ def calculate_circular_scenarios(
         )
         whole_garment = _available_scenario(
             whole_total,
-            new_garment_co2eq,
+            new_garment_production_co2eq,
             components=[
                 *shared_repair_components,
                 *_process_components("Preparation", whole_preparation),
                 {"name": "Transport", "co2eq": return_transport["co2eq"]},
             ],
-            avoided_new_garment_co2eq=round(new_garment_co2eq, 6),
-            reference_components=new_garment_components,
+            avoided_new_garment_co2eq=round(new_garment_production_co2eq, 6),
+            reference_components=new_garment_production_components,
             repair_co2eq=round(shared_repair_co2eq, 6),
             preparation=whole_preparation,
             transport=return_transport,

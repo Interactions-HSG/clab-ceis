@@ -3,7 +3,7 @@ import requests
 from pathlib import Path
 
 import plotly.graph_objects as go
-from dash import ctx, dcc, html
+from dash import ctx, dcc, html, no_update
 from dash.dependencies import Input, Output, State
 
 from ceis_shop import config
@@ -18,6 +18,21 @@ from ceis_shop.layouts.scenarios import (
 )
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "ceis_dashboard"))
+
+
+def _remove_returned_garment_option(
+    garment_options: list[dict] | None,
+    garment_id: int,
+) -> tuple[list[dict], int | None]:
+    remaining_options = [
+        option
+        for option in (garment_options or [])
+        if option.get("value") != garment_id
+    ]
+    next_garment_id = (
+        remaining_options[0].get("value") if remaining_options else None
+    )
+    return remaining_options, next_garment_id
 
 
 def get_callbacks(app):
@@ -220,6 +235,11 @@ def get_callbacks(app):
                 },
                 timeout=30,
             )
+            if response.status_code == 404:
+                return html.Div(
+                    "This garment is no longer available for repair or return "
+                    "scenarios. Select another bought garment."
+                )
             response.raise_for_status()
             return render_scenario_results(response.json())
         except Exception as exc:
@@ -273,14 +293,21 @@ def get_callbacks(app):
 
     @app.callback(
         Output("circular-garment-return-result", "children"),
+        Output("circular-garment", "options"),
+        Output("circular-garment", "value"),
         Input("return-garment-button", "n_clicks"),
         State("circular-garment", "value"),
         State("circular-damage", "value"),
+        State("circular-garment", "options"),
         prevent_initial_call=True,
     )
-    def return_garment(n_clicks, garment_id, damage_code):
+    def return_garment(n_clicks, garment_id, damage_code, garment_options):
         if not n_clicks or garment_id is None or damage_code is None:
-            return html.P("Select a garment and damage type before returning it.")
+            return (
+                html.P("Select a garment and damage type before returning it."),
+                no_update,
+                no_update,
+            )
 
         try:
             response = requests.post(
@@ -294,19 +321,28 @@ def get_callbacks(app):
             response.raise_for_status()
             returned = response.json()
         except Exception as exc:
-            return html.P(f"Unable to return garment: {exc}")
+            return html.P(f"Unable to return garment: {exc}"), no_update, no_update
 
-        return html.Div(
-            [
-                html.Strong(
-                    f"Returned garment #{returned['garment_id']} added to inventory"
-                ),
-                html.P(
-                    f"{returned['fabric_block_count']} corresponding fabric blocks "
-                    "were added with the whole-garment processes."
-                ),
-            ],
-            className="panel-muted",
+        remaining_options, next_garment_id = _remove_returned_garment_option(
+            garment_options,
+            garment_id,
+        )
+
+        return (
+            html.Div(
+                [
+                    html.Strong(
+                        f"Returned garment #{returned['garment_id']} added to inventory"
+                    ),
+                    html.P(
+                        f"{returned['fabric_block_count']} corresponding fabric blocks "
+                        "were added with the whole-garment processes."
+                    ),
+                ],
+                className="panel-muted",
+            ),
+            remaining_options,
+            next_garment_id,
         )
 
     @app.callback(

@@ -213,6 +213,11 @@ def render_scenario_explorer(options_payload: dict) -> html.Div:
                 color="green",
                 children=html.Div(id="circular-scenario-results"),
             ),
+            html.Div(
+                id="circular-garment-return-result",
+                className="repair-order-result",
+                role="status",
+            ),
         ]
     )
 
@@ -472,11 +477,6 @@ def render_scenario_results(payload: dict) -> html.Div:
                 className="scenario-chart-actions",
             ),
             html.Div(
-                id="circular-garment-return-result",
-                className="repair-order-result",
-                role="status",
-            ),
-            html.Div(
                 html.Button(
                     "View detailed bar charts",
                     id="toggle-circular-charts",
@@ -504,7 +504,8 @@ def render_scenario_results(payload: dict) -> html.Div:
                         [
                             html.P(
                                 "Positive sections are return emissions; negative "
-                                "sections are the new-production CO2 saved.",
+                                "sections are the new-garment production CO2 saved. "
+                                "Transport is shown only as a return emission.",
                             ),
                             dcc.Graph(
                                 id="return-component-chart",
