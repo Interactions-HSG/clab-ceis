@@ -4,6 +4,7 @@ from unittest.mock import Mock, patch
 
 from ceis_shop.layouts.scenarios import (
     _component_bar_chart,
+    _saved_components,
     repair_return_page,
     render_scenario_explorer,
     render_scenario_results,
@@ -169,12 +170,12 @@ def test_scenario_results_show_alternatives_without_recommendation():
     assert "Send for professional repair" in text
     assert "request-professional-repair" in text
     assert "circular-repair-order-result" in text
-    assert "Reuse whole garment" in text
     assert "Return garment" in text
     assert "return-garment-button" in text
     assert "circular-garment-return-result" not in text
     assert "Expected CO2 saving" in text
     assert "1.200 kg CO2eq" in text
+    assert "0.300 kg CO2eq needed for transport, repair, and preparation" in text
     assert "Reuse whole garment" not in text
     assert "Recover fabric blocks" not in text
     assert text.index("Expected CO2 saving") < text.index("return-garment-button")
@@ -182,7 +183,9 @@ def test_scenario_results_show_alternatives_without_recommendation():
     assert "View detailed bar charts" in text
     assert "circular-detailed-charts" in text
     assert "repair-component-chart" in text
-    assert "return-component-chart" not in text
+    assert "return-component-chart" in text
+    assert "Return alternative: CO2 needed (+) and CO2 saved (-)" in text
+    assert "Saved: New material" in text
     assert "Calculation components" in text
     assert "80.0%" in text
     assert "Recommended" not in text
@@ -217,6 +220,27 @@ def test_component_bar_chart_lists_each_calculation_component():
     assert figure.layout.barmode == "stack"
     assert figure.layout.hovermode == "closest"
     assert "%{x}" not in traces["Transport"].hovertemplate
+
+
+def test_saved_components_are_negative_for_return_saving_chart():
+    saved = _saved_components(
+        [
+            {"name": "New material", "co2eq": 1.5},
+            {"name": "Transport", "co2eq": 0.1},
+        ]
+    )
+    figure = _component_bar_chart(
+        "Return details",
+        [("Expected CO2 saving", saved)],
+        barmode="relative",
+    )
+
+    assert saved == [
+        {"name": "Saved: New material", "co2eq": -1.5},
+        {"name": "Saved: Transport", "co2eq": -0.1},
+    ]
+    assert figure.layout.barmode == "relative"
+    assert all(value <= 0 for trace in figure.data for value in trace.y)
 
 
 def test_garment_page_contains_recipe_and_co2_sections():
