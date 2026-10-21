@@ -107,6 +107,7 @@ def test_garment_return_copies_blocks_with_processes_only_on_garment(seeded_db):
     returned = response.json()
     assert returned["source_garment_id"] == source_garment_id
     assert returned["fabric_block_count"] == source_block_count
+    assert returned["discount_percent"] == 50
     assert source_garment_id not in {
         garment["id"] for garment in get_circular_scenario_options()["garments"]
     }
@@ -154,6 +155,83 @@ def test_garment_return_copies_blocks_with_processes_only_on_garment(seeded_db):
     block_processes = dict(cursor.fetchall())
     conn.close()
     assert block_processes == {}
+
+
+def test_returned_garment_shop_offer_uses_only_preparation_co2(seeded_db):
+    source_garment_id = get_circular_scenario_options()["garments"][0]["id"]
+    conn = sqlite3.connect("ceis_backend.db")
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT gi.type_id, gt.price_chf
+        FROM garments_inventory gi
+        JOIN garment_types gt ON gt.id = gi.type_id
+        WHERE gi.id = ?
+        """,
+        (source_garment_id,),
+    )
+    garment_type_id, base_price = cursor.fetchone()
+    cursor.execute(
+        """
+        SELECT material_id FROM garment_recipe_materials
+        WHERE garment_type = ? ORDER BY material_id LIMIT 1
+        """,
+        (garment_type_id,),
+    )
+    material_id = cursor.fetchone()[0]
+    conn.close()
+
+    with TestClient(app) as client:
+        client.app.state.wiser_client = _mock_wiser_client()
+        created = client.post(
+            "/garment-returns",
+            json={"garment_id": source_garment_id, "damage_code": "small_hole"},
+        ).json()
+        returned_id = created["garment_id"]
+
+        offers = client.get(
+            f"/garment-types/{garment_type_id}/returned-garments"
+        ).json()
+        comparison_response = client.get(
+            f"/garment-types/{garment_type_id}/returned-garments/"
+            f"{returned_id}/co2-comparison?material_id={material_id}"
+        )
+
+        # The regular order must not silently consume the discounted return.
+        regular_order = client.post(
+            "/orders",
+            json={"garment_type_id": garment_type_id, "material_id": material_id},
+        ).json()
+        returned_order = client.post(
+            "/orders",
+            json={
+                "garment_type_id": garment_type_id,
+                "material_id": material_id,
+                "garment_inventory_id": returned_id,
+            },
+        )
+
+    assert offers[0]["id"] == returned_id
+    assert offers[0]["fabric_emission_co2eq"] == 0
+    assert offers[0]["price_chf"] == pytest.approx(offers[0]["base_price_chf"] * 0.5)
+    assert created["price_chf"] == pytest.approx(base_price * 0.5)
+    assert comparison_response.status_code == 200
+    comparison = comparison_response.json()
+    assert comparison["fabric_is_second_life"] is True
+    assert comparison["fabric_emission_co2eq"] == 0
+    assert comparison["returned_total_co2eq"] == pytest.approx(
+        sum(step["emission"] for step in comparison["preparation_processes"])
+    )
+    assert comparison["returned_total_co2eq"] > 0
+    assert comparison["new_total_co2eq"] > comparison["returned_total_co2eq"]
+    assert {step["process"] for step in comparison["preparation_processes"]} == {
+        "sewing",
+        "steaming",
+    }
+    assert regular_order["garment_inventory_id"] != returned_id
+    assert returned_order.status_code == 201
+    assert returned_order.json()["is_returned"] is True
+    assert returned_order.json()["discount_percent"] == 50
 
 
 def test_mock_repair_amounts_are_scaled_to_garment_assembly():

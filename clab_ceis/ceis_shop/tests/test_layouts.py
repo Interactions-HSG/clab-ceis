@@ -14,6 +14,7 @@ from ceis_shop.layouts.garment import (
     _format_condition,
     garment_page,
     render_co2_content,
+    render_returned_garment_comparison,
 )
 from ceis_shop.layouts.home import home_page
 from ceis_shop.main import app as shop_app
@@ -287,7 +288,58 @@ def test_garment_page_auto_uses_single_material_for_co2_without_blocking_layout(
 
     assert "Select a material to view CO2 emissions." in text
     assert "value=1" in text
-    assert mocked_get.call_count == 3
+    assert mocked_get.call_count == 4
+
+
+def test_garment_page_shows_available_returned_garment_at_half_price():
+    responses = []
+    for payload in (
+        [{"id": 1, "name": "Basic Trousers", "price_chf": 100.0}],
+        [{"id": 1, "name": "hemp", "cost_per_sqm_chf": 5.04}],
+        [{"fabric_block": "80x64", "amount": 2}],
+        [
+            {
+                "id": 42,
+                "garment": "Basic Trousers",
+                "base_price_chf": 100.0,
+                "price_chf": 50.0,
+            }
+        ],
+    ):
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = payload
+        responses.append(response)
+
+    with patch("ceis_shop.layouts.garment.requests.get", side_effect=responses):
+        text = str(garment_page(1))
+
+    assert "Returned garment available" in text
+    assert "50% discount from CHF 100.00" in text
+    assert "Price: CHF 50.00" in text
+    assert "second-life fabric" in text
+    assert "returned-garment-order-button" in text
+
+
+def test_returned_garment_comparison_explains_zero_fabric_emissions():
+    text = str(
+        render_returned_garment_comparison(
+            {
+                "returned_total_co2eq": 0.14,
+                "new_total_co2eq": 2.0,
+                "saving_co2eq": 1.86,
+                "saving_percent": 93.0,
+                "preparation_processes": [
+                    {"process": "steaming", "emission": 0.138}
+                ],
+            }
+        )
+    )
+
+    assert "Returned garment: 0.140 kg CO2eq" in text
+    assert "Equivalent new garment: 2.000 kg CO2eq" in text
+    assert "Second-life fabric: 0.000 kg CO2eq" in text
+    assert "steaming: 0.138 kg CO2eq" in text
 
 
 def test_render_co2_content_shows_alternatives_and_capped_discount():

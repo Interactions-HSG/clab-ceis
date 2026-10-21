@@ -417,9 +417,10 @@ def db_create_garment_return(
         cursor.execute("BEGIN IMMEDIATE")
         cursor.execute(
             """
-            SELECT type_id, co2eq, price
-            FROM garments_inventory
-            WHERE id = ? AND sold = 1
+            SELECT gi.type_id, gi.co2eq, gt.price_chf
+            FROM garments_inventory gi
+            JOIN garment_types gt ON gt.id = gi.type_id
+            WHERE gi.id = ? AND gi.sold = 1
             """,
             (garment_id,),
         )
@@ -475,28 +476,18 @@ def db_create_garment_return(
                 detail=f"Missing process types: {', '.join(missing_processes)}",
             )
 
-        type_id, co2eq, price = source_garment
+        type_id, co2eq, base_price = source_garment
+        discounted_price = round(float(base_price) * 0.5, 2)
         cursor.execute(
             """
             INSERT INTO garments_inventory (
                 type_id, co2eq, price, sold, returned_from_garment_id
             ) VALUES (?, ?, ?, 0, ?)
             """,
-            (type_id, co2eq, price, garment_id),
+            (type_id, co2eq, discounted_price, garment_id),
         )
         returned_garment_id = cursor.lastrowid
 
-        cursor.execute(
-            """
-            INSERT INTO processes_garments_inventory (
-                process_id, amount, garment_id
-            )
-            SELECT process_id, amount, ?
-            FROM processes_garments_inventory
-            WHERE garment_id = ?
-            """,
-            (returned_garment_id, garment_id),
-        )
         cursor.executemany(
             """
             INSERT INTO processes_garments_inventory (
@@ -553,6 +544,8 @@ def db_create_garment_return(
             "fabric_block_ids": returned_block_ids,
             "fabric_block_count": block_count,
             "garment_processes": garment_processes,
+            "price_chf": discounted_price,
+            "discount_percent": 50,
             "status": "in_inventory",
         }
     except sqlite3.IntegrityError as error:
@@ -1720,7 +1713,48 @@ def db_get_resource_events(
         conn.close()
 
 
-def db_create_order(garment_type_id: int, material_id: int | None = None) -> dict:
+def db_get_available_returned_garments(garment_type_id: int) -> list[dict]:
+    """Return unsold, returned whole garments offered at half the new price."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT gi.id, gi.returned_from_garment_id, gt.name, gt.price_chf,
+               COUNT(fbi.id)
+        FROM garments_inventory gi
+        JOIN garment_types gt ON gt.id = gi.type_id
+        LEFT JOIN fabric_blocks_inventory fbi ON fbi.garment_id = gi.id
+        WHERE gi.type_id = ?
+          AND gi.sold = 0
+          AND gi.returned_from_garment_id IS NOT NULL
+        GROUP BY gi.id, gi.returned_from_garment_id, gt.name, gt.price_chf
+        ORDER BY gi.id
+        """,
+        (garment_type_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [
+        {
+            "id": row[0],
+            "returned_from_garment_id": row[1],
+            "garment_type_id": garment_type_id,
+            "garment": row[2],
+            "base_price_chf": float(row[3]),
+            "price_chf": round(float(row[3]) * 0.5, 2),
+            "discount_percent": 50,
+            "fabric_block_count": row[4],
+            "fabric_emission_co2eq": 0.0,
+        }
+        for row in rows
+    ]
+
+
+def db_create_order(
+    garment_type_id: int,
+    material_id: int | None = None,
+    garment_inventory_id: int | None = None,
+) -> dict:
     """Create an order, atomically reserving stock when one unit is available."""
     conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA foreign_keys = ON")
@@ -1728,7 +1762,8 @@ def db_create_order(garment_type_id: int, material_id: int | None = None) -> dic
     try:
         cursor.execute("BEGIN IMMEDIATE")
         cursor.execute(
-            "SELECT name FROM garment_types WHERE id = ?", (garment_type_id,)
+            "SELECT name, price_chf FROM garment_types WHERE id = ?",
+            (garment_type_id,),
         )
         garment = cursor.fetchone()
         if garment is None:
@@ -1747,15 +1782,32 @@ def db_create_order(garment_type_id: int, material_id: int | None = None) -> dic
                     detail="Material is not available for this garment",
                 )
 
-        cursor.execute(
-            """
-            SELECT id, co2eq FROM garments_inventory
-            WHERE type_id = ? AND sold = 0
-            ORDER BY id LIMIT 1
-            """,
-            (garment_type_id,),
-        )
+        if garment_inventory_id is not None:
+            cursor.execute(
+                """
+                SELECT id, co2eq FROM garments_inventory
+                WHERE id = ? AND type_id = ? AND sold = 0
+                  AND returned_from_garment_id IS NOT NULL
+                """,
+                (garment_inventory_id, garment_type_id),
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT id, co2eq FROM garments_inventory
+                WHERE type_id = ? AND sold = 0
+                  AND returned_from_garment_id IS NULL
+                ORDER BY id LIMIT 1
+                """,
+                (garment_type_id,),
+            )
         stock = cursor.fetchone()
+        if garment_inventory_id is not None and stock is None:
+            raise HTTPException(
+                status_code=409,
+                detail="Returned garment is no longer available",
+            )
+        is_returned = garment_inventory_id is not None
         fulfillment_type = "stock" if stock else "production"
         status = "Delivering" if stock else "Production requested"
         inventory_id = stock[0] if stock else None
@@ -1837,6 +1889,14 @@ def db_create_order(garment_type_id: int, material_id: int | None = None) -> dic
             "fulfillment_type": fulfillment_type,
             "status": status,
             "event_trigger": event_trigger,
+            "garment_inventory_id": inventory_id,
+            "is_returned": is_returned,
+            "discount_percent": 50 if is_returned else 0,
+            "price_chf": (
+                round(float(garment[1]) * 0.5, 2)
+                if is_returned
+                else float(garment[1])
+            ),
         }
     except Exception:
         conn.rollback()

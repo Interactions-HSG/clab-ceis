@@ -8,6 +8,7 @@ from ceis_backend.db_init import init_sqlite_db
 from ceis_backend.config import BACKEND_HOST, BACKEND_PORT
 from ceis_backend.utils import (
     get_co2_for_garment,
+    get_returned_garment_co2_comparison,
     calculate_transport_emission,
     build_scenario_activities,
     calculate_replacement_fabric_blocks_emissions,
@@ -39,6 +40,7 @@ from ceis_backend.queries import (
     db_create_order,
     db_create_repair,
     db_create_garment_return,
+    db_get_available_returned_garments,
     db_get_repairs,
     db_upsert_material,
     db_delete_garment_recipe,
@@ -160,7 +162,34 @@ def get_resource_events(
 
 @app.post("/orders", status_code=201)
 def create_order(payload: OrderCreate):
-    return db_create_order(payload.garment_type_id, payload.material_id)
+    return db_create_order(
+        payload.garment_type_id,
+        payload.material_id,
+        payload.garment_inventory_id,
+    )
+
+
+@app.get("/garment-types/{garment_type_id}/returned-garments")
+def get_available_returned_garments(garment_type_id: int):
+    return db_get_available_returned_garments(garment_type_id)
+
+
+@app.get(
+    "/garment-types/{garment_type_id}/returned-garments/"
+    "{garment_inventory_id}/co2-comparison"
+)
+def get_returned_garment_comparison(
+    garment_type_id: int,
+    garment_inventory_id: int,
+    material_id: int,
+    wiser_client: WiserClient = Depends(get_wiser_client),
+):
+    return get_returned_garment_co2_comparison(
+        garment_type_id,
+        garment_inventory_id,
+        material_id,
+        wiser_client,
+    )
 
 
 @app.post("/repairs", status_code=201)

@@ -202,6 +202,100 @@ def render_waiting_for_material_co2_content() -> html.Div:
     )
 
 
+def render_returned_garment_comparison(payload: dict) -> html.Div:
+    """Render the like-for-like climate comparison for a returned garment."""
+    returned_total = float(payload["returned_total_co2eq"])
+    new_total = float(payload["new_total_co2eq"])
+    saving = float(payload["saving_co2eq"])
+    saving_percent = float(payload["saving_percent"])
+    process_items = [
+        html.Li(
+            f"{process['process']}: {float(process['emission']):.3f} kg CO2eq"
+        )
+        for process in payload.get("preparation_processes", [])
+    ]
+
+    return html.Div(
+        [
+            html.H3("CO2 comparison to a new garment"),
+            html.P(
+                f"Returned garment: {returned_total:.3f} kg CO2eq "
+                "(repair and preparation only)."
+            ),
+            html.P(f"Equivalent new garment: {new_total:.3f} kg CO2eq."),
+            html.P(
+                f"CO2 saving: {saving:.3f} kg CO2eq ({saving_percent:.1f}%)."
+            ),
+            html.P("Second-life fabric: 0.000 kg CO2eq."),
+            html.H4("Preparation steps"),
+            html.Ul(process_items or [html.Li("No preparation steps recorded.")]),
+        ],
+        className="panel-muted",
+    )
+
+
+def _render_returned_garment_offer(returned_garments: list[dict]) -> html.Div:
+    if not returned_garments:
+        return html.Div(
+            [
+                dcc.Dropdown(id="returned-garment-dropdown", options=[]),
+                html.Div(id="returned-garment-comparison"),
+                html.Button(
+                    "Order returned garment",
+                    id="returned-garment-order-button",
+                    n_clicks=0,
+                ),
+                html.Div(id="returned-garment-order-result"),
+            ],
+            id="returned-garment-offer",
+            hidden=True,
+        )
+
+    selected = returned_garments[0]
+    options = [
+        {
+            "label": f"Returned {garment['garment']} #{garment['id']}",
+            "value": garment["id"],
+        }
+        for garment in returned_garments
+    ]
+    return html.Div(
+        [
+            html.Div("SECOND-LIFE OFFER", className="shop-kicker"),
+            html.H2("Returned garment available"),
+            html.P(
+                "This whole garment has already been returned and prepared for "
+                "another life."
+            ),
+            dcc.Dropdown(
+                id="returned-garment-dropdown",
+                options=options,
+                value=selected["id"],
+                clearable=False,
+            ),
+            html.P(
+                f"Price: CHF {float(selected['price_chf']):.2f} "
+                f"(50% discount from CHF {float(selected['base_price_chf']):.2f})."
+            ),
+            html.P("The second-life fabric contributes 0.000 kg CO2eq."),
+            html.Div(
+                "Select a material above to compare it with the equivalent new garment.",
+                id="returned-garment-comparison",
+                className="panel-muted",
+            ),
+            html.Button(
+                "Order returned garment",
+                id="returned-garment-order-button",
+                n_clicks=0,
+                className="primary-button",
+            ),
+            html.Div(id="returned-garment-order-result"),
+        ],
+        id="returned-garment-offer",
+        className="panel-muted",
+    )
+
+
 def _image_component(garment_name: str):
     file_name = GARMENT_IMAGE_MAP.get(garment_name)
     if not file_name:
@@ -279,6 +373,12 @@ def garment_page(garment_type_id: int):
                     html.P(str(exc)),
                 ]
             )
+        try:
+            returned_garments = _fetch_json(
+                f"/garment-types/{garment_type_id}/returned-garments"
+            )
+        except Exception:
+            returned_garments = []
         initial_co2_content = render_waiting_for_material_co2_content()
 
         return html.Div(
@@ -307,6 +407,7 @@ def garment_page(garment_type_id: int):
                 dcc.Store(id="garment-type-id-store", data=garment_type_id),
                 dcc.Store(id="garment-materials-store", data=materials),
                 dcc.Store(id="garment-base-price-store", data=garment.get("price_chf")),
+                dcc.Store(id="returned-garments-store", data=returned_garments),
                 html.Div(
                     [
                         html.Label("Material", htmlFor="garment-material-dropdown"),
@@ -357,6 +458,7 @@ def garment_page(garment_type_id: int):
                                         children=initial_co2_content,
                                     ),
                                 ),
+                                _render_returned_garment_offer(returned_garments),
                                 html.Button(
                                     "Place order",
                                     id="garment-order-button",

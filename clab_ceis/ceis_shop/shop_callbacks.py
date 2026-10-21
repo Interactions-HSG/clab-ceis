@@ -9,6 +9,7 @@ from dash.dependencies import Input, Output, State
 from ceis_shop import config
 from ceis_shop.layouts.garment import (
     render_co2_content,
+    render_returned_garment_comparison,
     render_waiting_for_material_co2_content,
 )
 from ceis_shop.layouts.scenarios import (
@@ -54,6 +55,72 @@ def get_callbacks(app):
             [html.Strong(f"Order #{order['id']}"), html.P(message)],
             className="panel-muted",
         )
+
+    @app.callback(
+        Output("returned-garment-order-result", "children"),
+        Input("returned-garment-order-button", "n_clicks"),
+        State("garment-type-id-store", "data"),
+        State("garment-material-dropdown", "value"),
+        State("returned-garment-dropdown", "value"),
+        prevent_initial_call=True,
+    )
+    def place_returned_garment_order(
+        n_clicks, garment_type_id, material_id, garment_inventory_id
+    ):
+        if not n_clicks:
+            return html.Div()
+        try:
+            response = requests.post(
+                f"{config.BACKEND_API_URL}/orders",
+                json={
+                    "garment_type_id": garment_type_id,
+                    "material_id": material_id,
+                    "garment_inventory_id": garment_inventory_id,
+                },
+                timeout=30,
+            )
+            response.raise_for_status()
+            order = response.json()
+        except Exception as exc:
+            return html.P(f"Unable to order returned garment: {exc}")
+
+        return html.Div(
+            [
+                html.Strong(f"Order #{order['id']}"),
+                html.P(
+                    f"Returned garment reserved for CHF {float(order['price_chf']):.2f}. "
+                    "Delivery has started."
+                ),
+            ],
+            className="panel-muted",
+        )
+
+    @app.callback(
+        Output("returned-garment-comparison", "children"),
+        Input("garment-material-dropdown", "value"),
+        Input("returned-garment-dropdown", "value"),
+        State("garment-type-id-store", "data"),
+    )
+    def update_returned_garment_comparison(
+        material_id, garment_inventory_id, garment_type_id
+    ):
+        if material_id is None:
+            return "Select a material above to compare it with the equivalent new garment."
+        if garment_inventory_id is None:
+            return "No returned garment is currently available."
+        try:
+            response = requests.get(
+                f"{config.BACKEND_API_URL}/garment-types/{garment_type_id}/"
+                f"returned-garments/{garment_inventory_id}/co2-comparison"
+                f"?material_id={material_id}",
+                timeout=30,
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except Exception as exc:
+            return html.P(f"Unable to calculate returned-garment CO2: {exc}")
+
+        return render_returned_garment_comparison(payload)
 
     @app.callback(
         Output("customer-repair-content", "children"),

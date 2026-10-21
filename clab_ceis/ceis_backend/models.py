@@ -129,6 +129,7 @@ class ActivitySearchRequest(BaseModel):
 class OrderCreate(BaseModel):
     garment_type_id: int
     material_id: Optional[int] = None
+    garment_inventory_id: Optional[int] = None
 
 
 class RepairCreate(BaseModel):
