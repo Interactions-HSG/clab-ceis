@@ -3,7 +3,7 @@ from pathlib import Path
 from dash import Dash, dcc, html
 from dash.dependencies import Input, Output
 
-from ceis_shop.layouts.scenarios import scenarios_page
+from ceis_shop.layouts.scenarios import repair_return_page, scenarios_page
 from ceis_shop.layouts.garment import garment_page
 from ceis_shop.layouts.home import home_page
 from ceis_shop.layouts.skirt import skirt_page
@@ -46,6 +46,8 @@ def display_page(pathname):
         return skirt_page()
     elif pathname == "/scenarios":
         return scenarios_page()
+    elif pathname == "/repair-return":
+        return repair_return_page()
     elif pathname == "/top":
         return top_page()
     else:

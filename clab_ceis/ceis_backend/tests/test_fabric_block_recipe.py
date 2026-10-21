@@ -126,7 +126,7 @@ class TestInventoryProcessTables:
             "processes_garments_inventory",
         ]
 
-    def test_garments_inventory_has_sold_column_after_init(self, test_db):
+    def test_garments_inventory_has_lifecycle_columns_after_init(self, test_db):
         conn = sqlite3.connect("ceis_backend.db")
         cursor = conn.cursor()
 
@@ -135,6 +135,9 @@ class TestInventoryProcessTables:
         conn.close()
 
         assert "sold" in columns
+        assert "returned_from_garment_id" in columns
+        assert "disassembled" in columns
+        assert "damage_code" in columns
 
     def test_fabric_blocks_inventory_has_second_life_column_after_init(self, test_db):
         conn = sqlite3.connect("ceis_backend.db")

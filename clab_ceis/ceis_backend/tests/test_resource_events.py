@@ -9,8 +9,10 @@ from ceis_backend.db_init import (
 )
 from ceis_backend.queries import (
     db_create_order,
+    db_get_orders,
     db_get_resource_events,
     db_get_supply_chain_graph,
+    db_ship_order,
 )
 from ceis_backend.resource_event_emissions import enrich_resource_events_with_co2
 from ceis_backend.wiser_bridge import WiserClientError
@@ -313,6 +315,124 @@ def test_order_delivers_stock_then_requests_production(clean_db):
         "Deliver",
         "Production",
     }
+
+
+def test_shipping_production_order_creates_sold_garment_and_recipe_blocks(clean_db):
+    conn = _connect()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO garment_types (name, price_chf) VALUES ('Made coat', 180)"
+    )
+    garment_type_id = cursor.lastrowid
+    cursor.execute(
+        """
+        INSERT INTO materials (name, kg_per_sqm, cost_per_sqm_chf, activity_id)
+        VALUES ('new wool', 1.2, 24, 101)
+        """
+    )
+    material_id = cursor.lastrowid
+    cursor.execute("INSERT INTO fabric_block_types (name, sqm) VALUES ('panel', 1.5)")
+    fabric_block_type_id = cursor.lastrowid
+    cursor.execute(
+        "INSERT INTO garment_recipe_materials (garment_type, material_id) VALUES (?, ?)",
+        (garment_type_id, material_id),
+    )
+    cursor.execute(
+        """
+        INSERT INTO garment_recipe_fabric_blocks (
+            garment_type, fabric_block_id, amount
+        ) VALUES (?, ?, 2)
+        """,
+        (garment_type_id, fabric_block_type_id),
+    )
+    conn.commit()
+    conn.close()
+
+    order = db_create_order(garment_type_id, material_id)
+    assert order["fulfillment_type"] == "production"
+    assert db_get_orders()[0]["material"] == "new wool"
+
+    shipped = db_ship_order(order["id"])
+
+    assert shipped["status"] == "Completed"
+    assert shipped["garment_inventory_id"] is not None
+    conn = _connect()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT type_id, price, sold FROM garments_inventory WHERE id = ?",
+        (shipped["garment_inventory_id"],),
+    )
+    assert cursor.fetchone() == (garment_type_id, 180, 1)
+    cursor.execute(
+        """
+        SELECT type_id, material_id, second_life
+        FROM fabric_blocks_inventory
+        WHERE garment_id = ?
+        ORDER BY id
+        """,
+        (shipped["garment_inventory_id"],),
+    )
+    assert cursor.fetchall() == [
+        (fabric_block_type_id, material_id, 0),
+        (fabric_block_type_id, material_id, 0),
+    ]
+    cursor.execute(
+        """
+        SELECT event_trigger, status
+        FROM resource_events
+        WHERE order_id = ?
+        ORDER BY id
+        """,
+        (order["id"],),
+    )
+    assert cursor.fetchall() == [
+        ("Production", "Completed"),
+        ("Deliver", "Completed"),
+    ]
+
+    # A repeated request is safe and does not duplicate the garment or event.
+    assert db_ship_order(order["id"])["garment_inventory_id"] == shipped[
+        "garment_inventory_id"
+    ]
+    cursor.execute("SELECT COUNT(*) FROM garments_inventory")
+    assert cursor.fetchone()[0] == 1
+    cursor.execute(
+        "SELECT COUNT(*) FROM resource_events WHERE order_id = ?",
+        (order["id"],),
+    )
+    assert cursor.fetchone()[0] == 2
+    conn.close()
+
+
+def test_shipping_stock_order_reuses_reserved_garment(clean_db):
+    conn = _connect()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO garment_types (name, price_chf) VALUES ('Stock shirt', 90)"
+    )
+    garment_type_id = cursor.lastrowid
+    cursor.execute(
+        "INSERT INTO garments_inventory (type_id, price, sold) VALUES (?, 90, 0)",
+        (garment_type_id,),
+    )
+    garment_inventory_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+
+    order = db_create_order(garment_type_id)
+    shipped = db_ship_order(order["id"])
+
+    assert shipped["garment_inventory_id"] == garment_inventory_id
+    conn = _connect()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, sold FROM garments_inventory")
+    assert cursor.fetchall() == [(garment_inventory_id, 1)]
+    cursor.execute(
+        "SELECT event_trigger, status FROM resource_events WHERE order_id = ?",
+        (order["id"],),
+    )
+    assert cursor.fetchall() == [("Deliver", "Completed")]
+    conn.close()
 
 
 def test_resource_event_emissions_use_material_activity_only(clean_db):

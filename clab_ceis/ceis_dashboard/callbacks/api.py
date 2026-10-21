@@ -101,6 +101,86 @@ def fetch_resource_events(**filters) -> list[dict]:
         return []
 
 
+def fetch_repairs() -> list[dict]:
+    try:
+        resp = requests.get(f"{config.BACKEND_API_URL}/repairs", timeout=30)
+        if resp.status_code != 200:
+            return []
+        return resp.json()
+    except Exception:
+        return []
+
+
+def fetch_orders() -> list[dict]:
+    try:
+        resp = requests.get(f"{config.BACKEND_API_URL}/orders", timeout=30)
+        if resp.status_code != 200:
+            return []
+        return resp.json()
+    except Exception:
+        return []
+
+
+def fetch_returned_garments() -> list[dict]:
+    try:
+        resp = requests.get(f"{config.BACKEND_API_URL}/returned-garments", timeout=30)
+        if resp.status_code != 200:
+            return []
+        return resp.json()
+    except Exception:
+        return []
+
+
+def disassemble_returned_garment(garment_id: int) -> dict:
+    try:
+        resp = requests.post(
+            f"{config.BACKEND_API_URL}/returned-garments/{garment_id}/disassemble",
+            timeout=30,
+        )
+        if resp.status_code != 200:
+            payload = resp.json()
+            return {"error": payload.get("detail", "Unable to disassemble garment")}
+        return resp.json()
+    except Exception as error:
+        return {"error": str(error)}
+
+
+def fetch_returned_garment_alternatives(
+    garment_id: int,
+    distance_km: float,
+    use_higher_electricity_factor: bool = False,
+) -> dict:
+    try:
+        resp = requests.get(
+            f"{config.BACKEND_API_URL}/returned-garments/{garment_id}/return-alternatives",
+            params={
+                "distance_km": distance_km,
+                "use_higher_electricity_factor": use_higher_electricity_factor,
+            },
+            timeout=30,
+        )
+        if resp.status_code != 200:
+            payload = resp.json()
+            return {"error": payload.get("detail", "Unable to calculate alternatives")}
+        return resp.json()
+    except Exception as error:
+        return {"error": str(error)}
+
+
+def ship_order(order_id: int) -> dict:
+    try:
+        resp = requests.post(
+            f"{config.BACKEND_API_URL}/orders/{order_id}/ship",
+            timeout=30,
+        )
+        if resp.status_code != 200:
+            payload = resp.json()
+            return {"error": payload.get("detail", "Unable to ship order")}
+        return resp.json()
+    except Exception as error:
+        return {"error": str(error)}
+
+
 def fetch_designer_balance_options() -> dict:
     try:
         resp = requests.get(f"{config.BACKEND_API_URL}/designer-balance/options")

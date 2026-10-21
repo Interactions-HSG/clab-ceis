@@ -230,12 +230,338 @@ def db_get_sold_garments_for_co2() -> list[dict]:
         FROM garments_inventory gi
         JOIN garment_types gt ON gt.id = gi.type_id
         WHERE gi.sold = 1
+          AND NOT EXISTS (
+              SELECT 1
+              FROM garments_inventory returned
+              WHERE returned.returned_from_garment_id = gi.id
+          )
           AND gi.co2eq IS NULL
         ORDER BY gi.id
         """)
     rows = cursor.fetchall()
     conn.close()
     return [{"id": row[0], "type_id": row[1], "name": row[2]} for row in rows]
+
+
+def db_get_sold_garments() -> list[dict]:
+    """Return sold garment instances available for circular scenarios."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT gi.id,
+               gi.type_id,
+               gt.name,
+               gi.co2eq,
+               COUNT(fbi.id) AS fabric_block_count
+        FROM garments_inventory gi
+        JOIN garment_types gt ON gt.id = gi.type_id
+        LEFT JOIN fabric_blocks_inventory fbi ON fbi.garment_id = gi.id
+        WHERE gi.sold = 1
+          AND NOT EXISTS (
+              SELECT 1
+              FROM garments_inventory returned
+              WHERE returned.returned_from_garment_id = gi.id
+          )
+        GROUP BY gi.id, gi.type_id, gt.name, gi.co2eq
+        ORDER BY gt.name, gi.id
+        """
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [
+        {
+            "id": row[0],
+            "type_id": row[1],
+            "name": row[2],
+            "co2eq": float(row[3]) if row[3] is not None else None,
+            "fabric_block_count": int(row[4] or 0),
+        }
+        for row in rows
+    ]
+
+
+def db_get_sold_garment(garment_id: int) -> dict | None:
+    """Return one sold garment instance or ``None`` when it is unavailable."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT gi.id, gi.type_id, gt.name, gi.co2eq
+        FROM garments_inventory gi
+        JOIN garment_types gt ON gt.id = gi.type_id
+        WHERE gi.id = ? AND gi.sold = 1
+          AND NOT EXISTS (
+              SELECT 1
+              FROM garments_inventory returned
+              WHERE returned.returned_from_garment_id = gi.id
+          )
+        """,
+        (garment_id,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    if row is None:
+        return None
+    return {
+        "id": row[0],
+        "type_id": row[1],
+        "name": row[2],
+        "co2eq": float(row[3]) if row[3] is not None else None,
+    }
+
+
+def db_create_repair(garment_id: int, action: str, damage_code: str) -> dict:
+    """Add one pending repair action for a bought garment."""
+    action_labels = {
+        "self_repair_kit": "Prepare self-repair kit",
+        "professional_repair": "Perform professional repair",
+    }
+    if action not in action_labels:
+        raise HTTPException(status_code=422, detail="Unknown repair action")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")
+    cursor = conn.cursor()
+    try:
+        cursor.execute("BEGIN IMMEDIATE")
+        cursor.execute(
+            """
+            SELECT gt.name
+            FROM garments_inventory gi
+            JOIN garment_types gt ON gt.id = gi.type_id
+            WHERE gi.id = ? AND gi.sold = 1
+            """,
+            (garment_id,),
+        )
+        garment = cursor.fetchone()
+        if garment is None:
+            raise HTTPException(status_code=404, detail="Bought garment not found")
+
+        cursor.execute(
+            """
+            INSERT INTO repairs (garment_inventory_id, action, damage_code)
+            VALUES (?, ?, ?)
+            """,
+            (garment_id, action, damage_code),
+        )
+        repair_id = cursor.lastrowid
+        conn.commit()
+        return {
+            "id": repair_id,
+            "garment_id": garment_id,
+            "garment": garment[0],
+            "action": action,
+            "action_label": action_labels[action],
+            "damage_code": damage_code,
+            "status": "pending",
+        }
+    except sqlite3.IntegrityError as error:
+        conn.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="This garment already has a pending repair action",
+        ) from error
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def db_get_repairs() -> list[dict]:
+    """Return repair actions for the operations dashboard."""
+    action_labels = {
+        "self_repair_kit": "Prepare self-repair kit",
+        "professional_repair": "Perform professional repair",
+    }
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT r.id, r.garment_inventory_id, gt.name, r.action,
+               r.damage_code, r.status, r.created_at
+        FROM repairs r
+        JOIN garments_inventory gi ON gi.id = r.garment_inventory_id
+        JOIN garment_types gt ON gt.id = gi.type_id
+        WHERE r.status = 'pending'
+        ORDER BY r.created_at DESC, r.id DESC
+        """
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [
+        {
+            "id": row[0],
+            "garment_id": row[1],
+            "garment": row[2],
+            "action": row[3],
+            "action_label": action_labels.get(row[3], row[3]),
+            "damage_code": row[4],
+            "status": row[5],
+            "created_at": row[6],
+        }
+        for row in rows
+    ]
+
+
+def db_create_garment_return(
+    garment_id: int,
+    garment_processes: list[dict],
+    damage_code: str,
+) -> dict:
+    """Copy a bought garment and its blocks into returned inventory."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")
+    cursor = conn.cursor()
+    try:
+        cursor.execute("BEGIN IMMEDIATE")
+        cursor.execute(
+            """
+            SELECT gi.type_id, gi.co2eq, gt.price_chf
+            FROM garments_inventory gi
+            JOIN garment_types gt ON gt.id = gi.type_id
+            WHERE gi.id = ? AND gi.sold = 1
+            """,
+            (garment_id,),
+        )
+        source_garment = cursor.fetchone()
+        if source_garment is None:
+            raise HTTPException(status_code=404, detail="Bought garment not found")
+
+        cursor.execute(
+            """
+            SELECT id
+            FROM garments_inventory
+            WHERE returned_from_garment_id = ?
+            """,
+            (garment_id,),
+        )
+        if cursor.fetchone() is not None:
+            raise HTTPException(
+                status_code=409,
+                detail="This garment has already been returned",
+            )
+
+        cursor.execute(
+            """
+            SELECT type_id, co2eq, location_id, material_id, quality,
+                   second_life
+            FROM fabric_blocks_inventory
+            WHERE garment_id = ?
+            ORDER BY id
+            """,
+            (garment_id,),
+        )
+        source_blocks = cursor.fetchall()
+        if not source_blocks:
+            raise HTTPException(
+                status_code=400,
+                detail="Selected garment has no linked fabric blocks",
+            )
+
+        process_names = {
+            str(process["name"])
+            for process in garment_processes
+        }
+        placeholders = ", ".join("?" for _ in process_names)
+        cursor.execute(
+            f"SELECT id, name FROM process_types WHERE name IN ({placeholders})",
+            tuple(sorted(process_names)),
+        )
+        process_ids = {name: process_id for process_id, name in cursor.fetchall()}
+        missing_processes = sorted(process_names - set(process_ids))
+        if missing_processes:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Missing process types: {', '.join(missing_processes)}",
+            )
+
+        type_id, co2eq, base_price = source_garment
+        discounted_price = round(float(base_price) * 0.5, 2)
+        cursor.execute(
+            """
+            INSERT INTO garments_inventory (
+                type_id, co2eq, price, sold, returned_from_garment_id,
+                damage_code
+            ) VALUES (?, ?, ?, 0, ?, ?)
+            """,
+            (type_id, co2eq, discounted_price, garment_id, damage_code),
+        )
+        returned_garment_id = cursor.lastrowid
+
+        cursor.executemany(
+            """
+            INSERT INTO processes_garments_inventory (
+                process_id, amount, garment_id
+            ) VALUES (?, ?, ?)
+            """,
+            [
+                (
+                    process_ids[str(process["name"])],
+                    float(process["amount"]),
+                    returned_garment_id,
+                )
+                for process in garment_processes
+            ],
+        )
+
+        cursor.execute("SELECT id FROM locations WHERE name = 'St. Gallen'")
+        return_location = cursor.fetchone()
+        return_location_id = return_location[0] if return_location else None
+        returned_block_ids: list[int] = []
+        block_count = len(source_blocks)
+        for source_block in source_blocks:
+            (
+                block_type_id,
+                block_co2eq,
+                source_location_id,
+                material_id,
+                quality,
+                _second_life,
+            ) = source_block
+            cursor.execute(
+                """
+                INSERT INTO fabric_blocks_inventory (
+                    type_id, co2eq, garment_id, location_id, material_id,
+                    quality, second_life
+                ) VALUES (?, ?, ?, ?, ?, ?, 1)
+                """,
+                (
+                    block_type_id,
+                    block_co2eq,
+                    returned_garment_id,
+                    return_location_id or source_location_id,
+                    material_id,
+                    quality,
+                ),
+            )
+            returned_block_id = cursor.lastrowid
+            returned_block_ids.append(returned_block_id)
+
+        conn.commit()
+        return {
+            "source_garment_id": garment_id,
+            "garment_id": returned_garment_id,
+            "fabric_block_ids": returned_block_ids,
+            "fabric_block_count": block_count,
+            "garment_processes": garment_processes,
+            "price_chf": discounted_price,
+            "discount_percent": 50,
+            "damage_code": damage_code,
+            "status": "in_inventory",
+        }
+    except sqlite3.IntegrityError as error:
+        conn.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="This garment has already been returned",
+        ) from error
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def db_get_inventory_fabric_blocks_for_garment(garment_id: int) -> list[dict]:
@@ -1390,7 +1716,173 @@ def db_get_resource_events(
         conn.close()
 
 
-def db_create_order(garment_type_id: int, material_id: int | None = None) -> dict:
+def db_get_available_returned_garments(garment_type_id: int) -> list[dict]:
+    """Return unsold, returned whole garments offered at half the new price."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT gi.id, gi.returned_from_garment_id, gt.name, gt.price_chf,
+               COUNT(fbi.id)
+        FROM garments_inventory gi
+        JOIN garment_types gt ON gt.id = gi.type_id
+        LEFT JOIN fabric_blocks_inventory fbi ON fbi.garment_id = gi.id
+        WHERE gi.type_id = ?
+          AND gi.sold = 0
+          AND gi.disassembled = 0
+          AND gi.returned_from_garment_id IS NOT NULL
+        GROUP BY gi.id, gi.returned_from_garment_id, gt.name, gt.price_chf
+        ORDER BY gi.id
+        """,
+        (garment_type_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [
+        {
+            "id": row[0],
+            "returned_from_garment_id": row[1],
+            "garment_type_id": garment_type_id,
+            "garment": row[2],
+            "base_price_chf": float(row[3]),
+            "price_chf": round(float(row[3]) * 0.5, 2),
+            "discount_percent": 50,
+            "fabric_block_count": row[4],
+            "fabric_emission_co2eq": 0.0,
+        }
+        for row in rows
+    ]
+
+
+def db_get_returned_garments() -> list[dict]:
+    """Return whole returned garments that are available for disassembly."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT gi.id, gi.returned_from_garment_id, gt.name, gi.price,
+               COUNT(fbi.id), gi.disassembled, gi.damage_code
+        FROM garments_inventory gi
+        JOIN garment_types gt ON gt.id = gi.type_id
+        LEFT JOIN fabric_blocks_inventory fbi ON fbi.garment_id = gi.id
+        WHERE gi.returned_from_garment_id IS NOT NULL
+          AND gi.sold = 0
+          AND gi.disassembled = 0
+        GROUP BY gi.id, gi.returned_from_garment_id, gt.name, gi.price,
+                 gi.disassembled, gi.damage_code
+        ORDER BY gi.id DESC
+        """
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [
+        {
+            "id": row[0],
+            "returned_from_garment_id": row[1],
+            "garment": row[2],
+            "price_chf": float(row[3]) if row[3] is not None else None,
+            "fabric_block_count": int(row[4] or 0),
+            "damage_code": row[6] or "small_hole",
+            "status": "Returned",
+        }
+        for row in rows
+    ]
+
+
+def db_get_returned_garment(garment_id: int) -> dict | None:
+    """Return one intact returned garment for dashboard scenario calculations."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT gi.id, gi.type_id, gt.name, gi.co2eq, gi.damage_code
+        FROM garments_inventory gi
+        JOIN garment_types gt ON gt.id = gi.type_id
+        WHERE gi.id = ?
+          AND gi.returned_from_garment_id IS NOT NULL
+          AND gi.sold = 0
+          AND gi.disassembled = 0
+        """,
+        (garment_id,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    if row is None:
+        return None
+    return {
+        "id": row[0],
+        "type_id": row[1],
+        "name": row[2],
+        "co2eq": float(row[3]) if row[3] is not None else None,
+        "damage_code": row[4] or "small_hole",
+    }
+
+
+def db_disassemble_returned_garment(garment_id: int) -> dict:
+    """Detach every block from an available returned garment atomically."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")
+    cursor = conn.cursor()
+    try:
+        cursor.execute("BEGIN IMMEDIATE")
+        cursor.execute(
+            """
+            SELECT gt.name
+            FROM garments_inventory gi
+            JOIN garment_types gt ON gt.id = gi.type_id
+            WHERE gi.id = ?
+              AND gi.returned_from_garment_id IS NOT NULL
+              AND gi.sold = 0
+              AND gi.disassembled = 0
+            """,
+            (garment_id,),
+        )
+        garment = cursor.fetchone()
+        if garment is None:
+            raise HTTPException(
+                status_code=409,
+                detail="Returned garment is no longer available for disassembly",
+            )
+
+        cursor.execute(
+            "SELECT id FROM fabric_blocks_inventory WHERE garment_id = ? ORDER BY id",
+            (garment_id,),
+        )
+        fabric_block_ids = [row[0] for row in cursor.fetchall()]
+        if not fabric_block_ids:
+            raise HTTPException(
+                status_code=409,
+                detail="Returned garment has no linked fabric blocks",
+            )
+
+        cursor.execute(
+            "UPDATE fabric_blocks_inventory SET garment_id = NULL WHERE garment_id = ?",
+            (garment_id,),
+        )
+        cursor.execute(
+            "UPDATE garments_inventory SET disassembled = 1 WHERE id = ?",
+            (garment_id,),
+        )
+        conn.commit()
+        return {
+            "garment_id": garment_id,
+            "garment": garment[0],
+            "fabric_block_ids": fabric_block_ids,
+            "fabric_block_count": len(fabric_block_ids),
+            "status": "disassembled",
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def db_create_order(
+    garment_type_id: int,
+    material_id: int | None = None,
+    garment_inventory_id: int | None = None,
+) -> dict:
     """Create an order, atomically reserving stock when one unit is available."""
     conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA foreign_keys = ON")
@@ -1398,7 +1890,8 @@ def db_create_order(garment_type_id: int, material_id: int | None = None) -> dic
     try:
         cursor.execute("BEGIN IMMEDIATE")
         cursor.execute(
-            "SELECT name FROM garment_types WHERE id = ?", (garment_type_id,)
+            "SELECT name, price_chf FROM garment_types WHERE id = ?",
+            (garment_type_id,),
         )
         garment = cursor.fetchone()
         if garment is None:
@@ -1417,15 +1910,33 @@ def db_create_order(garment_type_id: int, material_id: int | None = None) -> dic
                     detail="Material is not available for this garment",
                 )
 
-        cursor.execute(
-            """
-            SELECT id, co2eq FROM garments_inventory
-            WHERE type_id = ? AND sold = 0
-            ORDER BY id LIMIT 1
-            """,
-            (garment_type_id,),
-        )
+        if garment_inventory_id is not None:
+            cursor.execute(
+                """
+                SELECT id, co2eq FROM garments_inventory
+                WHERE id = ? AND type_id = ? AND sold = 0
+                  AND returned_from_garment_id IS NOT NULL
+                  AND disassembled = 0
+                """,
+                (garment_inventory_id, garment_type_id),
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT id, co2eq FROM garments_inventory
+                WHERE type_id = ? AND sold = 0
+                  AND returned_from_garment_id IS NULL
+                ORDER BY id LIMIT 1
+                """,
+                (garment_type_id,),
+            )
         stock = cursor.fetchone()
+        if garment_inventory_id is not None and stock is None:
+            raise HTTPException(
+                status_code=409,
+                detail="Returned garment is no longer available",
+            )
+        is_returned = garment_inventory_id is not None
         fulfillment_type = "stock" if stock else "production"
         status = "Delivering" if stock else "Production requested"
         inventory_id = stock[0] if stock else None
@@ -1507,6 +2018,231 @@ def db_create_order(garment_type_id: int, material_id: int | None = None) -> dic
             "fulfillment_type": fulfillment_type,
             "status": status,
             "event_trigger": event_trigger,
+            "garment_inventory_id": inventory_id,
+            "is_returned": is_returned,
+            "discount_percent": 50 if is_returned else 0,
+            "price_chf": (
+                round(float(garment[1]) * 0.5, 2)
+                if is_returned
+                else float(garment[1])
+            ),
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def db_get_orders() -> list[dict]:
+    """Return orders with the labels needed by the operations dashboard."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT o.id,
+               o.garment_type_id,
+               gt.name,
+               o.material_id,
+               m.name,
+               o.garment_inventory_id,
+               o.fulfillment_type,
+               o.status,
+               o.created_at
+        FROM orders o
+        JOIN garment_types gt ON gt.id = o.garment_type_id
+        LEFT JOIN materials m ON m.id = o.material_id
+        ORDER BY o.created_at DESC, o.id DESC
+        """
+    )
+    orders = [
+        {
+            "id": row[0],
+            "garment_type_id": row[1],
+            "garment": row[2],
+            "material_id": row[3],
+            "material": row[4],
+            "garment_inventory_id": row[5],
+            "fulfillment_type": row[6],
+            "status": row[7],
+            "created_at": row[8],
+        }
+        for row in cursor.fetchall()
+    ]
+    conn.close()
+    return orders
+
+
+def db_ship_order(order_id: int) -> dict:
+    """Complete an order and create its sold garment when production was needed."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")
+    cursor = conn.cursor()
+    try:
+        cursor.execute("BEGIN IMMEDIATE")
+        cursor.execute(
+            """
+            SELECT o.id, o.garment_type_id, gt.name, gt.price_chf,
+                   o.material_id, m.name, o.garment_inventory_id,
+                   o.fulfillment_type, o.status, o.created_at
+            FROM orders o
+            JOIN garment_types gt ON gt.id = o.garment_type_id
+            LEFT JOIN materials m ON m.id = o.material_id
+            WHERE o.id = ?
+            """,
+            (order_id,),
+        )
+        order = cursor.fetchone()
+        if order is None:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        (
+            _,
+            garment_type_id,
+            garment_name,
+            price_chf,
+            material_id,
+            material_name,
+            garment_inventory_id,
+            fulfillment_type,
+            status,
+            created_at,
+        ) = order
+
+        # Shipping is idempotent so a repeated UI request cannot create a
+        # duplicate garment or delivery event.
+        if status == "Completed":
+            conn.commit()
+            return {
+                "id": order_id,
+                "garment_type_id": garment_type_id,
+                "garment": garment_name,
+                "material_id": material_id,
+                "material": material_name,
+                "garment_inventory_id": garment_inventory_id,
+                "fulfillment_type": fulfillment_type,
+                "status": status,
+                "created_at": created_at,
+            }
+
+        if garment_inventory_id is None:
+            cursor.execute(
+                """
+                SELECT co2eq
+                FROM resource_events
+                WHERE order_id = ? AND event_trigger = 'Production'
+                ORDER BY id DESC LIMIT 1
+                """,
+                (order_id,),
+            )
+            production_event = cursor.fetchone()
+            co2eq = production_event[0] if production_event else None
+            cursor.execute(
+                """
+                INSERT INTO garments_inventory (type_id, co2eq, price, sold)
+                VALUES (?, ?, ?, 1)
+                """,
+                (garment_type_id, co2eq, price_chf),
+            )
+            garment_inventory_id = cursor.lastrowid
+
+            # Materialize the garment recipe as first-life inventory blocks.
+            # This keeps the shipped garment usable by CO2 and return flows.
+            cursor.execute(
+                """
+                SELECT fabric_block_id, amount
+                FROM garment_recipe_fabric_blocks
+                WHERE garment_type = ?
+                """,
+                (garment_type_id,),
+            )
+            recipe_blocks = cursor.fetchall()
+            inventory_blocks = [
+                (fabric_block_id, garment_inventory_id, material_id)
+                for fabric_block_id, amount in recipe_blocks
+                for _ in range(int(amount or 0))
+            ]
+            cursor.executemany(
+                """
+                INSERT INTO fabric_blocks_inventory (
+                    type_id, garment_id, material_id, quality, second_life
+                ) VALUES (?, ?, ?, 100, 0)
+                """,
+                inventory_blocks,
+            )
+            cursor.execute(
+                """
+                UPDATE orders
+                SET garment_inventory_id = ?
+                WHERE id = ?
+                """,
+                (garment_inventory_id, order_id),
+            )
+        else:
+            cursor.execute(
+                "UPDATE garments_inventory SET sold = 1 WHERE id = ?",
+                (garment_inventory_id,),
+            )
+
+        cursor.execute(
+            """
+            UPDATE resource_events
+            SET status = 'Completed'
+            WHERE order_id = ? AND event_trigger = 'Production'
+            """,
+            (order_id,),
+        )
+        cursor.execute(
+            """
+            SELECT id FROM resource_events
+            WHERE order_id = ? AND event_trigger = 'Deliver'
+            ORDER BY id DESC LIMIT 1
+            """,
+            (order_id,),
+        )
+        delivery_event = cursor.fetchone()
+        if delivery_event:
+            cursor.execute(
+                "UPDATE resource_events SET status = 'Completed' WHERE id = ?",
+                (delivery_event[0],),
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT id FROM manufacturer_distances
+                WHERE source_role_group = 'garment'
+                  AND source_company <> destination_company
+                ORDER BY id LIMIT 1
+                """
+            )
+            distance = cursor.fetchone()
+            distance_id = distance[0] if distance else None
+            cursor.execute(
+                """
+                INSERT INTO resource_events (
+                    event_trigger, request_type, resource_type, co2eq, status,
+                    lifecycle_edge, manufacturer_distance_id, order_id
+                ) VALUES ('Deliver', 'Order', ?, NULL, 'Completed',
+                          'Deliver', ?, ?)
+                """,
+                (garment_name, distance_id, order_id),
+            )
+
+        cursor.execute(
+            "UPDATE orders SET status = 'Completed' WHERE id = ?",
+            (order_id,),
+        )
+        conn.commit()
+        return {
+            "id": order_id,
+            "garment_type_id": garment_type_id,
+            "garment": garment_name,
+            "material_id": material_id,
+            "material": material_name,
+            "garment_inventory_id": garment_inventory_id,
+            "fulfillment_type": fulfillment_type,
+            "status": "Completed",
+            "created_at": created_at,
         }
     except Exception:
         conn.rollback()

@@ -3,16 +3,36 @@ import requests
 from pathlib import Path
 
 import plotly.graph_objects as go
-from dash import dcc, html
+from dash import ctx, dcc, html, no_update
 from dash.dependencies import Input, Output, State
 
 from ceis_shop import config
 from ceis_shop.layouts.garment import (
     render_co2_content,
+    render_returned_garment_comparison,
     render_waiting_for_material_co2_content,
+)
+from ceis_shop.layouts.scenarios import (
+    render_scenario_explorer,
+    render_scenario_results,
 )
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "ceis_dashboard"))
+
+
+def _remove_returned_garment_option(
+    garment_options: list[dict] | None,
+    garment_id: int,
+) -> tuple[list[dict], int | None]:
+    remaining_options = [
+        option
+        for option in (garment_options or [])
+        if option.get("value") != garment_id
+    ]
+    next_garment_id = (
+        remaining_options[0].get("value") if remaining_options else None
+    )
+    return remaining_options, next_garment_id
 
 
 def get_callbacks(app):
@@ -52,10 +72,76 @@ def get_callbacks(app):
         )
 
     @app.callback(
+        Output("returned-garment-order-result", "children"),
+        Input("returned-garment-order-button", "n_clicks"),
+        State("garment-type-id-store", "data"),
+        State("garment-material-dropdown", "value"),
+        State("returned-garment-dropdown", "value"),
+        prevent_initial_call=True,
+    )
+    def place_returned_garment_order(
+        n_clicks, garment_type_id, material_id, garment_inventory_id
+    ):
+        if not n_clicks:
+            return html.Div()
+        try:
+            response = requests.post(
+                f"{config.BACKEND_API_URL}/orders",
+                json={
+                    "garment_type_id": garment_type_id,
+                    "material_id": material_id,
+                    "garment_inventory_id": garment_inventory_id,
+                },
+                timeout=30,
+            )
+            response.raise_for_status()
+            order = response.json()
+        except Exception as exc:
+            return html.P(f"Unable to order returned garment: {exc}")
+
+        return html.Div(
+            [
+                html.Strong(f"Order #{order['id']}"),
+                html.P(
+                    f"Returned garment reserved for CHF {float(order['price_chf']):.2f}. "
+                    "Delivery has started."
+                ),
+            ],
+            className="panel-muted",
+        )
+
+    @app.callback(
+        Output("returned-garment-comparison", "children"),
+        Input("garment-material-dropdown", "value"),
+        Input("returned-garment-dropdown", "value"),
+        State("garment-type-id-store", "data"),
+    )
+    def update_returned_garment_comparison(
+        material_id, garment_inventory_id, garment_type_id
+    ):
+        if material_id is None:
+            return "Select a material above to compare it with the equivalent new garment."
+        if garment_inventory_id is None:
+            return "No returned garment is currently available."
+        try:
+            response = requests.get(
+                f"{config.BACKEND_API_URL}/garment-types/{garment_type_id}/"
+                f"returned-garments/{garment_inventory_id}/co2-comparison"
+                f"?material_id={material_id}",
+                timeout=30,
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except Exception as exc:
+            return html.P(f"Unable to calculate returned-garment CO2: {exc}")
+
+        return render_returned_garment_comparison(payload)
+
+    @app.callback(
         Output("customer-repair-content", "children"),
         Input("url", "pathname"),
     )
-    def load_customer_repair_content(pathname):
+    def load_end_of_life_content(pathname):
         if pathname != "/scenarios":
             return html.Div()
 
@@ -64,59 +150,215 @@ def get_callbacks(app):
                 f"{config.BACKEND_API_URL}/scenarios",
             )
             response.raise_for_status()
-            body = response.json()
-            scenarios = body
-        except Exception as e:
-            print(f"Error fetching repair CO2 data: {e}")
+            scenarios = response.json()
+        except Exception as exc:
+            print(f"Error fetching repair CO2 data: {exc}")
             return html.Div("Unable to load repair CO2 comparison.")
 
-        # Extract all unique activities across all scenarios
         all_activities = set()
         scenario_activity_map = {}
-
         for scenario in scenarios:
             scenario_label = scenario.get("label", "Scenario")
-            activities = scenario.get("activities", [])
             scenario_activity_map[scenario_label] = {}
-
-            for activity in activities:
+            for activity in scenario.get("activities", []):
                 activity_name = activity.get("name", "Unknown Activity")
                 emission = activity.get("costs", {}).get("co2_kg", 0)
                 scenario_activity_map[scenario_label][activity_name] = emission
                 all_activities.add(activity_name)
 
-        # Sort scenario labels to maintain consistent order
-        scenario_labels = [s.get("label", "Scenario") for s in scenarios]
-
-        # Create bar chart with activities as separate traces
-        fig = go.Figure()
-
+        scenario_labels = [
+            scenario.get("label", "Scenario") for scenario in scenarios
+        ]
+        figure = go.Figure()
         for activity_name in sorted(all_activities):
-            activity_values = []
-            for scenario_label in scenario_labels:
-                emission = scenario_activity_map.get(scenario_label, {}).get(
-                    activity_name, 0
-                )
-                activity_values.append(emission)
-
-            fig.add_bar(
+            figure.add_bar(
                 name=activity_name,
                 x=scenario_labels,
-                y=activity_values,
+                y=[
+                    scenario_activity_map.get(label, {}).get(activity_name, 0)
+                    for label in scenario_labels
+                ],
             )
 
-        fig.update_layout(
+        figure.update_layout(
             barmode="stack",
-            title="CO2 Comparison: Different Repairing Options (replacement of the fabric block 64x40) vs Buying new 'Basic Crop Top'",
+            title=(
+                "CO2 Comparison: Different Repairing Options (replacement of "
+                "the fabric block 64x40) vs Buying new 'Basic Crop Top'"
+            ),
             xaxis_title="Scenario",
             yaxis_title="CO2 (kg CO2eq)",
-            # legend_title_text="Emissions",
-            margin=dict(l=20, r=20, t=40, b=20),
+            margin={"l": 20, "r": 20, "t": 40, "b": 20},
         )
+        return html.Div(dcc.Graph(figure=figure))
+
+    @app.callback(
+        Output("customer-circular-content", "children"),
+        Input("url", "pathname"),
+    )
+    def load_customer_circular_content(pathname):
+        if pathname != "/repair-return":
+            return html.Div()
+
+        try:
+            response = requests.get(
+                f"{config.BACKEND_API_URL}/circular-scenarios/options",
+                timeout=30,
+            )
+            response.raise_for_status()
+            return render_scenario_explorer(response.json())
+        except Exception as exc:
+            print(f"Error fetching circular scenario options: {exc}")
+            return html.Div("Unable to load repair and return comparisons.")
+
+    @app.callback(
+        Output("circular-scenario-results", "children"),
+        Input("circular-garment", "value"),
+        Input("circular-distance", "value"),
+        Input("circular-damage", "value"),
+        Input("circular-use-higher-electricity-factor", "value"),
+    )
+    def update_customer_circular_scenarios(
+        garment_id, distance_km, damage_code, electricity_mode
+    ):
+        if garment_id is None or distance_km is None or damage_code is None:
+            return html.P("Select a garment, distance, and damage type.")
+
+        try:
+            response = requests.get(
+                f"{config.BACKEND_API_URL}/circular-scenarios/{garment_id}",
+                params={
+                    "distance_km": distance_km,
+                    "damage_code": damage_code,
+                    "use_higher_electricity_factor": "higher_factor"
+                    in (electricity_mode or []),
+                },
+                timeout=30,
+            )
+            if response.status_code == 404:
+                return html.Div(
+                    "This garment is no longer available for repair or return "
+                    "scenarios. Select another bought garment."
+                )
+            response.raise_for_status()
+            return render_scenario_results(response.json())
+        except Exception as exc:
+            print(f"Error fetching circular scenario calculation: {exc}")
+            return html.Div("Unable to calculate the selected scenarios.")
+
+    @app.callback(
+        Output("circular-repair-order-result", "children"),
+        Input("order-self-repair-kit", "n_clicks"),
+        Input("request-professional-repair", "n_clicks"),
+        State("circular-garment", "value"),
+        State("circular-damage", "value"),
+        prevent_initial_call=True,
+    )
+    def create_repair_order(
+        _self_repair_clicks,
+        _professional_repair_clicks,
+        garment_id,
+        damage_code,
+    ):
+        actions = {
+            "order-self-repair-kit": "self_repair_kit",
+            "request-professional-repair": "professional_repair",
+        }
+        action = actions.get(ctx.triggered_id)
+        if action is None or garment_id is None or damage_code is None:
+            return html.P("Select a garment and damage type before ordering.")
+
+        try:
+            response = requests.post(
+                f"{config.BACKEND_API_URL}/repairs",
+                json={
+                    "garment_id": garment_id,
+                    "action": action,
+                    "damage_code": damage_code,
+                },
+                timeout=30,
+            )
+            response.raise_for_status()
+            repair = response.json()
+        except Exception as exc:
+            return html.P(f"Unable to create repair request: {exc}")
 
         return html.Div(
-            dcc.Graph(figure=fig),
+            [
+                html.Strong(f"Repair request #{repair['id']}"),
+                html.P(f"{repair['action_label']} · {repair['status']}"),
+            ],
+            className="panel-muted",
         )
+
+    @app.callback(
+        Output("circular-garment-return-result", "children"),
+        Output("circular-garment", "options"),
+        Output("circular-garment", "value"),
+        Input("return-garment-button", "n_clicks"),
+        State("circular-garment", "value"),
+        State("circular-damage", "value"),
+        State("circular-garment", "options"),
+        prevent_initial_call=True,
+    )
+    def return_garment(n_clicks, garment_id, damage_code, garment_options):
+        if not n_clicks or garment_id is None or damage_code is None:
+            return (
+                html.P("Select a garment and damage type before returning it."),
+                no_update,
+                no_update,
+            )
+
+        try:
+            response = requests.post(
+                f"{config.BACKEND_API_URL}/garment-returns",
+                json={
+                    "garment_id": garment_id,
+                    "damage_code": damage_code,
+                },
+                timeout=30,
+            )
+            response.raise_for_status()
+            returned = response.json()
+        except Exception as exc:
+            return html.P(f"Unable to return garment: {exc}"), no_update, no_update
+
+        remaining_options, next_garment_id = _remove_returned_garment_option(
+            garment_options,
+            garment_id,
+        )
+
+        return (
+            html.Div(
+                [
+                    html.Strong(
+                        f"Returned garment #{returned['garment_id']} added to inventory"
+                    ),
+                    html.P(
+                        f"{returned['fabric_block_count']} corresponding fabric blocks "
+                        "were added with the whole-garment processes."
+                    ),
+                ],
+                className="panel-muted",
+            ),
+            remaining_options,
+            next_garment_id,
+        )
+
+    @app.callback(
+        Output("circular-detailed-charts", "hidden"),
+        Output("toggle-circular-charts", "children"),
+        Input("toggle-circular-charts", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def toggle_circular_charts(n_clicks):
+        charts_are_open = bool(n_clicks and n_clicks % 2)
+        button_label = (
+            "Hide detailed bar charts"
+            if charts_are_open
+            else "View detailed bar charts"
+        )
+        return not charts_are_open, button_label
 
     @app.callback(
         Output("garment-co2-content", "children"),

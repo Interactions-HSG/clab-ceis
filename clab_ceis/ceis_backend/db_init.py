@@ -302,9 +302,45 @@ def create_tables(cursor):
             co2eq INTEGER,
             price INTEGER,
             sold INTEGER NOT NULL DEFAULT 0,
-            FOREIGN KEY (type_id) REFERENCES garment_types (id) ON DELETE CASCADE
+            returned_from_garment_id INTEGER,
+            disassembled INTEGER NOT NULL DEFAULT 0,
+            damage_code TEXT,
+            FOREIGN KEY (type_id) REFERENCES garment_types (id) ON DELETE CASCADE,
+            FOREIGN KEY (returned_from_garment_id)
+                REFERENCES garments_inventory (id) ON DELETE SET NULL
         )
     """
+    )
+    cursor.execute("PRAGMA table_info(garments_inventory)")
+    garment_inventory_columns = {row[1] for row in cursor.fetchall()}
+    if "returned_from_garment_id" not in garment_inventory_columns:
+        cursor.execute(
+            """
+            ALTER TABLE garments_inventory
+            ADD COLUMN returned_from_garment_id INTEGER
+                REFERENCES garments_inventory (id) ON DELETE SET NULL
+            """
+        )
+    if "disassembled" not in garment_inventory_columns:
+        cursor.execute(
+            """
+            ALTER TABLE garments_inventory
+            ADD COLUMN disassembled INTEGER NOT NULL DEFAULT 0
+            """
+        )
+    if "damage_code" not in garment_inventory_columns:
+        cursor.execute(
+            """
+            ALTER TABLE garments_inventory
+            ADD COLUMN damage_code TEXT
+            """
+        )
+    cursor.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS one_return_per_garment
+        ON garments_inventory (returned_from_garment_id)
+        WHERE returned_from_garment_id IS NOT NULL
+        """
     )
 
     cursor.execute(
@@ -350,6 +386,29 @@ def create_tables(cursor):
             FOREIGN KEY (garment_id) REFERENCES garments_inventory (id) ON DELETE CASCADE
         )
     """
+    )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS repairs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            garment_inventory_id INTEGER NOT NULL,
+            action TEXT NOT NULL
+                CHECK (action IN ('self_repair_kit', 'professional_repair')),
+            damage_code TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (garment_inventory_id)
+                REFERENCES garments_inventory (id) ON DELETE CASCADE
+        )
+    """
+    )
+    cursor.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS one_pending_repair_per_garment
+        ON repairs (garment_inventory_id)
+        WHERE status = 'pending'
+        """
     )
 
     cursor.execute(

@@ -8,12 +8,19 @@ from ceis_backend.db_init import init_sqlite_db
 from ceis_backend.config import BACKEND_HOST, BACKEND_PORT
 from ceis_backend.utils import (
     get_co2_for_garment,
+    get_returned_garment_co2_comparison,
     calculate_transport_emission,
     build_scenario_activities,
     calculate_replacement_fabric_blocks_emissions,
     refresh_sold_garment_co2_values,
 )
 from ceis_backend.resource_event_emissions import enrich_resource_events_with_co2
+from ceis_backend.circular_scenarios import (
+    DAMAGE_PROFILE_BY_CODE,
+    calculate_circular_scenarios,
+    get_circular_scenario_options,
+    get_return_inventory_processes,
+)
 from ceis_backend.designer_balance import (
     get_designer_garment_reference_data,
     get_designer_balance_options,
@@ -31,6 +38,15 @@ from ceis_backend.queries import (
     db_get_resource_events,
     db_get_supply_chain_graph,
     db_create_order,
+    db_get_orders,
+    db_ship_order,
+    db_create_repair,
+    db_create_garment_return,
+    db_get_available_returned_garments,
+    db_get_returned_garments,
+    db_get_returned_garment,
+    db_disassemble_returned_garment,
+    db_get_repairs,
     db_upsert_material,
     db_delete_garment_recipe,
     db_create_fabric_block_type,
@@ -58,6 +74,8 @@ from ceis_backend.models import (
     MaterialCreate,
     ProcessTypeCreate,
     OrderCreate,
+    RepairCreate,
+    GarmentReturnCreate,
 )
 
 
@@ -149,7 +167,105 @@ def get_resource_events(
 
 @app.post("/orders", status_code=201)
 def create_order(payload: OrderCreate):
-    return db_create_order(payload.garment_type_id, payload.material_id)
+    return db_create_order(
+        payload.garment_type_id,
+        payload.material_id,
+        payload.garment_inventory_id,
+    )
+
+
+@app.get("/orders")
+def get_orders():
+    return db_get_orders()
+
+
+@app.post("/orders/{order_id}/ship")
+def ship_order(order_id: int):
+    return db_ship_order(order_id)
+
+
+@app.get("/garment-types/{garment_type_id}/returned-garments")
+def get_available_returned_garments(garment_type_id: int):
+    return db_get_available_returned_garments(garment_type_id)
+
+
+@app.get(
+    "/garment-types/{garment_type_id}/returned-garments/"
+    "{garment_inventory_id}/co2-comparison"
+)
+def get_returned_garment_comparison(
+    garment_type_id: int,
+    garment_inventory_id: int,
+    material_id: int,
+    wiser_client: WiserClient = Depends(get_wiser_client),
+):
+    return get_returned_garment_co2_comparison(
+        garment_type_id,
+        garment_inventory_id,
+        material_id,
+        wiser_client,
+    )
+
+
+@app.post("/repairs", status_code=201)
+def create_repair(payload: RepairCreate):
+    damage = DAMAGE_PROFILE_BY_CODE.get(payload.damage_code)
+    if damage is None:
+        raise HTTPException(status_code=404, detail="Damage type not found")
+    if not damage.repair_available:
+        raise HTTPException(
+            status_code=422,
+            detail="Repair is not available for this damage type",
+        )
+    return db_create_repair(payload.garment_id, payload.action, payload.damage_code)
+
+
+@app.get("/repairs")
+def get_repairs():
+    return db_get_repairs()
+
+
+@app.post("/garment-returns", status_code=201)
+def create_garment_return(payload: GarmentReturnCreate):
+    processes = get_return_inventory_processes(payload.damage_code)
+    return db_create_garment_return(
+        payload.garment_id,
+        processes,
+        payload.damage_code,
+    )
+
+
+@app.get("/returned-garments")
+def get_returned_garments():
+    return db_get_returned_garments()
+
+
+@app.get("/returned-garments/{garment_id}/return-alternatives")
+def get_returned_garment_alternatives(
+    garment_id: int,
+    distance_km: float,
+    use_higher_electricity_factor: bool = False,
+    wiser_client: WiserClient = Depends(get_wiser_client),
+):
+    garment = db_get_returned_garment(garment_id)
+    if garment is None:
+        raise HTTPException(status_code=404, detail="Returned garment not found")
+    try:
+        return calculate_circular_scenarios(
+            garment_id,
+            distance_km,
+            garment["damage_code"],
+            wiser_client,
+            use_higher_electricity_factor,
+            returned_garment=True,
+        )
+    except WiserClientError as error:
+        _raise_wiser_http_exception(error)
+
+
+@app.post("/returned-garments/{garment_id}/disassemble")
+def disassemble_returned_garment(garment_id: int):
+    return db_disassemble_returned_garment(garment_id)
 
 
 @app.get("/garment-types/{garment_type_id}/materials")
@@ -443,6 +559,31 @@ def get_co2_scenarios(
         )
 
         return scenarios
+    except WiserClientError as error:
+        _raise_wiser_http_exception(error)
+
+
+@app.get("/circular-scenarios/options")
+def get_customer_circular_scenario_options():
+    return get_circular_scenario_options()
+
+
+@app.get("/circular-scenarios/{garment_id}")
+def get_customer_circular_scenarios(
+    garment_id: int,
+    distance_km: float,
+    damage_code: str,
+    use_higher_electricity_factor: bool = False,
+    wiser_client: WiserClient = Depends(get_wiser_client),
+):
+    try:
+        return calculate_circular_scenarios(
+            garment_id,
+            distance_km,
+            damage_code,
+            wiser_client,
+            use_higher_electricity_factor,
+        )
     except WiserClientError as error:
         _raise_wiser_http_exception(error)
 

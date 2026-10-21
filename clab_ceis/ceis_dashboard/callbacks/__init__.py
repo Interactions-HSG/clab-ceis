@@ -7,6 +7,7 @@ from ceis_dashboard.callbacks.fabric_blocks import register_fabric_block_callbac
 from ceis_dashboard.callbacks.garment_designer import (
     register_garment_designer_callbacks,
 )
+from ceis_dashboard.callbacks.orders import register_order_callbacks
 from ceis_dashboard.callbacks.recipe_types import register_recipe_type_callbacks
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     "register_dashboard_table_callbacks",
     "register_fabric_block_callbacks",
     "register_garment_designer_callbacks",
+    "register_order_callbacks",
     "register_recipe_type_callbacks",
 ]

@@ -34,7 +34,6 @@ EVENT_COLUMNS = [
     {"name": "Distance (km)", "id": "distance_km"},
 ]
 
-
 def _event_table(table_id: str, events: list[dict]):
     return dash_table.DataTable(
         id=table_id,
@@ -45,8 +44,6 @@ def _event_table(table_id: str, events: list[dict]):
         style_cell={"textAlign": "center", "padding": "10px"},
         style_header={"fontWeight": "bold"},
     )
-
-
 LIFECYCLE_EDGE_IDS = {
     "Supply": "lifecycle-edge-supply",
     "Deliver": "lifecycle-edge-deliver",

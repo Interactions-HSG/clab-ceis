@@ -125,8 +125,41 @@ def test_shop_backend_scenarios_contains_expected_content(tmp_path):
         assert buy_new["activities"]
         assert any(a.get("name") == "Garment Material" for a in buy_new["activities"])
 
-        repair = next(s for s in scenarios if s.get("label") == "Self repair (materials shipped)")
+        repair = next(
+            s
+            for s in scenarios
+            if s.get("label") == "Self repair (materials shipped)"
+        )
         assert any(a.get("name") == "Fabric Block Material" for a in repair["activities"])
+
+        options_response = requests.get(
+            f"{base_url}/circular-scenarios/options", timeout=10
+        )
+        assert options_response.status_code == 200
+        options = options_response.json()
+        assert options["garments"]
+        assert any(damage["code"] == "small_hole" for damage in options["damages"])
+
+        garment_id = options["garments"][0]["id"]
+        calculation_response = requests.get(
+            f"{base_url}/circular-scenarios/{garment_id}",
+            params={"distance_km": 100, "damage_code": "small_hole"},
+            timeout=10,
+        )
+        assert calculation_response.status_code == 200
+        calculation = calculation_response.json()
+        assert (
+            calculation["repair"]["self_repair"]["shared_repair_co2eq"]
+            == calculation["repair"]["professional_repair"]["shared_repair_co2eq"]
+        )
+        assert calculation["return"]["whole_garment"]["available"] is True
+        assert calculation["return"]["fabric_blocks"]["available"] is True
+        assert calculation["repair"]["self_repair"]["components"]
+        assert calculation["repair"]["new_garment"]["components"]
+        assert calculation["repair"]["new_garment"]["transport"]["legs"] == 1
+        assert calculation["return"]["whole_garment"]["reference_components"]
+        assert calculation["return"]["fabric_blocks"]["reference_components"]
+        assert "recommendation" not in calculation
     finally:
         proc.terminate()
         proc.wait(timeout=10)

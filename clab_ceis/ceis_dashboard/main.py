@@ -80,7 +80,7 @@ class CeisMonitor:
                 except (ValueError, IndexError):
                     return html.Div("Invalid CO2 garment page.")
             # default / or unknown paths -> index
-            return self._index_layout
+            return get_index_layout()
 
 
 def main():

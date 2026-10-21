@@ -20,6 +20,7 @@ from ceis_backend.data.location_details import (
 from ceis_backend.queries import (
     db_get_garment_processes,
     db_get_garment_inventory_processes,
+    db_get_available_returned_garments,
     db_get_inventory_fabric_blocks_for_garment,
     db_get_sold_garments_for_co2,
     db_update_garment_inventory_co2,
@@ -86,6 +87,53 @@ def calculate_process_emissions(
         )
 
     return total_emission, process_details
+
+
+def get_returned_garment_co2_comparison(
+    garment_type_id: int,
+    garment_inventory_id: int,
+    material_id: int,
+    wiser_client: WiserClient,
+) -> dict:
+    """Compare a returned garment's preparation impact with a new garment.
+
+    Returned fabric is second-life, so its embodied and fabric-production
+    emissions are deliberately zero here. Only inventory-specific preparation
+    and repair steps created by the return workflow are counted.
+    """
+    returned_garment = next(
+        (
+            garment
+            for garment in db_get_available_returned_garments(garment_type_id)
+            if garment["id"] == garment_inventory_id
+        ),
+        None,
+    )
+    if returned_garment is None:
+        raise HTTPException(status_code=404, detail="Returned garment not available")
+
+    preparation_total, preparation_details = calculate_process_emissions(
+        wiser_client,
+        db_get_garment_inventory_processes(garment_inventory_id),
+    )
+    db_update_garment_inventory_co2(garment_inventory_id, preparation_total)
+    new_garment = get_co2_for_garment(garment_type_id, wiser_client, material_id)
+    new_total = (
+        new_garment.fabric_blocks.total_emission
+        + new_garment.processes.total_emission
+    )
+    saving = new_total - preparation_total
+
+    return {
+        "garment_inventory_id": garment_inventory_id,
+        "returned_total_co2eq": preparation_total,
+        "new_total_co2eq": new_total,
+        "saving_co2eq": saving,
+        "saving_percent": (saving / new_total * 100) if new_total else 0.0,
+        "fabric_emission_co2eq": 0.0,
+        "fabric_is_second_life": True,
+        "preparation_processes": preparation_details,
+    }
 
 
 def calculate_used_fabric_block_alternative(

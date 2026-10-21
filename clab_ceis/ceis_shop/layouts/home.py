@@ -89,10 +89,20 @@ def home_page():
                     html.P(
                         "Explore repair and return routes for garments at the end of use."
                     ),
-                    dcc.Link(
-                        "View End of Life Options",
-                        href="/scenarios",
-                        className="back-link",
+                    html.Div(
+                        [
+                            dcc.Link(
+                                "View End of Life Options",
+                                href="/scenarios",
+                                className="back-link",
+                            ),
+                            dcc.Link(
+                                "Explore repair and return",
+                                href="/repair-return",
+                                className="back-link",
+                            ),
+                        ],
+                        className="shop-actions",
                     ),
                 ],
             ),
