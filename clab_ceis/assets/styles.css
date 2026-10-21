@@ -626,6 +626,55 @@ ul {
     overflow: hidden;
 }
 
+.orders-table-scroll {
+    overflow-x: auto;
+}
+
+.orders-table {
+    border-collapse: collapse;
+    min-width: 760px;
+    width: 100%;
+}
+
+.orders-table th,
+.orders-table td {
+    border-bottom: 1px solid var(--line);
+    padding: 11px 12px;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.orders-table th {
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.orders-table tbody tr:hover {
+    background: rgba(223, 238, 232, 0.55);
+}
+
+.order-ship-button {
+    min-height: 36px;
+    padding: 7px 12px;
+}
+
+.order-ship-button:disabled {
+    background: var(--surface-soft);
+    border-color: var(--line-strong);
+    box-shadow: none;
+    color: var(--muted);
+    cursor: default;
+    transform: none;
+}
+
+.order-action-status:not(:empty) {
+    color: var(--accent-strong);
+    font-weight: 700;
+    margin-top: 12px;
+}
+
 .assessment-grid {
     display: grid;
     gap: 16px;

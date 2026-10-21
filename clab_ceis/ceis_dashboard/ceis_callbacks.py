@@ -7,6 +7,7 @@ from callbacks import (
     register_dashboard_table_callbacks,
     register_fabric_block_callbacks,
     register_garment_designer_callbacks,
+    register_order_callbacks,
     register_recipe_type_callbacks,
 )
 
@@ -17,4 +18,5 @@ def get_callbacks(app: Dash, data: ceis_data.CeisData) -> None:
     register_co2_callbacks(app, data)
     register_designer_balance_callbacks(app, data)
     register_garment_designer_callbacks(app, data)
+    register_order_callbacks(app, data)
     register_recipe_type_callbacks(app, data)

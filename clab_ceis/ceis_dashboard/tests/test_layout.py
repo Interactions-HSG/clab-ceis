@@ -43,6 +43,7 @@ def test_page_hero_home_link_is_opt_in_for_subpages():
 def test_homepage_shows_pending_repairs_below_fabric_block_form():
     with (
         patch("pages.home.fetch_garment_types", return_value=[]),
+        patch("pages.home.fetch_orders", return_value=[]),
         patch(
             "pages.home.fetch_repairs",
             return_value=[
@@ -68,6 +69,34 @@ def test_homepage_shows_pending_repairs_below_fabric_block_form():
         "Pending Repair Actions"
     )
     assert "Pending Repair Actions" not in str(get_dashboard_layout())
+
+
+def test_homepage_shows_orders_at_top_with_ship_action():
+    with (
+        patch("pages.home.fetch_garment_types", return_value=[]),
+        patch("pages.home.fetch_repairs", return_value=[]),
+        patch(
+            "pages.home.fetch_orders",
+            return_value=[
+                {
+                    "id": 12,
+                    "garment": "Made coat",
+                    "material": "new wool",
+                    "fulfillment_type": "production",
+                    "status": "Production requested",
+                    "created_at": "2026-10-21 12:00:00",
+                }
+            ],
+        ),
+    ):
+        layout = get_index_layout()
+    text = str(layout)
+
+    assert "Orders" in text
+    assert "orders-table-container" in text
+    assert "Made coat" in text
+    assert "ship-order" in text
+    assert text.index("Orders") < text.index("Second-hand Fabric Block Inventory")
 
 
 def test_product_lifecycle_uses_top_to_bottom_flow():

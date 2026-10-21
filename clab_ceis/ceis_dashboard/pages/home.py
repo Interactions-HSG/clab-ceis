@@ -2,7 +2,12 @@ from urllib.parse import quote
 
 from dash import html, dcc, dash_table
 
-from ceis_dashboard.callbacks.api import fetch_garment_types, fetch_repairs
+from ceis_dashboard.callbacks.api import (
+    fetch_garment_types,
+    fetch_orders,
+    fetch_repairs,
+)
+from pages.order_table import render_orders_table
 from pages.ui import app_topbar, page_hero
 
 GARMENT_IMAGE_MAP = {
@@ -30,6 +35,22 @@ REPAIR_COLUMNS = [
 
 
 def get_index_layout():
+    orders = html.Div(
+        [
+            html.H2("Orders"),
+            html.P(
+                "Ship an order after production is ready. Production orders create "
+                "a sold garment inventory record when shipped."
+            ),
+            html.Div(
+                id="orders-table-container",
+                children=render_orders_table(fetch_orders()),
+            ),
+            html.Div(id="order-action-status", className="order-action-status"),
+        ],
+        className="panel table-panel orders-panel",
+    )
+
     inventory_form = html.Div(
         [
             html.H2("Second-hand Fabric Block Inventory"),
@@ -221,6 +242,7 @@ def get_index_layout():
                 "Welcome",
                 "Manage reusable fabric inventory, recipe references, and garment-level assessments from one cockpit.",
             ),
+            orders,
             inventory_form,
             fabric_form,
             repair_actions,

@@ -97,3 +97,29 @@ def test_fetch_repairs_returns_payload(monkeypatch):
     monkeypatch.setattr(api.requests, "get", fake_get)
 
     assert api.fetch_repairs() == payload
+
+
+def test_fetch_orders_returns_payload(monkeypatch):
+    payload = [{"id": 8, "garment": "Coat", "status": "Production requested"}]
+
+    def fake_get(url, timeout):
+        assert url.endswith("/orders")
+        assert timeout == 30
+        return _Response(200, payload)
+
+    monkeypatch.setattr(api.requests, "get", fake_get)
+
+    assert api.fetch_orders() == payload
+
+
+def test_ship_order_posts_action(monkeypatch):
+    payload = {"id": 8, "garment_inventory_id": 21, "status": "Completed"}
+
+    def fake_post(url, timeout):
+        assert url.endswith("/orders/8/ship")
+        assert timeout == 30
+        return _Response(200, payload)
+
+    monkeypatch.setattr(api.requests, "post", fake_post)
+
+    assert api.ship_order(8) == payload

@@ -38,6 +38,8 @@ from ceis_backend.queries import (
     db_get_resource_events,
     db_get_supply_chain_graph,
     db_create_order,
+    db_get_orders,
+    db_ship_order,
     db_create_repair,
     db_create_garment_return,
     db_get_available_returned_garments,
@@ -167,6 +169,16 @@ def create_order(payload: OrderCreate):
         payload.material_id,
         payload.garment_inventory_id,
     )
+
+
+@app.get("/orders")
+def get_orders():
+    return db_get_orders()
+
+
+@app.post("/orders/{order_id}/ship")
+def ship_order(order_id: int):
+    return db_ship_order(order_id)
 
 
 @app.get("/garment-types/{garment_type_id}/returned-garments")

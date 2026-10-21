@@ -111,6 +111,30 @@ def fetch_repairs() -> list[dict]:
         return []
 
 
+def fetch_orders() -> list[dict]:
+    try:
+        resp = requests.get(f"{config.BACKEND_API_URL}/orders", timeout=30)
+        if resp.status_code != 200:
+            return []
+        return resp.json()
+    except Exception:
+        return []
+
+
+def ship_order(order_id: int) -> dict:
+    try:
+        resp = requests.post(
+            f"{config.BACKEND_API_URL}/orders/{order_id}/ship",
+            timeout=30,
+        )
+        if resp.status_code != 200:
+            payload = resp.json()
+            return {"error": payload.get("detail", "Unable to ship order")}
+        return resp.json()
+    except Exception as error:
+        return {"error": str(error)}
+
+
 def fetch_designer_balance_options() -> dict:
     try:
         resp = requests.get(f"{config.BACKEND_API_URL}/designer-balance/options")

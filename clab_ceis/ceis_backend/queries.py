@@ -1905,6 +1905,223 @@ def db_create_order(
         conn.close()
 
 
+def db_get_orders() -> list[dict]:
+    """Return orders with the labels needed by the operations dashboard."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT o.id,
+               o.garment_type_id,
+               gt.name,
+               o.material_id,
+               m.name,
+               o.garment_inventory_id,
+               o.fulfillment_type,
+               o.status,
+               o.created_at
+        FROM orders o
+        JOIN garment_types gt ON gt.id = o.garment_type_id
+        LEFT JOIN materials m ON m.id = o.material_id
+        ORDER BY o.created_at DESC, o.id DESC
+        """
+    )
+    orders = [
+        {
+            "id": row[0],
+            "garment_type_id": row[1],
+            "garment": row[2],
+            "material_id": row[3],
+            "material": row[4],
+            "garment_inventory_id": row[5],
+            "fulfillment_type": row[6],
+            "status": row[7],
+            "created_at": row[8],
+        }
+        for row in cursor.fetchall()
+    ]
+    conn.close()
+    return orders
+
+
+def db_ship_order(order_id: int) -> dict:
+    """Complete an order and create its sold garment when production was needed."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")
+    cursor = conn.cursor()
+    try:
+        cursor.execute("BEGIN IMMEDIATE")
+        cursor.execute(
+            """
+            SELECT o.id, o.garment_type_id, gt.name, gt.price_chf,
+                   o.material_id, m.name, o.garment_inventory_id,
+                   o.fulfillment_type, o.status, o.created_at
+            FROM orders o
+            JOIN garment_types gt ON gt.id = o.garment_type_id
+            LEFT JOIN materials m ON m.id = o.material_id
+            WHERE o.id = ?
+            """,
+            (order_id,),
+        )
+        order = cursor.fetchone()
+        if order is None:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        (
+            _,
+            garment_type_id,
+            garment_name,
+            price_chf,
+            material_id,
+            material_name,
+            garment_inventory_id,
+            fulfillment_type,
+            status,
+            created_at,
+        ) = order
+
+        # Shipping is idempotent so a repeated UI request cannot create a
+        # duplicate garment or delivery event.
+        if status == "Completed":
+            conn.commit()
+            return {
+                "id": order_id,
+                "garment_type_id": garment_type_id,
+                "garment": garment_name,
+                "material_id": material_id,
+                "material": material_name,
+                "garment_inventory_id": garment_inventory_id,
+                "fulfillment_type": fulfillment_type,
+                "status": status,
+                "created_at": created_at,
+            }
+
+        if garment_inventory_id is None:
+            cursor.execute(
+                """
+                SELECT co2eq
+                FROM resource_events
+                WHERE order_id = ? AND event_trigger = 'Production'
+                ORDER BY id DESC LIMIT 1
+                """,
+                (order_id,),
+            )
+            production_event = cursor.fetchone()
+            co2eq = production_event[0] if production_event else None
+            cursor.execute(
+                """
+                INSERT INTO garments_inventory (type_id, co2eq, price, sold)
+                VALUES (?, ?, ?, 1)
+                """,
+                (garment_type_id, co2eq, price_chf),
+            )
+            garment_inventory_id = cursor.lastrowid
+
+            # Materialize the garment recipe as first-life inventory blocks.
+            # This keeps the shipped garment usable by CO2 and return flows.
+            cursor.execute(
+                """
+                SELECT fabric_block_id, amount
+                FROM garment_recipe_fabric_blocks
+                WHERE garment_type = ?
+                """,
+                (garment_type_id,),
+            )
+            recipe_blocks = cursor.fetchall()
+            inventory_blocks = [
+                (fabric_block_id, garment_inventory_id, material_id)
+                for fabric_block_id, amount in recipe_blocks
+                for _ in range(int(amount or 0))
+            ]
+            cursor.executemany(
+                """
+                INSERT INTO fabric_blocks_inventory (
+                    type_id, garment_id, material_id, quality, second_life
+                ) VALUES (?, ?, ?, 100, 0)
+                """,
+                inventory_blocks,
+            )
+            cursor.execute(
+                """
+                UPDATE orders
+                SET garment_inventory_id = ?
+                WHERE id = ?
+                """,
+                (garment_inventory_id, order_id),
+            )
+        else:
+            cursor.execute(
+                "UPDATE garments_inventory SET sold = 1 WHERE id = ?",
+                (garment_inventory_id,),
+            )
+
+        cursor.execute(
+            """
+            UPDATE resource_events
+            SET status = 'Completed'
+            WHERE order_id = ? AND event_trigger = 'Production'
+            """,
+            (order_id,),
+        )
+        cursor.execute(
+            """
+            SELECT id FROM resource_events
+            WHERE order_id = ? AND event_trigger = 'Deliver'
+            ORDER BY id DESC LIMIT 1
+            """,
+            (order_id,),
+        )
+        delivery_event = cursor.fetchone()
+        if delivery_event:
+            cursor.execute(
+                "UPDATE resource_events SET status = 'Completed' WHERE id = ?",
+                (delivery_event[0],),
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT id FROM manufacturer_distances
+                WHERE source_role_group = 'garment'
+                  AND source_company <> destination_company
+                ORDER BY id LIMIT 1
+                """
+            )
+            distance = cursor.fetchone()
+            distance_id = distance[0] if distance else None
+            cursor.execute(
+                """
+                INSERT INTO resource_events (
+                    event_trigger, request_type, resource_type, co2eq, status,
+                    lifecycle_edge, manufacturer_distance_id, order_id
+                ) VALUES ('Deliver', 'Order', ?, NULL, 'Completed',
+                          'Deliver', ?, ?)
+                """,
+                (garment_name, distance_id, order_id),
+            )
+
+        cursor.execute(
+            "UPDATE orders SET status = 'Completed' WHERE id = ?",
+            (order_id,),
+        )
+        conn.commit()
+        return {
+            "id": order_id,
+            "garment_type_id": garment_type_id,
+            "garment": garment_name,
+            "material_id": material_id,
+            "material": material_name,
+            "garment_inventory_id": garment_inventory_id,
+            "fulfillment_type": fulfillment_type,
+            "status": "Completed",
+            "created_at": created_at,
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 def get_used_fabric_block(
     fabric_block_name: str,
     already_used_ids: list[int],
