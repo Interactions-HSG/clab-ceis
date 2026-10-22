@@ -55,7 +55,7 @@ def _build_supply_chain_graph(supply_chain: dict):
                 "data": {
                     "id": role_group,
                     "label": (
-                        f"{actor.get('company', 'Unknown')}\n"
+                        f"{actor.get('alias_name', 'Unknown')}\n"
                         f"{role_group.title()}\n"
                         f"Delay: {actor.get('delay_days', 0)} d"
                     ),
@@ -142,7 +142,10 @@ def _build_supply_chain_leg_cards(supply_chain: dict):
             html.Div(
                 [
                     html.Div(
-                        f"{leg.get('source_company', 'Unknown')} -> {leg.get('destination_company', 'Unknown')}",
+                        (
+                            f"{leg.get('source_alias_name', 'Unknown')} -> "
+                            f"{leg.get('destination_alias_name', 'Unknown')}"
+                        ),
                         className="designer-balance-leg-title",
                     ),
                     html.Div(
@@ -220,7 +223,7 @@ def _build_balance_content(scenario: dict):
                         "Delays",
                         _format_days(summary.get("total_delay_days")),
                         (
-                            f"Highest delay at {highest_delay_actor.get('company', 'N/A')} "
+                            f"Highest delay at {highest_delay_actor.get('alias_name', 'N/A')} "
                             f"({highest_delay_actor.get('role_group', 'n/a')})"
                         ),
                     ),
@@ -266,8 +269,8 @@ def _build_balance_content(scenario: dict):
                             html.H3("Transport Legs"),
                             _build_table(
                                 [
-                                    {"name": "From", "id": "source_company"},
-                                    {"name": "To", "id": "destination_company"},
+                                    {"name": "From", "id": "source_alias_name"},
+                                    {"name": "To", "id": "destination_alias_name"},
                                     {"name": "Distance (km)", "id": "distance_km"},
                                     {"name": "Delay (days)", "id": "delay_days"},
                                     {
@@ -365,8 +368,8 @@ def register_designer_balance_callbacks(app: Dash, data: ceis_data.CeisData) -> 
             supplier_rows = suppliers.get(role_group, [])
             return [
                 {
-                    "label": f"{item['company']} ({item['location']})",
-                    "value": item["company"],
+                    "label": f"{item['alias_name']} ({item['postal_code']})",
+                    "value": item["alias_name"],
                 }
                 for item in supplier_rows
             ]

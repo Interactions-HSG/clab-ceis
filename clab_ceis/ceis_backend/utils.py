@@ -590,7 +590,12 @@ def build_scenario_activities(
 
         # Aggregate process emissions by process name
         for process in detail.get("processes", []):
-            process_name = f"Fabric Block {process.get('process', 'Unknown Process')}"
+            raw_process_name = process.get("process", "Unknown Process")
+            process_name = (
+                "Fabric dyeing"
+                if raw_process_name == "dyeing"
+                else f"Fabric Block {raw_process_name}"
+            )
             process_emission = process.get("emission", 0)
             activity_map[process_name] = (
                 activity_map.get(process_name, 0) + process_emission

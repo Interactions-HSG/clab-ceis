@@ -1500,14 +1500,16 @@ def db_get_manufacturers(role_group: str | None = None) -> list[dict]:
     try:
         if role_group is None:
             cursor.execute("""
-                SELECT company, role, role_group, location
+                SELECT id, company, alias_name, role, role_group, location,
+                       postal_code
                 FROM manufacturers
                 ORDER BY role_group, company
                 """)
         else:
             cursor.execute(
                 """
-                SELECT company, role, role_group, location
+                SELECT id, company, alias_name, role, role_group, location,
+                       postal_code
                 FROM manufacturers
                 WHERE role_group = ?
                 ORDER BY company
@@ -1517,10 +1519,13 @@ def db_get_manufacturers(role_group: str | None = None) -> list[dict]:
         rows = cursor.fetchall()
         return [
             {
-                "company": row[0],
-                "role": row[1],
-                "role_group": row[2],
-                "location": row[3],
+                "id": row[0],
+                "company": row[1],
+                "alias_name": row[2] or f"Anonymous manufacturer {row[0]}",
+                "role": row[3],
+                "role_group": row[4],
+                "location": row[5],
+                "postal_code": row[6] or "",
             }
             for row in rows
         ]
@@ -1535,23 +1540,28 @@ def db_get_supply_chain_graph() -> dict:
     try:
         cursor.execute(
             """
-            SELECT id, company, role, role_group, location
+            SELECT id, company, alias_name, role, role_group, postal_code
             FROM manufacturers
             ORDER BY role_group, company
             """
         )
+        manufacturer_rows = cursor.fetchall()
         nodes = [
             {
                 "id": row[0],
-                "company": row[1],
-                "role": row[2],
-                "role_group": row[3],
-                "location": row[4],
+                "alias_name": row[2] or f"Anonymous manufacturer {row[0]}",
+                "role": row[3],
+                "role_group": row[4],
+                "postal_code": row[5] or "",
             }
-            for row in cursor.fetchall()
+            for row in manufacturer_rows
         ]
         manufacturer_ids = {
-            (node["company"], node["role_group"]): node["id"] for node in nodes
+            (row[1], row[4]): row[0] for row in manufacturer_rows
+        }
+        manufacturer_aliases = {
+            (row[1], row[4]): row[2] or f"Anonymous manufacturer {row[0]}"
+            for row in manufacturer_rows
         }
         cursor.execute(
             """
@@ -1567,8 +1577,8 @@ def db_get_supply_chain_graph() -> dict:
                 "id": row[0],
                 "source_manufacturer_id": manufacturer_ids.get((row[1], row[2])),
                 "destination_manufacturer_id": manufacturer_ids.get((row[3], row[4])),
-                "source_company": row[1],
-                "destination_company": row[3],
+                "source_alias_name": manufacturer_aliases.get((row[1], row[2])),
+                "destination_alias_name": manufacturer_aliases.get((row[3], row[4])),
                 "distance_km": float(row[5]),
             }
             for row in cursor.fetchall()
@@ -1661,13 +1671,24 @@ def db_get_resource_events(
                    re.lifecycle_node, re.lifecycle_edge,
                    re.manufacturer_id, re.manufacturer_distance_id,
                    re.material_id,
-                   m.company,
-                   md.source_company, md.destination_company, md.distance_km,
+                   COALESCE(NULLIF(m.alias_name, ''),
+                            'Anonymous manufacturer ' || m.id),
+                   COALESCE(NULLIF(source_m.alias_name, ''),
+                            'Anonymous manufacturer ' || source_m.id),
+                   COALESCE(NULLIF(destination_m.alias_name, ''),
+                            'Anonymous manufacturer ' || destination_m.id),
+                   md.distance_km,
                    material.name
             FROM resource_events re
             LEFT JOIN manufacturers m ON m.id = re.manufacturer_id
             LEFT JOIN manufacturer_distances md
                    ON md.id = re.manufacturer_distance_id
+            LEFT JOIN manufacturers source_m
+                   ON source_m.company = md.source_company
+                  AND source_m.role_group = md.source_role_group
+            LEFT JOIN manufacturers destination_m
+                   ON destination_m.company = md.destination_company
+                  AND destination_m.role_group = md.destination_role_group
             LEFT JOIN materials material ON material.id = re.material_id
             {where_clause}
             ORDER BY re.timestamp DESC, re.id DESC

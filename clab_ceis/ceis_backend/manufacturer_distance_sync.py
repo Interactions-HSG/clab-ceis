@@ -25,9 +25,11 @@ NOMINATIM_MIN_INTERVAL_SEC = float(os.getenv("CEIS_NOMINATIM_MIN_INTERVAL_SEC", 
 @dataclass
 class Manufacturer:
     company: str
+    alias_name: str
     role: str
     role_group: str
     location: str
+    postal_code: str
 
 
 class _RateLimiter:
@@ -61,6 +63,12 @@ def _normalize_role(role: str) -> str | None:
     if "repair" in role_lower:
         return "repair"
     return None
+
+
+def _extract_postal_code(location: str) -> str:
+    """Return only the postal code from a free-form manufacturer address."""
+    match = re.search(r"(?:\b[A-Z]{1,2}\s*-\s*)?(\d{4,5})\b", location)
+    return match.group(1) if match else ""
 
 
 def _candidate_geocode_queries(location: str) -> list[str]:
@@ -179,21 +187,29 @@ def _load_distance_cache_from_db(
 
 def _load_manufacturers(csv_path: Path) -> list[Manufacturer]:
     manufacturers: list[Manufacturer] = []
+    generated_aliases: dict[str, str] = {}
     with csv_path.open(newline="", encoding="utf-8") as csv_file:
         reader = csv.DictReader(csv_file)
         for row in reader:
             company = (row.get("COMPANY") or "").strip()
+            alias_name = (row.get("ALIAS NAME") or "").strip()
             role = (row.get("ROLE") or "").strip()
             location = (row.get("LOCATION") or "").strip()
             role_group = _normalize_role(role)
             if not company or not role_group or not location:
                 continue
+            if not alias_name:
+                alias_name = generated_aliases.setdefault(
+                    company, f"Anonymous manufacturer {len(generated_aliases) + 1}"
+                )
             manufacturers.append(
                 Manufacturer(
                     company=company,
+                    alias_name=alias_name,
                     role=role,
                     role_group=role_group,
                     location=location,
+                    postal_code=_extract_postal_code(location),
                 )
             )
     return manufacturers
@@ -376,10 +392,22 @@ def sync_manufacturer_distances_if_changed() -> dict:
     cursor.execute("DELETE FROM manufacturers")
     cursor.executemany(
         """
-        INSERT INTO manufacturers (company, role, role_group, location)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO manufacturers (
+            company, alias_name, role, role_group, location, postal_code
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
         """,
-        [(m.company, m.role, m.role_group, m.location) for m in manufacturers],
+        [
+            (
+                m.company,
+                m.alias_name,
+                m.role,
+                m.role_group,
+                m.location,
+                m.postal_code,
+            )
+            for m in manufacturers
+        ],
     )
 
     if distance_rows:

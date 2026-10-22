@@ -11,6 +11,7 @@ from ceis_shop.layouts.scenarios import (
     scenarios_page,
 )
 from ceis_shop.layouts.garment import (
+    _render_returned_garment_offer,
     _format_condition,
     garment_page,
     render_co2_content,
@@ -42,7 +43,8 @@ def test_home_page_contains_expected_links():
         layout = home_page()
         text = str(layout)
 
-    assert "Welcome to Our Clothing Order Website" in text
+    assert "Choose clothes with a life beyond the first wear." in text
+    assert "The collection" in text
     assert "/garment/1" in text
     assert "/garment/2" in text
     assert "/scenarios" in text
@@ -51,12 +53,50 @@ def test_home_page_contains_expected_links():
     assert "shop-home-button" not in text
 
 
+def test_home_page_hides_products_without_pictures():
+    with patch("ceis_shop.layouts.home.requests.get") as mocked_get:
+        mocked_response = Mock()
+        mocked_response.json.return_value = [
+            {"id": 1, "name": "Basic Trousers"},
+            {"id": 99, "name": "Garment Without A Picture"},
+        ]
+        mocked_response.raise_for_status.return_value = None
+        mocked_get.return_value = mocked_response
+
+        text = str(home_page())
+
+    assert "/garment/1" in text
+    assert "Basic Trousers" in text
+    assert "/garment/99" not in text
+    assert "Garment Without A Picture" not in text
+
+
+def test_home_page_shows_second_collection_before_first_collection():
+    with patch("ceis_shop.layouts.home.requests.get") as mocked_get:
+        mocked_response = Mock()
+        mocked_response.json.return_value = [
+            {"id": 1, "name": "Orka jacket"},
+            {"id": 2, "name": "Wrap Skirt"},
+            {"id": 3, "name": "Mangata Dress"},
+            {"id": 4, "name": "Basic Trousers"},
+        ]
+        mocked_response.raise_for_status.return_value = None
+        mocked_get.return_value = mocked_response
+
+        text = str(home_page())
+
+    assert text.index("Second collection") < text.index("First collection")
+    assert text.index("Basic Trousers") < text.index("Wrap Skirt")
+    assert text.index("Wrap Skirt") < text.index("Mangata Dress")
+    assert text.index("Mangata Dress") < text.index("Orka jacket")
+
+
 def test_scenarios_page_contains_scenarios_section():
     layout = scenarios_page()
     text = str(layout)
 
-    assert "End of Life Options" in text
-    assert "Manufacturer: Bucharest" in text
+    assert "Understand the impact of what comes next" in text
+    assert "Production in Bucharest" in text
     assert "customer-repair-content" in text
     assert "page-home-link" in text
     assert "shop-home-button" in text
@@ -64,11 +104,11 @@ def test_scenarios_page_contains_scenarios_section():
     assert "Back to Home" not in text
 
 
-def test_repair_return_page_is_separate_from_end_of_life_page():
+def test_repair_return_page_is_separate_from_end_of_cycle_page():
     layout = repair_return_page()
     text = str(layout)
 
-    assert "Repair and return scenarios" in text
+    assert "Find the best next step for your garment" in text
     assert "customer-circular-content" in text
     assert "/repair-return" in text
     assert "Manufacturer: Bucharest" not in text
@@ -88,9 +128,10 @@ def test_scenario_explorer_uses_bought_garment_and_damage_options():
     text = str(layout)
 
     assert "circular-garment" in text
-    assert "Bought garment" in text
-    assert "Sold garment" not in text
-    assert "Basic Crop Top · garment #7" in text
+    assert "Your garment" in text
+    assert "Bought garment" not in text
+    assert "Basic Crop Top" in text
+    assert "garment #7" not in text
     assert "circular-distance" in text
     assert "value=1000" in text
     assert "circular-damage" in text
@@ -175,11 +216,16 @@ def test_scenario_results_show_alternatives_without_recommendation():
     assert "circular-garment-return-result" not in text
     assert "Expected CO2 saving" in text
     assert "1.200 kg CO2eq" in text
-    assert "0.300 kg CO2eq needed for transport, repair, and preparation" in text
+    assert (
+        "Reusing this garment saves 1.200 kg CO2eq compared with buying a new one."
+        in text
+    )
+    assert "Transport, repair, and preparation add 0.300 kg CO2eq." in text
     assert "Reuse whole garment" not in text
     assert "Recover fabric blocks" not in text
     assert text.index("Expected CO2 saving") < text.index("return-garment-button")
-    assert "Blocks to replace: 1" in text
+    assert "Pieces to replace: 1" in text
+    assert "#7" not in text
     assert "View detailed bar charts" in text
     assert "circular-detailed-charts" in text
     assert "repair-component-chart" in text
@@ -273,10 +319,10 @@ def test_garment_page_contains_recipe_and_co2_sections():
         layout = garment_page(1)
         text = str(layout)
 
-    assert "Fabric Blocks" in text
-    assert "CO2 Emissions" in text
+    assert "Cut efficiently, built for longevity" in text
+    assert "See your price and impact" in text
     assert "Select a material to view recipe details." not in text
-    assert "Select a material to view CO2 emissions." in text
+    assert "Choose a material to reveal available second-life alternatives" in text
     assert "garment-material-dropdown" in text
     assert "garment-order-button" in text
     assert "garment-order-result" in text
@@ -315,7 +361,7 @@ def test_garment_page_auto_uses_single_material_for_co2_without_blocking_layout(
         layout = garment_page(1)
         text = str(layout)
 
-    assert "Select a material to view CO2 emissions." in text
+    assert "Choose a material to reveal available second-life alternatives" in text
     assert "value=1" in text
     assert mocked_get.call_count == 4
 
@@ -343,11 +389,39 @@ def test_garment_page_shows_available_returned_garment_at_half_price():
     with patch("ceis_shop.layouts.garment.requests.get", side_effect=responses):
         text = str(garment_page(1))
 
-    assert "Returned garment available" in text
-    assert "50% discount from CHF 100.00" in text
-    assert "Price: CHF 50.00" in text
-    assert "second-life fabric" in text
+    assert "Give a returned garment its next life" in text
+    assert "50% OFF" in text
+    assert "CHF 50.00" in text
+    assert "CHF 100.00" in text
+    assert "no new fabric required" in text
+    assert "#42" not in text
     assert "returned-garment-order-button" in text
+
+
+def test_returned_garment_offer_only_shows_first_available_option():
+    text = str(
+        _render_returned_garment_offer(
+            [
+                {
+                    "id": 42,
+                    "garment": "Basic Trousers",
+                    "base_price_chf": 100.0,
+                    "price_chf": 50.0,
+                },
+                {
+                    "id": 43,
+                    "garment": "Basic Trousers backup",
+                    "base_price_chf": 120.0,
+                    "price_chf": 60.0,
+                },
+            ]
+        )
+    )
+
+    assert "Second-life Basic Trousers" in text
+    assert "Basic Trousers backup" not in text
+    assert "value=42" in text
+    assert "value=43" not in text
 
 
 def test_returned_garment_comparison_explains_zero_fabric_emissions():
@@ -365,10 +439,12 @@ def test_returned_garment_comparison_explains_zero_fabric_emissions():
         )
     )
 
-    assert "Returned garment: 0.140 kg CO2eq" in text
-    assert "Equivalent new garment: 2.000 kg CO2eq" in text
-    assert "Second-life fabric: 0.000 kg CO2eq" in text
-    assert "steaming: 0.138 kg CO2eq" in text
+    assert "Second-life garment" in text
+    assert "0.140 kg CO2eq" in text
+    assert "Equivalent new" in text
+    assert "2.000 kg CO2eq" in text
+    assert "preparation details" not in text.lower()
+    assert "steaming" not in text
 
 
 def test_render_co2_content_shows_alternatives_and_capped_discount():
@@ -432,25 +508,21 @@ def test_render_co2_content_shows_alternatives_and_capped_discount():
 
     text = str(layout)
 
-    assert (
-        "80x64 can be replaced by a second-life cotton block in very good condition"
-        in text
-    )
-    assert (
-        "64x40 can be replaced by a second-life linen block in excellent condition"
-        in text
-    )
-    assert (
-        "32x32 can be replaced by a second-life wool block in good condition" in text
-    )
+    assert "Second-life cotton" in text
+    assert "very good condition" in text
+    assert "Second-life linen" in text
+    assert "excellent condition" in text
+    assert "Second-life wool" in text
+    assert "good condition" in text
     assert "with quality" not in text
-    assert "16x16 can be replaced" not in text
-    assert (
-        "Choosing the available alternative fabric blocks would reduce this to "
-        "1.450 kg CO2eq, saving 1.550 kg CO2eq." in text
-    )
-    assert "Price: CHF 40.00 (60% discount from CHF 100.00)" in text
-    assert "Fabric rate: CHF 5.04/m²." in text
+    assert "Second-life silk" not in text
+    assert "save 1.550 kg CO2eq" in text
+    assert "SAVE 60%" in text
+    assert "CHF 40.00" in text
+    assert "CHF 100.00" in text
+    assert "/m²" not in text
+    assert "80x64" not in text
+    assert "64x40" not in text
 
 
 def test_format_condition_uses_clear_quality_bands():
@@ -484,4 +556,4 @@ def test_render_co2_content_shows_no_savings_message_without_replacements():
 
     text = str(layout)
 
-    assert "No CO2-saving fabric block alternatives available." in text
+    assert "No second-life fabric available right now" in text

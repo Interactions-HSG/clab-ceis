@@ -10,7 +10,7 @@ of producers anymore, but it is held by participants along the whole value chain
 consumers. Therefore, the data is highly heterogeneous and fragmented. The Circular Economy
 Information Systems (CEIS) is our research platform to exploring the future of CE and to finding
 solutions to these challenges through hands-on digital innovation. Current CEIS demonstrators
-integrate CO2 footprint assessments and end-of-life scenario calculations across regional repair
+integrate CO2 footprint assessments and end-of-cycle scenario calculations across regional repair
 networks, enabling stakeholders to compare environmental impacts of repair, recirculation, and new
 production — bridging fragmented value-chain data into actionable circular decisions.
 

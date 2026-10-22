@@ -5,7 +5,7 @@ import requests
 from dash import dcc, html
 
 from ceis_shop import config
-from ceis_shop.layouts.ui import shop_home_link
+from ceis_shop.layouts.ui import shop_home_link, shop_topbar
 
 # Map seeded garments to existing shop asset photos where available.
 GARMENT_IMAGE_MAP = {
@@ -28,7 +28,7 @@ def _fetch_json(path: str):
     return response.json()
 
 
-def _format_fabric_blocks(recipe_payload: list[dict]) -> list[html.Li]:
+def _format_fabric_blocks(recipe_payload: list[dict]) -> tuple[int, int]:
     block_counter: Counter[str] = Counter()
     for index, detail in enumerate(recipe_payload):
         block_name = detail.get("fabric_block")
@@ -45,21 +45,26 @@ def _format_fabric_blocks(recipe_payload: list[dict]) -> list[html.Li]:
 
         block_counter[block_name] += amount
 
-    return [
-        html.Li(f"{block_name} x {count}")
-        for block_name, count in sorted(block_counter.items())
-    ]
+    return sum(block_counter.values()), len(block_counter)
 
 
 def render_recipe_content(recipe_payload: list[dict]) -> html.Div:
-    fabric_blocks = _format_fabric_blocks(recipe_payload)
+    piece_count, shape_count = _format_fabric_blocks(recipe_payload)
 
     return html.Div(
         children=[
-            html.H3("Fabric Blocks"),
-            html.Ul(fabric_blocks or [html.Li("No fabric blocks found.")]),
+            html.Div("How it is made", className="section-eyebrow"),
+            html.H3("Cut efficiently, built for longevity"),
+            html.P(
+                (
+                    f"This garment is assembled from {piece_count} fabric pieces "
+                    f"across {shape_count} cut shapes."
+                    if piece_count
+                    else "Construction information is not available yet."
+                )
+            ),
         ],
-        className="panel-muted",
+        className="construction-summary",
     )
 
 
@@ -89,8 +94,8 @@ def _format_condition(quality: float) -> str:
     return "fair condition"
 
 
-def _build_alternative_fabric_block_items(co2_payload: dict) -> list[html.Li]:
-    items: list[html.Li] = []
+def _build_alternative_fabric_block_items(co2_payload: dict) -> list[html.Div]:
+    items: list[html.Div] = []
 
     for detail in co2_payload.get("fabric_blocks", {}).get("details", []):
         alternative = detail.get("alternative") or {}
@@ -105,10 +110,12 @@ def _build_alternative_fabric_block_items(co2_payload: dict) -> list[html.Li]:
             continue
 
         items.append(
-            html.Li(
-                f"{detail.get('fabric_block', 'Unknown')} can be replaced by a "
-                f"second-life {alternative_material} block "
-                f"in {_format_condition(quality_score)}"
+            html.Div(
+                [
+                    html.Strong(f"Second-life {alternative_material}"),
+                    html.Span(_format_condition(quality_score)),
+                ],
+                className="alternative-item",
             )
         )
 
@@ -157,48 +164,101 @@ def render_co2_content(
 
     return html.Div(
         children=[
-            html.H3("CO2 Emissions"),
-            html.P(f"Material for CO2 calculation: {selected_material_name}."),
             (
-                html.P(f"Fabric rate: CHF {material_cost_per_sqm_chf:.2f}/m².")
-                if material_cost_per_sqm_chf is not None
-                else html.P("Fabric rate unavailable.")
-            ),
-            html.P(f"Total: {total_emission:.3f} kg CO2eq"),
-            (
-                html.P(
-                    "Choosing the available alternative fabric blocks would reduce "
-                    f"this to {alternative_emission:.3f} kg CO2eq, saving "
-                    f"{co2_saved:.3f} kg CO2eq."
+                html.Section(
+                    [
+                        html.Div(
+                            f"SAVE {int(discount_rate * 100)}%",
+                            className="discount-badge",
+                        ),
+                        html.Div(
+                            [
+                                html.Div(
+                                    [
+                                        html.Div(
+                                            "Best circular choice",
+                                            className="section-eyebrow",
+                                        ),
+                                        html.H3(
+                                            "Choose available second-life fabric"
+                                        ),
+                                        html.P(
+                                            f"Pay CHF {discounted_price:.2f} instead of CHF {base_price_chf:.2f} and save {co2_saved:.3f} kg CO2eq.",
+                                            className="alternative-lead",
+                                        ),
+                                    ]
+                                ),
+                                html.Div(
+                                    [
+                                        html.Span(
+                                            f"CHF {discounted_price:.2f}",
+                                            className="discount-price",
+                                        ),
+                                        html.Span(
+                                            f"CHF {base_price_chf:.2f}",
+                                            className="original-price",
+                                        ),
+                                    ],
+                                    className="price-stack",
+                                ),
+                            ],
+                            className="alternative-offer-heading",
+                        ),
+                        html.Div(alternative_items, className="alternative-list"),
+                        html.P(
+                            f"Estimated impact: {alternative_emission:.3f} kg CO2eq with the currently available alternatives.",
+                            className="alternative-impact",
+                        ),
+                    ],
+                    className="alternative-offer",
                 )
-                if alternative_emission is not None and co2_saved is not None
-                else html.P("No CO2-saving fabric block alternatives available.")
-            ),
-            html.H3("Alternatives"),
-            html.Ul(
-                alternative_items
-                or [html.Li("No second-life fabric block replacements available.")]
-            ),
-            (
-                html.P(
-                    f"Price: CHF {discounted_price:.2f} "
-                    f"({int(discount_rate * 100)}% discount from CHF {base_price_chf:.2f})"
+                if alternative_emission is not None
+                and co2_saved is not None
+                and discounted_price is not None
+                and alternative_items
+                else html.Div(
+                    [
+                        html.H3("No second-life fabric available right now"),
+                        html.P(
+                            "You can still order this garment in your selected material."
+                        ),
+                    ],
+                    className="availability-note",
                 )
-                if discounted_price is not None
-                else html.P("Price unavailable.")
+            ),
+            html.Div(
+                [
+                    html.Div(
+                        [
+                            html.Span("Selected material", className="impact-label"),
+                            html.Strong(selected_material_name),
+                        ],
+                        className="impact-stat",
+                    ),
+                    html.Div(
+                        [
+                            html.Span("Estimated impact", className="impact-label"),
+                            html.Strong(f"{total_emission:.3f} kg CO2eq"),
+                        ],
+                        className="impact-stat",
+                    ),
+                ],
+                className="impact-strip",
             ),
         ],
-        className="panel-muted",
+        className="purchase-impact",
     )
 
 
 def render_waiting_for_material_co2_content() -> html.Div:
     return html.Div(
         [
-            html.H3("CO2 Emissions"),
-            html.P("Select a material to view CO2 emissions."),
+            html.H3("See your price and impact"),
+            html.P(
+                "Choose a material to reveal available second-life alternatives and savings."
+            ),
         ],
-        className="panel-muted",
+        className="availability-note",
     )
 
 
@@ -208,29 +268,41 @@ def render_returned_garment_comparison(payload: dict) -> html.Div:
     new_total = float(payload["new_total_co2eq"])
     saving = float(payload["saving_co2eq"])
     saving_percent = float(payload["saving_percent"])
-    process_items = [
-        html.Li(
-            f"{process['process']}: {float(process['emission']):.3f} kg CO2eq"
-        )
-        for process in payload.get("preparation_processes", [])
-    ]
 
     return html.Div(
         [
-            html.H3("CO2 comparison to a new garment"),
-            html.P(
-                f"Returned garment: {returned_total:.3f} kg CO2eq "
-                "(repair and preparation only)."
+            html.Div(
+                [
+                    html.Div(
+                        [
+                            html.Span("CO2 saved", className="impact-label"),
+                            html.Strong(
+                                f"{saving:.3f} kg ({saving_percent:.1f}%)"
+                            ),
+                        ],
+                        className="impact-stat positive",
+                    ),
+                    html.Div(
+                        [
+                            html.Span(
+                                "Second-life garment", className="impact-label"
+                            ),
+                            html.Strong(f"{returned_total:.3f} kg CO2eq"),
+                        ],
+                        className="impact-stat",
+                    ),
+                    html.Div(
+                        [
+                            html.Span("Equivalent new", className="impact-label"),
+                            html.Strong(f"{new_total:.3f} kg CO2eq"),
+                        ],
+                        className="impact-stat",
+                    ),
+                ],
+                className="impact-strip",
             ),
-            html.P(f"Equivalent new garment: {new_total:.3f} kg CO2eq."),
-            html.P(
-                f"CO2 saving: {saving:.3f} kg CO2eq ({saving_percent:.1f}%)."
-            ),
-            html.P("Second-life fabric: 0.000 kg CO2eq."),
-            html.H4("Preparation steps"),
-            html.Ul(process_items or [html.Li("No preparation steps recorded.")]),
         ],
-        className="panel-muted",
+        className="returned-impact-comparison",
     )
 
 
@@ -254,34 +326,46 @@ def _render_returned_garment_offer(returned_garments: list[dict]) -> html.Div:
     selected = returned_garments[0]
     options = [
         {
-            "label": f"Returned {garment['garment']} #{garment['id']}",
-            "value": garment["id"],
+            "label": f"Second-life {selected['garment']}",
+            "value": selected["id"],
         }
-        for garment in returned_garments
     ]
     return html.Div(
         [
-            html.Div("SECOND-LIFE OFFER", className="shop-kicker"),
-            html.H2("Returned garment available"),
+            html.Div("50% OFF · ONE AVAILABLE", className="discount-badge"),
+            html.Div("Whole-garment alternative", className="section-eyebrow"),
+            html.H2("Give a returned garment its next life"),
             html.P(
-                "This whole garment has already been returned and prepared for "
-                "another life."
+                "Professionally prepared and ready to wear, with no new fabric required."
             ),
             dcc.Dropdown(
                 id="returned-garment-dropdown",
                 options=options,
                 value=selected["id"],
                 clearable=False,
+                disabled=True,
+            ),
+            html.Div(
+                [
+                    html.Span(
+                        f"CHF {float(selected['price_chf']):.2f}",
+                        className="discount-price",
+                    ),
+                    html.Span(
+                        f"CHF {float(selected['base_price_chf']):.2f}",
+                        className="original-price",
+                    ),
+                ],
+                className="price-stack horizontal",
             ),
             html.P(
-                f"Price: CHF {float(selected['price_chf']):.2f} "
-                f"(50% discount from CHF {float(selected['base_price_chf']):.2f})."
+                "Choosing the returned garment avoids new-fabric emissions.",
+                className="alternative-impact",
             ),
-            html.P("The second-life fabric contributes 0.000 kg CO2eq."),
             html.Div(
                 "Select a material above to compare it with the equivalent new garment.",
                 id="returned-garment-comparison",
-                className="panel-muted",
+                className="returned-comparison-slot",
             ),
             html.Button(
                 "Order returned garment",
@@ -292,14 +376,20 @@ def _render_returned_garment_offer(returned_garments: list[dict]) -> html.Div:
             html.Div(id="returned-garment-order-result"),
         ],
         id="returned-garment-offer",
-        className="panel-muted",
+        className="returned-garment-offer",
     )
 
 
 def _image_component(garment_name: str):
     file_name = GARMENT_IMAGE_MAP.get(garment_name)
     if not file_name:
-        return html.Div("No image available.", className="product-image-fallback")
+        return html.Div(
+            [
+                html.Span("CL", className="fallback-monogram"),
+                html.Span(garment_name, className="fallback-name"),
+            ],
+            className="product-image-fallback",
+        )
 
     encoded_name = quote(file_name)
     return html.Img(
@@ -321,7 +411,7 @@ def garment_page(garment_type_id: int):
         if not materials:
             return html.Div(
                 [
-                    _shop_topbar(),
+                    shop_topbar("shop"),
                     html.Section(
                         [
                             html.Div(
@@ -343,17 +433,11 @@ def garment_page(garment_type_id: int):
                     ),
                     html.P("No materials configured for this garment."),
                 ],
-                className="product-detail",
+                className="product-detail shop-page garment-page",
             )
 
         material_options = [
-            {
-                "label": (
-                    f"{material['name']} "
-                    f"(CHF {float(material['cost_per_sqm_chf']):.2f}/m²)"
-                ),
-                "value": material["id"],
-            }
+            {"label": material["name"], "value": material["id"]}
             for material in materials
         ]
         selected_material = materials[0] if len(materials) == 1 else None
@@ -368,10 +452,11 @@ def garment_page(garment_type_id: int):
         except Exception as exc:
             recipe_content = html.Div(
                 [
-                    html.H3("Fabric Blocks"),
-                    html.P("Unable to load recipe details."),
+                    html.H3("How it is made"),
+                    html.P("Construction details are unavailable right now."),
                     html.P(str(exc)),
-                ]
+                ],
+                className="construction-summary",
             )
         try:
             returned_garments = _fetch_json(
@@ -382,19 +467,19 @@ def garment_page(garment_type_id: int):
         initial_co2_content = render_waiting_for_material_co2_content()
 
         return html.Div(
-            className="product-detail",
+            className="product-detail shop-page garment-page",
             children=[
-                _shop_topbar(),
+                shop_topbar("shop"),
                 html.Section(
                     [
                         html.Div(
                             [
                                 html.Div(
-                                    "Garment configurator", className="shop-kicker"
+                                    "Circular garment", className="shop-kicker"
                                 ),
                                 html.H1(garment["name"], className="product-title"),
                                 html.P(
-                                    "Review the material choice, bill of fabric blocks, circular substitutions, and estimated climate impact.",
+                                    "Choose your material, compare its impact, and check whether a lower-price second-life option is available.",
                                     className="shop-intro",
                                 ),
                             ],
@@ -409,19 +494,6 @@ def garment_page(garment_type_id: int):
                 dcc.Store(id="garment-base-price-store", data=garment.get("price_chf")),
                 dcc.Store(id="returned-garments-store", data=returned_garments),
                 html.Div(
-                    [
-                        html.Label("Material", htmlFor="garment-material-dropdown"),
-                        dcc.Dropdown(
-                            id="garment-material-dropdown",
-                            options=material_options,
-                            value=selected_material_id,
-                            placeholder="Select a material",
-                            clearable=True,
-                        ),
-                    ],
-                    className="field-panel",
-                ),
-                html.Div(
                     className="product-content",
                     children=[
                         html.Div(
@@ -435,20 +507,42 @@ def garment_page(garment_type_id: int):
                                     html.Div(
                                         [
                                             html.Div(
-                                                "Base price", className="metric-title"
+                                                "Garment price",
+                                                className="purchase-price-label",
                                             ),
                                             html.Div(
                                                 f"CHF {float(garment['price_chf']):.2f}",
-                                                className="metric-value",
+                                                className="purchase-price",
+                                            ),
+                                            html.P(
+                                                "Second-life materials may unlock a lower price after you choose a material.",
+                                                className="purchase-price-note",
                                             ),
                                         ],
-                                        className="metric-card",
+                                        className="purchase-price-card",
                                     )
                                     if garment.get("price_chf") is not None
                                     else html.P("Base price unavailable.")
                                 ),
                                 html.Div(
-                                    id="garment-recipe-content", children=recipe_content
+                                    [
+                                        html.Label(
+                                            "Choose a material",
+                                            htmlFor="garment-material-dropdown",
+                                        ),
+                                        dcc.Dropdown(
+                                            id="garment-material-dropdown",
+                                            options=material_options,
+                                            value=selected_material_id,
+                                            placeholder="Select a material",
+                                            clearable=True,
+                                        ),
+                                        html.P(
+                                            "We will immediately show available alternatives and savings.",
+                                            className="field-help",
+                                        ),
+                                    ],
+                                    className="material-choice",
                                 ),
                                 dcc.Loading(
                                     id="garment-co2-loading",
@@ -458,14 +552,17 @@ def garment_page(garment_type_id: int):
                                         children=initial_co2_content,
                                     ),
                                 ),
-                                _render_returned_garment_offer(returned_garments),
                                 html.Button(
-                                    "Place order",
+                                    "Order garment",
                                     id="garment-order-button",
                                     n_clicks=0,
                                     className="primary-button",
                                 ),
                                 html.Div(id="garment-order-result"),
+                                _render_returned_garment_offer(returned_garments),
+                                html.Div(
+                                    id="garment-recipe-content", children=recipe_content
+                                ),
                             ],
                         ),
                     ],
@@ -474,9 +571,9 @@ def garment_page(garment_type_id: int):
         )
     except Exception as exc:
         return html.Div(
-            className="product-detail",
+            className="product-detail shop-page garment-page",
             children=[
-                _shop_topbar(),
+                shop_topbar("shop"),
                 html.Section(
                     [
                         html.Div(
@@ -499,19 +596,3 @@ def garment_page(garment_type_id: int):
                 ),
             ],
         )
-
-
-def _shop_topbar():
-    return html.Header(
-        [
-            html.Div("Circular Lab Shop", className="brand"),
-            html.Nav(
-                [
-                    dcc.Link("Home", href="/", className="home-nav-link"),
-                    dcc.Link("End of life", href="/scenarios"),
-                ],
-                className="shop-actions",
-            ),
-        ],
-        className="shop-topbar",
-    )

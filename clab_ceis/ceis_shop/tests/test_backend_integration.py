@@ -124,6 +124,10 @@ def test_shop_backend_scenarios_contains_expected_content(tmp_path):
         buy_new = next(s for s in scenarios if s.get("label") == "Buy New")
         assert buy_new["activities"]
         assert any(a.get("name") == "Garment Material" for a in buy_new["activities"])
+        assert any(a.get("name") == "Fabric dyeing" for a in buy_new["activities"])
+        assert not any(
+            a.get("name") == "Garment dyeing" for a in buy_new["activities"]
+        )
 
         repair = next(
             s
@@ -131,6 +135,11 @@ def test_shop_backend_scenarios_contains_expected_content(tmp_path):
             if s.get("label") == "Self repair (materials shipped)"
         )
         assert any(a.get("name") == "Fabric Block Material" for a in repair["activities"])
+        assert any(a.get("name") == "Fabric dyeing" for a in repair["activities"])
+        assert not any(
+            a.get("name") == "Fabric Block dyeing"
+            for a in repair["activities"]
+        )
 
         options_response = requests.get(
             f"{base_url}/circular-scenarios/options", timeout=10

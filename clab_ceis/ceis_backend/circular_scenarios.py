@@ -724,6 +724,6 @@ def calculate_circular_scenarios(
             "Return scenarios transport the complete garment for one leg.",
             "The new-garment reference transports the complete garment for one leg.",
             "Without detected block IDs, unrecoverable blocks use the average block footprint.",
-            "Packaging, age, probability, and end-of-life emissions are excluded.",
+            "Packaging, age, probability, and end-of-cycle emissions are excluded.",
         ],
     }

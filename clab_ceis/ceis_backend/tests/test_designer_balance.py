@@ -23,17 +23,35 @@ def _insert_manufacturer_data() -> None:
 
     cursor.executemany(
         """
-        INSERT INTO manufacturers (company, role, role_group, location)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO manufacturers (
+            company, alias_name, role, role_group, location, postal_code
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
         """,
         [
-            ("Fabric Alpha", "fabric manufacturer", "fabric", "St. Gallen"),
-            ("Fabric Beta", "fabric manufacturer", "fabric", "Dornbirn"),
+            (
+                "Fabric Alpha",
+                "Northstar Textiles",
+                "fabric manufacturer",
+                "fabric",
+                "Alpha Street 1, 9000 St. Gallen",
+                "9000",
+            ),
+            (
+                "Fabric Beta",
+                "Blueleaf Fabrics",
+                "fabric manufacturer",
+                "fabric",
+                "Beta Street 2, 6850 Dornbirn",
+                "6850",
+            ),
             (
                 "Garment Works",
+                "Bridgeway Apparel",
                 "garment manufacturer",
                 "garment",
-                "Burladingen",
+                "Garment Street 3, 72393 Burladingen",
+                "72393",
             ),
         ],
     )
@@ -98,9 +116,12 @@ def test_designer_balance_endpoint_returns_balanced_scenario(tmp_path, monkeypat
         assert options_response.status_code == 200
         options_payload = options_response.json()
         assert any(
-            role["company"] == "Fabric Alpha"
+            role["alias_name"] == "Northstar Textiles"
+            and role["postal_code"] == "9000"
             for role in options_payload["suppliers"]["fabric"]
         )
+        assert "Fabric Alpha" not in options_response.text
+        assert "Alpha Street" not in options_response.text
         assert set(options_payload["suppliers"]) == {"fabric", "garment"}
 
         garment_types = client.get("/garment-types").json()
@@ -117,8 +138,8 @@ def test_designer_balance_endpoint_returns_balanced_scenario(tmp_path, monkeypat
             f"/designer-balance/{basic_trousers['id']}",
             params={
                 "material_id": hemp["id"],
-                "fabric_supplier": "Fabric Alpha",
-                "garment_supplier": "Garment Works",
+                "fabric_supplier": "Northstar Textiles",
+                "garment_supplier": "Bridgeway Apparel",
             },
         )
 
@@ -127,7 +148,10 @@ def test_designer_balance_endpoint_returns_balanced_scenario(tmp_path, monkeypat
 
     assert payload["garment"]["name"] == "Basic Trousers"
     assert payload["material"]["name"] == "hemp"
-    assert payload["selection"]["fabric_supplier"] == "Fabric Alpha"
+    assert payload["selection"]["fabric_supplier"] == "Northstar Textiles"
+    assert "Fabric Alpha" not in response.text
+    assert "Garment Works" not in response.text
+    assert "Alpha Street" not in response.text
     assert set(payload["selection"]) == {"fabric_supplier", "garment_supplier"}
     assert len(payload["supply_chain"]["legs"]) == 1
     assert payload["summary"]["economic_total_chf"] > 0
@@ -175,16 +199,16 @@ def test_designer_balance_supplier_switch_changes_transport_balance(
             f"/designer-balance/{basic_trousers['id']}",
             params={
                 "material_id": hemp["id"],
-                "fabric_supplier": "Fabric Alpha",
-                "garment_supplier": "Garment Works",
+                "fabric_supplier": "Northstar Textiles",
+                "garment_supplier": "Bridgeway Apparel",
             },
         )
         beta_response = client.get(
             f"/designer-balance/{basic_trousers['id']}",
             params={
                 "material_id": hemp["id"],
-                "fabric_supplier": "Fabric Beta",
-                "garment_supplier": "Garment Works",
+                "fabric_supplier": "Blueleaf Fabrics",
+                "garment_supplier": "Bridgeway Apparel",
             },
         )
 

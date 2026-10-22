@@ -2,22 +2,22 @@
 
 The CEIS view are determined by the use cases it is demonstrating.
 
-1. Customers compare of End of Life (EoL) scenarios with respect to their economical and environmental costs proxied by CO2eq.
+1. Customers compare End of Cycle (EoC) scenarios with respect to their economical and environmental costs proxied by CO2eq.
 2. Customers weigh delivery speed against environmental impact proxied by CO2eq.
 3. Strategist review progress towards the company's goals.
 4. Designer balance design, longevity, and costs of a product.
 
 
-## Comparison of End of Life (EoL) Scenarios:
+## Comparison of End of Cycle (EoC) Scenarios:
 
-Sooner or later, all products reach their end of life. In this use case, owners of a product are interested in end of life scenarios of that product. They either need to start a new life cycle or dispose the product entirely. Currently, the following EoL scenarios are covered in CEIS:
+Sooner or later, all products reach their end of cycle. In this use case, owners of a product are interested in end-of-cycle scenarios for that product. They either need to start a new life cycle or dispose of the product entirely. Currently, the following EoC scenarios are covered in CEIS:
 
 1. Customer does repair on their own; CEIS assumes some cost for various processes(cleaning, etc.)
 2. Customer brings it to a close by repair shop.
 3. Customer send the product to Solve to perform the repair / remanufacturing.
 4. Customer orders a new product from Solve.
 
-CEIS requires a view that presents the EoL scenarios in a way that natural customer agents can easily digest the information to make corresponding decisions. To this end, they are interested in delivery time and in both environmental and ecological costs.
+CEIS requires a view that presents the EoC scenarios in a way that natural customer agents can easily digest the information to make corresponding decisions. To this end, they are interested in delivery time and in both environmental and ecological costs.
 
 ## Trade-off between Delivery Speed and Environmental Costs
 
