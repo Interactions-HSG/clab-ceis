@@ -18,10 +18,10 @@ def test_sync_populates_distances_when_csv_changed(tmp_path, monkeypatch):
     csv_path = tmp_path / "manufacturers.csv"
     csv_path.write_text(
         (
-            "COMPANY,ROLE,LOCATION,WEBSITE,NOTES,CERTIFICATIONS & DPP\n"
-            "Fabric A,fabric manufacturer,\"A Street 1, City A\",,,\n"
-            "Garment A,garment manufacturer,\"B Street 1, City B\",,,\n"
-            "Finish A,finishing,\"C Street 1, City C\",,,\n"
+            "COMPANY,ALIAS NAME,ROLE,LOCATION,WEBSITE,NOTES,CERTIFICATIONS & DPP\n"
+            "Fabric A,Northstar Textiles,fabric manufacturer,\"A Street 1, 9000 City A\",,,\n"
+            "Garment A,Bridgeway Apparel,garment manufacturer,\"B Street 1, 72393 City B\",,,\n"
+            "Finish A,Clearwater Finishing,finishing,\"C Street 1, 6850 City C\",,,\n"
         ),
         encoding="utf-8",
     )
@@ -59,6 +59,13 @@ def test_sync_populates_distances_when_csv_changed(tmp_path, monkeypatch):
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM manufacturers")
     assert cursor.fetchone()[0] == 2
+    cursor.execute(
+        "SELECT alias_name, postal_code FROM manufacturers ORDER BY role_group"
+    )
+    assert cursor.fetchall() == [
+        ("Northstar Textiles", "9000"),
+        ("Bridgeway Apparel", "72393"),
+    ]
     cursor.execute("SELECT COUNT(*) FROM manufacturer_distances")
     assert cursor.fetchone()[0] == 1
     cursor.execute(

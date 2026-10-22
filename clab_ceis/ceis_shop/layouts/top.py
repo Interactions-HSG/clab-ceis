@@ -1,25 +1,13 @@
 from dash import html, dcc
 
-from ceis_shop.layouts.ui import shop_home_link
+from ceis_shop.layouts.ui import shop_home_link, shop_topbar
 
 
 def top_page():
     return html.Div(
-        className="product-detail",
+        className="product-detail shop-page garment-page",
         children=[
-            html.Header(
-                [
-                    html.Div("Circular Lab Shop", className="brand"),
-                    html.Nav(
-                        [
-                            dcc.Link("Home", href="/", className="home-nav-link"),
-                            dcc.Link("End of life", href="/scenarios"),
-                        ],
-                        className="shop-actions",
-                    ),
-                ],
-                className="shop-topbar",
-            ),
+            shop_topbar("shop"),
             html.Section(
                 [
                     html.Div(
@@ -46,9 +34,15 @@ def top_page():
                     html.Div(
                         className="product-description",
                         children=[
+                            html.Div("Thoughtfully cut", className="section-eyebrow"),
                             html.P(
                                 "Crop top made from fine hemp fabric in a linen weave."
                                 "Loose fit with a T-shape geometric opening at the neck.",
+                            ),
+                            dcc.Link(
+                                "Explore the full collection →",
+                                href="/",
+                                className="primary-link",
                             ),
                         ],
                     ),

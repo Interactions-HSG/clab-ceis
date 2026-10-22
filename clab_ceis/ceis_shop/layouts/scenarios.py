@@ -3,36 +3,23 @@ from __future__ import annotations
 import plotly.graph_objects as go
 from dash import dcc, html
 
-from ceis_shop.layouts.ui import shop_home_link
+from ceis_shop.layouts.ui import shop_home_link, shop_topbar
 
 
 def scenarios_page():
-    """Original end-of-life comparison page."""
+    """Original end-of-cycle comparison page."""
     return html.Div(
-        className="wrapper",
+        className="wrapper shop-page impact-page",
         children=[
-            html.Header(
-                [
-                    html.Div("Circular Lab Shop", className="brand"),
-                    html.Nav(
-                        [
-                            dcc.Link("Home", href="/", className="home-nav-link"),
-                            dcc.Link("End of life", href="/scenarios"),
-                        ],
-                        className="shop-actions",
-                    ),
-                ],
-                className="shop-topbar",
-            ),
+            shop_topbar("impact"),
             html.Section(
                 [
                     html.Div(
                         [
                             html.Div("Circular services", className="shop-kicker"),
-                            html.H1("End of Life Options", className="header-title"),
+                            html.H1("Understand the impact of what comes next", className="header-title"),
                             html.P(
-                                "Compare practical return, repair, and replacement "
-                                "scenarios for the current garment journey.",
+                                "A simple comparison of repair and replacement routes for a Circular Lab garment.",
                                 className="shop-intro",
                             ),
                         ],
@@ -45,9 +32,14 @@ def scenarios_page():
             html.Section(
                 className="panel",
                 children=[
-                    html.P(
-                        "Manufacturer: Bucharest, Repair Center: St. Gallen, "
-                        "Consumer: Sigmaringen."
+                    html.Details(
+                        [
+                            html.Summary("Calculation route"),
+                            html.P(
+                                "Production in Bucharest, repair in St. Gallen, and customer location in Sigmaringen."
+                            ),
+                        ],
+                        className="offer-details",
                     ),
                     dcc.Loading(
                         id="customer-repair-loading",
@@ -64,34 +56,20 @@ def scenarios_page():
 def repair_return_page():
     """Interactive sold-garment repair and return CO2 explorer."""
     return html.Div(
-        className="wrapper",
+        className="wrapper shop-page circular-care-page",
         children=[
-            html.Header(
-                [
-                    html.Div("Circular Lab Shop", className="brand"),
-                    html.Nav(
-                        [
-                            dcc.Link("Home", href="/", className="home-nav-link"),
-                            dcc.Link("End of life", href="/scenarios"),
-                            dcc.Link("Repair and return", href="/repair-return"),
-                        ],
-                        className="shop-actions",
-                    ),
-                ],
-                className="shop-topbar",
-            ),
+            shop_topbar("care"),
             html.Section(
                 [
                     html.Div(
                         [
                             html.Div("Circular services", className="shop-kicker"),
                             html.H1(
-                                "Repair and return scenarios",
+                                "Find the best next step for your garment",
                                 className="header-title",
                             ),
                             html.P(
-                                "Compare the CO2 impact of repair and replacement "
-                                "with the expected saving from whole-garment reuse.",
+                                "Tell us what happened and compare self-repair, professional repair, replacement, and return at a glance.",
                                 className="shop-intro",
                             ),
                         ],
@@ -125,7 +103,10 @@ def render_scenario_explorer(options_payload: dict) -> html.Div:
         return html.P("No damage types are configured.")
 
     garment_options = [
-        {"label": garment["label"], "value": garment["id"]}
+        {
+            "label": _customer_garment_label(garment),
+            "value": garment["id"],
+        }
         for garment in garments
     ]
     damage_options = [
@@ -139,7 +120,7 @@ def render_scenario_explorer(options_payload: dict) -> html.Div:
                 [
                     html.Div(
                         [
-                            html.Label("Bought garment", htmlFor="circular-garment"),
+                            html.Label("Your garment", htmlFor="circular-garment"),
                             dcc.Dropdown(
                                 id="circular-garment",
                                 options=garment_options,
@@ -152,7 +133,7 @@ def render_scenario_explorer(options_payload: dict) -> html.Div:
                     html.Div(
                         [
                             html.Label(
-                                "Transport distance (km, one way)",
+                                "Distance to repair centre (km, one way)",
                                 htmlFor="circular-distance",
                             ),
                             dcc.Input(
@@ -197,8 +178,8 @@ def render_scenario_explorer(options_payload: dict) -> html.Div:
                                 className="circular-factor-switch",
                             ),
                             html.P(
-                                "1.253 kg CO2eq/kWh (activity 6566). "
-                                "Applies only to calculations on this page.",
+                                "Uses a higher electricity emissions factor for "
+                                "calculations on this page only.",
                                 className="field-help",
                             ),
                         ],
@@ -219,6 +200,16 @@ def render_scenario_explorer(options_payload: dict) -> html.Div:
             ),
         ]
     )
+
+
+def _customer_garment_label(garment: dict) -> str:
+    """Return a customer-friendly selector label without exposing database IDs."""
+    name = garment.get("name")
+    if name:
+        return str(name)
+
+    label = str(garment.get("label", "Your garment"))
+    return label.split("· garment #", maxsplit=1)[0].strip()
 
 
 def _format_number(value: float | int | None) -> str:
@@ -306,9 +297,18 @@ def _expected_return_saving_card(scenario: dict) -> html.Div:
                 className="co2-metric-value",
             ),
             html.Div(
-                f"{_format_number(scenario.get('total_co2eq'))} kg CO2eq "
-                "needed for transport, repair, and preparation",
-                className="co2-metric-subtitle",
+                [
+                    html.Strong(
+                        "Reusing this garment saves "
+                        f"{_format_number(scenario.get('saving_co2eq'))} kg CO2eq "
+                        "compared with buying a new one."
+                    ),
+                    html.Span(
+                        "Transport, repair, and preparation add "
+                        f"{_format_number(scenario.get('total_co2eq'))} kg CO2eq."
+                    ),
+                ],
+                className="co2-metric-subtitle return-saving-explanation",
             ),
         ],
         className="co2-metric-card",
@@ -425,17 +425,14 @@ def render_scenario_results(payload: dict) -> html.Div:
         [
             html.Div(
                 [
-                    html.Strong(
-                        f"{garment.get('name', 'Garment')} "
-                        f"#{garment.get('id', '')}"
-                    ),
+                    html.Strong(garment.get("name", "Your garment")),
                     html.Span(f"Damage process: {process_label}"),
                     html.Span(
-                        f"{garment.get('fabric_block_count', 0)} blocks · "
+                        f"{garment.get('fabric_block_count', 0)} fabric pieces · "
                         f"{_format_number(garment.get('weight_kg'))} kg"
                     ),
                     html.Span(
-                        "Blocks to replace: "
+                        "Pieces to replace: "
                         f"{damage.get('replacement_block_count', 0)}"
                     ),
                 ],

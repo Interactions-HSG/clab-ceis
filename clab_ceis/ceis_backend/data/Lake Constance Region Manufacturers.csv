@@ -1,9 +1,9 @@
-COMPANY,ROLE,LOCATION,WEBSITE,NOTES,CERTIFICATIONS & DPP
-Okutex,fabric manufacturer,"Okutex AG, Hintere Poststrasse 12, CH-9000 St.Gallen",https://www.okutex.ch/en/home-page/,Finished wovens & embroideries. Simon already reached out to them*.,
-Filtex AG,fabric manufacturer ,"Filtex AG, Teufener Str. 1, 9000 St. Gallen",https://www.filtex.ch/en/about,finished woven & embroidery / unfinished fabrics (grey goods),
-Dolinschek GmbH,fabric manufacturer,"Dolinschek GmbH, Eichhalde 15, 72393 Burladingen, Germany",https://dolinschek.de/  ,finished knitwear incl cut,
-Will Hermann,fabric manufacturer ,"Willy Hermann – SUPERFINE GmbH & Co KG, Oberer Achdamm 10, A-6971 Hard, Austria",https://www.willy-hermann.com/ ,"unfinished knitwear (they have a separate dye-house called Pro4Tex for finishing, but it is too far away - Pro4tex, Limbacher Str. 28, 09243 Niederfrohna, Germany)",
-Albstoffe,fabric manufacturer,"ALBSTOFFE, MR Création Maute + Renz Textil GmbH, Goethestrasse 86, D-72461 Albstadt-Tailfingen",https://albstoffe.de/,I've had troubles in understanding if the address is from their factory (all in german),"Oekotex 100, GOTS"
-Takli Textil,garment manufacturer,"Takli Textil, Ringinger Tal 39, 72393 Burladingen, Germany",https://takli-textil.de/leistungen-service.html,"Contract manufacturing (cut&sew) / Intermediate workshop (cut &sew) / pattern / Processing (steaming, repair etc) /packaging and shipping",
-Takli Textil,repair,"Takli Textil, Ringinger Tal 39, 72393 Burladingen, Germany",https://takli-textil.de/leistungen-service.html,"Repair shop services",
-Die Manufaktur GmbH,repair,"Die Manufaktur GmbH, Bahnhofstrasse 8, 9000 St.Gallen",https://www.diemanufakturgmbh.ch/,alteration & repair services per gament,
+COMPANY,ALIAS NAME,ROLE,LOCATION,WEBSITE,NOTES,CERTIFICATIONS & DPP
+Okutex,Northstar Textiles,fabric manufacturer,"Okutex AG, Hintere Poststrasse 12, CH-9000 St.Gallen",https://www.okutex.ch/en/home-page/,Finished wovens & embroideries. Simon already reached out to them*.,
+Filtex AG,Blueleaf Fabrics,fabric manufacturer ,"Filtex AG, Teufener Str. 1, 9000 St. Gallen",https://www.filtex.ch/en/about,finished woven & embroidery / unfinished fabrics (grey goods),
+Dolinschek GmbH,Pinecrest Knitworks,fabric manufacturer,"Dolinschek GmbH, Eichhalde 15, 72393 Burladingen, Germany",https://dolinschek.de/  ,finished knitwear incl cut,
+Will Hermann,Silverline Mills,fabric manufacturer ,"Willy Hermann – SUPERFINE GmbH & Co KG, Oberer Achdamm 10, A-6971 Hard, Austria",https://www.willy-hermann.com/ ,"unfinished knitwear (they have a separate dye-house called Pro4Tex for finishing, but it is too far away - Pro4tex, Limbacher Str. 28, 09243 Niederfrohna, Germany)",
+Albstoffe,Meadowloom Textiles,fabric manufacturer,"ALBSTOFFE, MR Création Maute + Renz Textil GmbH, Goethestrasse 86, D-72461 Albstadt-Tailfingen",https://albstoffe.de/,I've had troubles in understanding if the address is from their factory (all in german),"Oekotex 100, GOTS"
+Takli Textil,Bridgeway Apparel,garment manufacturer,"Takli Textil, Ringinger Tal 39, 72393 Burladingen, Germany",https://takli-textil.de/leistungen-service.html,"Contract manufacturing (cut&sew) / Intermediate workshop (cut &sew) / pattern / Processing (steaming, repair etc) /packaging and shipping",
+Takli Textil,Bridgeway Apparel,repair,"Takli Textil, Ringinger Tal 39, 72393 Burladingen, Germany",https://takli-textil.de/leistungen-service.html,"Repair shop services",
+Die Manufaktur GmbH,Harbor Repair Studio,repair,"Die Manufaktur GmbH, Bahnhofstrasse 8, 9000 St.Gallen",https://www.diemanufakturgmbh.ch/,alteration & repair services per gament,

@@ -416,13 +416,25 @@ def create_tables(cursor):
         CREATE TABLE IF NOT EXISTS manufacturers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             company TEXT NOT NULL,
+            alias_name TEXT NOT NULL DEFAULT '',
             role TEXT NOT NULL,
             role_group TEXT NOT NULL,
             location TEXT NOT NULL,
+            postal_code TEXT NOT NULL DEFAULT '',
             UNIQUE(company, role_group)
         )
     """
     )
+    cursor.execute("PRAGMA table_info(manufacturers)")
+    manufacturer_columns = {row[1] for row in cursor.fetchall()}
+    if "alias_name" not in manufacturer_columns:
+        cursor.execute(
+            "ALTER TABLE manufacturers ADD COLUMN alias_name TEXT NOT NULL DEFAULT ''"
+        )
+    if "postal_code" not in manufacturer_columns:
+        cursor.execute(
+            "ALTER TABLE manufacturers ADD COLUMN postal_code TEXT NOT NULL DEFAULT ''"
+        )
 
     cursor.execute(
         """

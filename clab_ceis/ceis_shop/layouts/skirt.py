@@ -1,25 +1,13 @@
 from dash import html, dcc
 
-from ceis_shop.layouts.ui import shop_home_link
+from ceis_shop.layouts.ui import shop_home_link, shop_topbar
 
 
 def skirt_page():
     return html.Div(
-        className="product-detail",
+        className="product-detail shop-page garment-page",
         children=[
-            html.Header(
-                [
-                    html.Div("Circular Lab Shop", className="brand"),
-                    html.Nav(
-                        [
-                            dcc.Link("Home", href="/", className="home-nav-link"),
-                            dcc.Link("End of life", href="/scenarios"),
-                        ],
-                        className="shop-actions",
-                    ),
-                ],
-                className="shop-topbar",
-            ),
+            shop_topbar("shop"),
             html.Section(
                 [
                     html.Div(
@@ -46,8 +34,14 @@ def skirt_page():
                     html.Div(
                         className="product-description",
                         children=[
+                            html.Div("Reversible design", className="section-eyebrow"),
                             html.P(
                                 "Wrapped Skirt made of double-sided fabric, in light blue and dark blue colors.",
+                            ),
+                            dcc.Link(
+                                "Explore the full collection →",
+                                href="/",
+                                className="primary-link",
                             ),
                         ],
                     ),

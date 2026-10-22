@@ -7,14 +7,14 @@ def test_scenario_planner_uses_horizontal_supplier_flow_graph():
             "actors": [
                 {
                     "role_group": "fabric",
-                    "company": "Fabric A",
-                    "location": "St. Gallen",
+                    "alias_name": "Northstar Textiles",
+                    "postal_code": "9000",
                     "delay_days": 1.5,
                 },
                 {
                     "role_group": "garment",
-                    "company": "Garment A",
-                    "location": "Burladingen",
+                    "alias_name": "Bridgeway Apparel",
+                    "postal_code": "72393",
                     "delay_days": 3.0,
                 },
             ],

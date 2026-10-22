@@ -67,7 +67,7 @@ def get_callbacks(app):
         else:
             message = "Not in stock — production has been requested."
         return html.Div(
-            [html.Strong(f"Order #{order['id']}"), html.P(message)],
+            [html.Strong("Order confirmed"), html.P(message)],
             className="panel-muted",
         )
 
@@ -101,7 +101,7 @@ def get_callbacks(app):
 
         return html.Div(
             [
-                html.Strong(f"Order #{order['id']}"),
+                html.Strong("Second-life garment reserved"),
                 html.P(
                     f"Returned garment reserved for CHF {float(order['price_chf']):.2f}. "
                     "Delivery has started."
@@ -141,7 +141,7 @@ def get_callbacks(app):
         Output("customer-repair-content", "children"),
         Input("url", "pathname"),
     )
-    def load_end_of_life_content(pathname):
+    def load_end_of_cycle_content(pathname):
         if pathname != "/scenarios":
             return html.Div()
 
@@ -184,7 +184,7 @@ def get_callbacks(app):
             barmode="stack",
             title=(
                 "CO2 Comparison: Different Repairing Options (replacement of "
-                "the fabric block 64x40) vs Buying new 'Basic Crop Top'"
+                "a damaged garment piece) vs buying a new garment"
             ),
             xaxis_title="Scenario",
             yaxis_title="CO2 (kg CO2eq)",
@@ -285,7 +285,7 @@ def get_callbacks(app):
 
         return html.Div(
             [
-                html.Strong(f"Repair request #{repair['id']}"),
+                html.Strong("Repair request confirmed"),
                 html.P(f"{repair['action_label']} · {repair['status']}"),
             ],
             className="panel-muted",
@@ -302,7 +302,9 @@ def get_callbacks(app):
         prevent_initial_call=True,
     )
     def return_garment(n_clicks, garment_id, damage_code, garment_options):
-        if not n_clicks or garment_id is None or damage_code is None:
+        if not n_clicks:
+            return html.Div(), no_update, no_update
+        if garment_id is None or damage_code is None:
             return (
                 html.P("Select a garment and damage type before returning it."),
                 no_update,
@@ -331,12 +333,10 @@ def get_callbacks(app):
         return (
             html.Div(
                 [
-                    html.Strong(
-                        f"Returned garment #{returned['garment_id']} added to inventory"
-                    ),
+                    html.Strong("Return confirmed and added to circular inventory"),
                     html.P(
-                        f"{returned['fabric_block_count']} corresponding fabric blocks "
-                        "were added with the whole-garment processes."
+                        f"{returned['fabric_block_count']} corresponding fabric pieces "
+                        "were recorded for their next use."
                     ),
                 ],
                 className="panel-muted",
@@ -384,10 +384,6 @@ def get_callbacks(app):
         selected_material_name = (
             selected_material.get("name") if selected_material else "Unknown"
         )
-        material_cost_per_sqm_chf = (
-            selected_material.get("cost_per_sqm_chf") if selected_material else None
-        )
-
         try:
             response = requests.get(
                 f"{config.BACKEND_API_URL}/co2/{garment_type_id}?material_id={material_id}",
@@ -409,5 +405,4 @@ def get_callbacks(app):
             selected_material_name,
             co2_payload,
             garment_base_price,
-            material_cost_per_sqm_chf,
         )

@@ -132,13 +132,36 @@ def test_supplier_filter_returns_events_to_and_from_supplier(clean_db):
     cursor = conn.cursor()
     cursor.executemany(
         """
-        INSERT INTO manufacturers (company, role, role_group, location)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO manufacturers (
+            company, alias_name, role, role_group, location, postal_code
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
         """,
         [
-            ("Fabric Co", "fabric manufacturer", "fabric", "Fabric town"),
-            ("Garment Co", "garment manufacturer", "garment", "Garment town"),
-            ("Finisher Co", "finishing", "finishing", "Finish town"),
+            (
+                "Fabric Co",
+                "Northstar Textiles",
+                "fabric manufacturer",
+                "fabric",
+                "Fabric town",
+                "9000",
+            ),
+            (
+                "Garment Co",
+                "Bridgeway Apparel",
+                "garment manufacturer",
+                "garment",
+                "Garment town",
+                "72393",
+            ),
+            (
+                "Finisher Co",
+                "Clearwater Finishing",
+                "finishing",
+                "finishing",
+                "Finish town",
+                "6850",
+            ),
         ],
     )
     cursor.execute("SELECT id FROM manufacturers WHERE company = 'Garment Co'")
@@ -180,15 +203,16 @@ def test_supplier_filter_returns_events_to_and_from_supplier(clean_db):
     event_pairs = {(event["from"], event["to"]) for event in events}
 
     assert all("date" in event and "time" in event for event in events)
-    assert ("Fabric Co", "Garment Co") in event_pairs
-    assert ("Garment Co", "Finisher Co") in event_pairs
+    assert ("Northstar Textiles", "Bridgeway Apparel") in event_pairs
+    assert ("Bridgeway Apparel", "Clearwater Finishing") in event_pairs
     assert any(
-        event["at"] == "Garment Co"
+        event["at"] == "Bridgeway Apparel"
         and event["from"] is None
         and event["to"] is None
         for event in events
     )
-    assert ("Fabric Co", "Finisher Co") not in event_pairs
+    assert ("Northstar Textiles", "Clearwater Finishing") not in event_pairs
+    assert all("Fabric Co" not in str(event) for event in events)
 
 
 def test_repair_shop_seeds_repair_lifecycle_event(clean_db):
@@ -196,13 +220,25 @@ def test_repair_shop_seeds_repair_lifecycle_event(clean_db):
     cursor = conn.cursor()
     cursor.executemany(
         """
-        INSERT INTO manufacturers (company, role, role_group, location)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO manufacturers (company, alias_name, role, role_group, location)
+        VALUES (?, ?, ?, ?, ?)
         """,
         [
-            ("Takli Textil", "garment manufacturer / repair", "garment", "A"),
-            ("Takli Textil", "repair", "repair", "A"),
-            ("Die Manufaktur GmbH", "repair", "repair", "B"),
+            (
+                "Takli Textil",
+                "Bridgeway Apparel",
+                "garment manufacturer / repair",
+                "garment",
+                "A",
+            ),
+            ("Takli Textil", "Bridgeway Apparel", "repair", "repair", "A"),
+            (
+                "Die Manufaktur GmbH",
+                "Harbor Repair Studio",
+                "repair",
+                "repair",
+                "B",
+            ),
         ],
     )
     seed_resource_events(cursor)
@@ -212,8 +248,8 @@ def test_repair_shop_seeds_repair_lifecycle_event(clean_db):
     events = db_get_resource_events(lifecycle_edge="Repair")
     repair_locations = {event["at"] for event in events}
 
-    assert "Die Manufaktur GmbH" in repair_locations
-    assert "Takli Textil" in repair_locations
+    assert "Harbor Repair Studio" in repair_locations
+    assert "Bridgeway Apparel" in repair_locations
 
 
 def test_supply_chain_graph_uses_company_and_role_for_duplicate_suppliers(clean_db):
@@ -221,13 +257,19 @@ def test_supply_chain_graph_uses_company_and_role_for_duplicate_suppliers(clean_
     cursor = conn.cursor()
     cursor.executemany(
         """
-        INSERT INTO manufacturers (company, role, role_group, location)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO manufacturers (company, alias_name, role, role_group, location)
+        VALUES (?, ?, ?, ?, ?)
         """,
         [
-            ("Takli Textil", "garment manufacturer / repair", "garment", "A"),
-            ("Takli Textil", "repair", "repair", "A"),
-            ("Finisher Co", "finishing", "finishing", "B"),
+            (
+                "Takli Textil",
+                "Bridgeway Apparel",
+                "garment manufacturer / repair",
+                "garment",
+                "A",
+            ),
+            ("Takli Textil", "Bridgeway Apparel", "repair", "repair", "A"),
+            ("Finisher Co", "Clearwater Finishing", "finishing", "finishing", "B"),
         ],
     )
     cursor.execute(
@@ -253,7 +295,9 @@ def test_supply_chain_graph_uses_company_and_role_for_duplicate_suppliers(clean_
 
     graph = db_get_supply_chain_graph()
     takli_edges = [
-        edge for edge in graph["edges"] if edge["source_company"] == "Takli Textil"
+        edge
+        for edge in graph["edges"]
+        if edge["source_alias_name"] == "Bridgeway Apparel"
     ]
 
     assert takli_edges[0]["source_manufacturer_id"] == garment_takli_id

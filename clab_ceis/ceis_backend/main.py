@@ -420,7 +420,7 @@ def get_co2_scenarios(
     wiser_client: WiserClient = Depends(get_wiser_client),
 ):
     garment_type_id = 18  # Basic Crop Top
-    replacements = ["64x40"]
+    replacements = ["40x14"]
     # use hemp as the material for now
     materials = get_materials()
     hemp_material = next((m for m in materials if m["name"].lower() == "hemp"), None)
@@ -526,7 +526,12 @@ def get_co2_scenarios(
 
             # Aggregate production processes by process name
             for process in detail.get("production_processes", []):
-                process_name = f"Garment {process.get('process', 'Unknown Process')}"
+                raw_process_name = process.get("process", "Unknown Process")
+                process_name = (
+                    "Fabric dyeing"
+                    if raw_process_name == "dyeing"
+                    else f"Garment {raw_process_name}"
+                )
                 process_emission = process.get("emission", 0)
                 buy_new_activity_map[process_name] = (
                     buy_new_activity_map.get(process_name, 0) + process_emission

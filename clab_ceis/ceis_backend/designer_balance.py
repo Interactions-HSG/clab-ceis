@@ -32,12 +32,27 @@ def load_designer_balance_mock_data() -> dict:
         return json.load(mock_file)
 
 
+def _public_supplier(supplier: dict) -> dict:
+    """Return the supplier fields that are safe to send to the frontend."""
+    return {
+        "id": supplier["id"],
+        "alias_name": supplier["alias_name"],
+        "role": supplier["role"],
+        "role_group": supplier["role_group"],
+        "postal_code": supplier["postal_code"],
+    }
+
+
 def get_designer_balance_options() -> dict:
+    suppliers = {
+        "fabric": db_get_manufacturers("fabric"),
+        "garment": db_get_manufacturers("garment"),
+    }
     return {
         "garment_types": db_get_garment_types(),
         "suppliers": {
-            "fabric": db_get_manufacturers("fabric"),
-            "garment": db_get_manufacturers("garment"),
+            role_group: [_public_supplier(item) for item in options]
+            for role_group, options in suppliers.items()
         },
     }
 
@@ -300,8 +315,8 @@ def _select_default_company(
 ) -> str | None:
     if preferred:
         for option in options:
-            if option["company"] == preferred:
-                return preferred
+            if preferred in {option["company"], option["alias_name"]}:
+                return option["company"]
     if not options:
         return None
     return options[0]["company"]
@@ -319,8 +334,8 @@ def _build_supply_chain_legs(
         actors.append(
             {
                 "role_group": "fabric",
-                "company": fabric_supplier["company"],
-                "location": fabric_supplier["location"],
+                "alias_name": fabric_supplier["alias_name"],
+                "postal_code": fabric_supplier["postal_code"],
                 "delay_days": _actor_delay("fabric", mock_data),
             }
         )
@@ -328,8 +343,8 @@ def _build_supply_chain_legs(
         actors.append(
             {
                 "role_group": "garment",
-                "company": garment_supplier["company"],
-                "location": garment_supplier["location"],
+                "alias_name": garment_supplier["alias_name"],
+                "postal_code": garment_supplier["postal_code"],
                 "delay_days": _actor_delay("garment", mock_data),
             }
         )
@@ -359,9 +374,9 @@ def _build_supply_chain_legs(
         total_delay_days += leg_delay_days
         legs.append(
             {
-                "source_company": source_supplier["company"],
+                "source_alias_name": source_supplier["alias_name"],
                 "source_role_group": source_supplier["role_group"],
-                "destination_company": destination_supplier["company"],
+                "destination_alias_name": destination_supplier["alias_name"],
                 "destination_role_group": destination_supplier["role_group"],
                 "distance_km": _safe_round(distance_km),
                 "delay_days": _safe_round(leg_delay_days),
@@ -371,16 +386,16 @@ def _build_supply_chain_legs(
         )
 
     actor_delays = []
-    incoming_delay_by_company = {
-        leg["destination_company"]: float(leg["delay_days"]) for leg in legs
+    incoming_delay_by_alias = {
+        leg["destination_alias_name"]: float(leg["delay_days"]) for leg in legs
     }
     for actor in actors:
         total_actor_delay = float(actor["delay_days"]) + float(
-            incoming_delay_by_company.get(actor["company"], 0)
+            incoming_delay_by_alias.get(actor["alias_name"], 0)
         )
         actor_delays.append(
             {
-                "company": actor["company"],
+                "alias_name": actor["alias_name"],
                 "role_group": actor["role_group"],
                 "delay_days": _safe_round(total_actor_delay),
             }
@@ -390,7 +405,7 @@ def _build_supply_chain_legs(
     highest_delay_actor = max(
         actor_delays,
         key=lambda actor: float(actor["delay_days"]),
-        default={"company": None, "role_group": None, "delay_days": 0.0},
+        default={"alias_name": None, "role_group": None, "delay_days": 0.0},
     )
 
     return (
@@ -585,7 +600,10 @@ def get_designer_balance_scenario(
     total_transport_cost = float(transport_summary["transport_cost_total"])
     bop_rows.extend(
         {
-            "source": f"{leg['source_company']} -> {leg['destination_company']}",
+            "source": (
+                f"{leg['source_alias_name']} -> "
+                f"{leg['destination_alias_name']}"
+            ),
             "process": "transport inside supply chain",
             "amount": leg["distance_km"],
             "economic_cost_chf": leg["economic_cost_chf"],
@@ -645,11 +663,18 @@ def get_designer_balance_scenario(
         },
         "options": {
             "materials": materials,
-            "suppliers": supplier_options,
+            "suppliers": {
+                role_group: [_public_supplier(item) for item in options]
+                for role_group, options in supplier_options.items()
+            },
         },
         "selection": {
-            "fabric_supplier": selected_supplier_names["fabric"],
-            "garment_supplier": selected_supplier_names["garment"],
+            "fabric_supplier": (
+                fabric_supplier["alias_name"] if fabric_supplier else None
+            ),
+            "garment_supplier": (
+                garment_supplier["alias_name"] if garment_supplier else None
+            ),
         },
         "summary": {
             "bom_cost_chf": _safe_round(total_material_cost),
