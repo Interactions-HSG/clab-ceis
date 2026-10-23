@@ -147,12 +147,15 @@ def test_shop_backend_scenarios_contains_expected_content(tmp_path):
         assert options_response.status_code == 200
         options = options_response.json()
         assert options["garments"]
-        assert any(damage["code"] == "small_hole" for damage in options["damages"])
+        assert any(damage["code"] == "no_damage" for damage in options["damages"])
 
         garment_id = options["garments"][0]["id"]
         calculation_response = requests.get(
             f"{base_url}/circular-scenarios/{garment_id}",
-            params={"distance_km": 100, "damage_code": "small_hole"},
+            params={
+                "distance_km": 100,
+                "damage_code": "holes_worn_under_5cm_patching",
+            },
             timeout=10,
         )
         assert calculation_response.status_code == 200

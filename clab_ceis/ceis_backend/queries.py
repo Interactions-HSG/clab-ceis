@@ -1803,7 +1803,7 @@ def db_get_returned_garments() -> list[dict]:
             "garment": row[2],
             "price_chf": float(row[3]) if row[3] is not None else None,
             "fabric_block_count": int(row[4] or 0),
-            "damage_code": row[6] or "small_hole",
+            "damage_code": row[6] or "no_damage",
             "status": "Pre-loved",
         }
         for row in rows
@@ -1835,7 +1835,7 @@ def db_get_returned_garment(garment_id: int) -> dict | None:
         "type_id": row[1],
         "name": row[2],
         "co2eq": float(row[3]) if row[3] is not None else None,
-        "damage_code": row[4] or "small_hole",
+        "damage_code": row[4] or "no_damage",
     }
 
 

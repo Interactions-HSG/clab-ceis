@@ -153,9 +153,9 @@ def render_scenario_explorer(options_payload: dict) -> html.Div:
                             dcc.Dropdown(
                                 id="circular-damage",
                                 options=damage_options,
-                                value="small_hole"
+                                value="no_damage"
                                 if any(
-                                    option["value"] == "small_hole"
+                                    option["value"] == "no_damage"
                                     for option in damage_options
                                 )
                                 else damage_options[0]["value"],
@@ -364,13 +364,18 @@ def _saved_components(components: list[dict]) -> list[dict]:
 def render_scenario_results(payload: dict) -> html.Div:
     garment = payload.get("garment", {})
     damage = payload.get("damage", {})
+    patch_material = damage.get("patch_material", {})
     repair = payload.get("repair", {})
     return_scenarios = payload.get("return", {})
     process_names = [
         detail.get("process", "Unknown process")
         for detail in damage.get("processes", [])
     ]
-    process_label = ", ".join(process_names) or "Manual assessment"
+    process_label = ", ".join(process_names) or (
+        "No repair needed"
+        if damage.get("code") == "no_damage"
+        else "Manual assessment"
+    )
     self_repair = repair.get("self_repair", {})
     professional_repair = repair.get("professional_repair", {})
     new_garment = repair.get("new_garment", {})
@@ -415,6 +420,16 @@ def render_scenario_results(payload: dict) -> html.Div:
                     html.Span(
                         "Pieces to replace: "
                         f"{damage.get('replacement_block_count', 0)}"
+                    ),
+                    *(
+                        [
+                            html.Span(
+                                "Patch material: "
+                                f"{_format_number(patch_material.get('area_sqm'))} m²"
+                            )
+                        ]
+                        if patch_material.get("area_sqm")
+                        else []
                     ),
                 ],
                 className="scenario-summary panel-muted",

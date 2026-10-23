@@ -80,7 +80,7 @@ def render_returned_garments_table(garments: list[dict]):
                 html.Td(f"#{garment['returned_from_garment_id']}"),
                 html.Td(garment.get("fabric_block_count", 0)),
                 html.Td(
-                    str(garment.get("damage_code") or "small_hole")
+                    str(garment.get("damage_code") or "no_damage")
                     .replace("_", " ")
                     .title()
                 ),

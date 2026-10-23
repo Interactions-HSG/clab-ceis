@@ -19,7 +19,23 @@ from pages.order_table import (
     _return_alternatives_chart,
     render_return_alternative_details,
 )
+from pages.recipe import get_recipe_layout
 from pages.ui import page_hero
+
+
+def _find_parent(component, target_id):
+    children = getattr(component, "children", None)
+    if children is None:
+        return None
+    if not isinstance(children, (list, tuple)):
+        children = [children]
+    for child in children:
+        if getattr(child, "id", None) == target_id:
+            return component
+        parent = _find_parent(child, target_id)
+        if parent is not None:
+            return parent
+    return None
 
 
 def test_app_shell_does_not_render_global_home_link():
@@ -42,6 +58,16 @@ def test_page_hero_home_link_is_opt_in_for_subpages():
     assert "page-home-link" not in str(home_hero)
     assert "page-home-link" in str(subpage_hero)
     assert "page-hero-with-action" in str(subpage_hero)
+
+
+def test_recipe_reference_form_actions_render_below_their_fields():
+    layout = get_recipe_layout()
+
+    process_action_row = _find_parent(layout, "add-process-type")
+    material_action_row = _find_parent(layout, "add-material")
+
+    assert process_action_row.className == "form-actions"
+    assert material_action_row.className == "form-actions"
 
 
 def test_homepage_shows_pending_repairs_below_fabric_block_form():

@@ -46,11 +46,20 @@ def test_options_use_actual_sold_garments(seeded_db):
     assert all(
         "garment #" in garment["label"] for garment in payload["garments"]
     )
-    assert {damage["code"] for damage in payload["damages"]} >= {
-        "small_hole",
-        "zipper",
-        "burn",
-    }
+    assert [damage["code"] for damage in payload["damages"]] == [
+        "no_damage",
+        "loose_missing_fasteners",
+        "loose_elastic",
+        "loose_missing_button",
+        "holes_worn_under_5cm_patching",
+        "split_seam_fraying_edge",
+        "holes_worn_under_5cm_visible_mending",
+        "holes_worn_under_5cm_sashiko",
+        "holes_worn_under_7cm_applique",
+        "stains_painting",
+        "large_damage_fbm_replacement",
+    ]
+    assert payload["damages"][0]["label"] == "No damages"
 
 
 def test_shipped_production_order_supports_circular_scenarios(seeded_db):
@@ -84,7 +93,7 @@ def test_shipped_production_order_supports_circular_scenarios(seeded_db):
     payload = calculate_circular_scenarios(
         garment_id=shipped["garment_inventory_id"],
         distance_km=100,
-        damage_code="small_hole",
+        damage_code="holes_worn_under_5cm_patching",
         wiser_client=_mock_wiser_client(),
     )
 
@@ -102,7 +111,7 @@ def test_shop_repair_request_is_visible_in_repair_queue(seeded_db):
             json={
                 "garment_id": garment_id,
                 "action": "professional_repair",
-                "damage_code": "small_hole",
+                "damage_code": "holes_worn_under_5cm_patching",
             },
         )
         queue = client.get("/repairs")
@@ -114,7 +123,10 @@ def test_shop_repair_request_is_visible_in_repair_queue(seeded_db):
     assert queue.json()[0]["garment_id"] == garment_id
     assert queue.json()[0]["action"] == "professional_repair"
     assert queue.json()[0]["action_label"] == "Perform professional repair"
-    assert queue.json()[0]["damage_code"] == "small_hole"
+    assert (
+        queue.json()[0]["damage_code"]
+        == "holes_worn_under_5cm_patching"
+    )
 
 
 def test_garment_return_copies_blocks_with_processes_only_on_garment(seeded_db):
@@ -133,14 +145,14 @@ def test_garment_return_copies_blocks_with_processes_only_on_garment(seeded_db):
             "/garment-returns",
             json={
                 "garment_id": source_garment_id,
-                "damage_code": "small_hole",
+                "damage_code": "holes_worn_under_5cm_patching",
             },
         )
         duplicate = client.post(
             "/garment-returns",
             json={
                 "garment_id": source_garment_id,
-                "damage_code": "small_hole",
+                "damage_code": "holes_worn_under_5cm_patching",
             },
         )
 
@@ -181,7 +193,7 @@ def test_garment_return_copies_blocks_with_processes_only_on_garment(seeded_db):
         (returned["garment_id"],),
     )
     garment_processes = dict(cursor.fetchall())
-    assert garment_processes["sewing"] == pytest.approx(0.0042)
+    assert garment_processes["sewing"] == pytest.approx(0.0105)
     assert garment_processes["washing"] == pytest.approx(0.10)
     assert garment_processes["steaming"] == pytest.approx(0.11)
     cursor.execute(
@@ -207,7 +219,10 @@ def test_returned_garment_can_be_disassembled_into_fabric_inventory(seeded_db):
         client.app.state.wiser_client = _mock_wiser_client()
         returned = client.post(
             "/garment-returns",
-            json={"garment_id": source_garment_id, "damage_code": "small_hole"},
+            json={
+                "garment_id": source_garment_id,
+                "damage_code": "holes_worn_under_5cm_patching",
+            },
         ).json()
         returned_id = returned["garment_id"]
 
@@ -231,7 +246,10 @@ def test_returned_garment_can_be_disassembled_into_fabric_inventory(seeded_db):
     assert queue.status_code == 200
     assert queue.json()[0]["id"] == returned_id
     assert queue.json()[0]["fabric_block_count"] == returned["fabric_block_count"]
-    assert queue.json()[0]["damage_code"] == "small_hole"
+    assert (
+        queue.json()[0]["damage_code"]
+        == "holes_worn_under_5cm_patching"
+    )
     assert alternatives.status_code == 200
     assert alternatives.json()["garment"]["id"] == returned_id
     assert alternatives.json()["return"]["whole_garment"]["components"]
@@ -292,7 +310,10 @@ def test_returned_garment_shop_offer_uses_only_preparation_co2(seeded_db):
         client.app.state.wiser_client = _mock_wiser_client()
         created = client.post(
             "/garment-returns",
-            json={"garment_id": source_garment_id, "damage_code": "small_hole"},
+            json={
+                "garment_id": source_garment_id,
+                "damage_code": "holes_worn_under_5cm_patching",
+            },
         ).json()
         returned_id = created["garment_id"]
 
@@ -344,16 +365,85 @@ def test_returned_garment_shop_offer_uses_only_preparation_co2(seeded_db):
 
 def test_mock_repair_amounts_are_scaled_to_garment_assembly():
     expected_sewing_amounts = {
-        "small_hole": 0.0042,
-        "seam": 0.0105,
-        "tear": 0.021,
-        "burn": 0.042,
+        "loose_missing_fasteners": 0.0042,
+        "loose_elastic": 0.0105,
+        "loose_missing_button": 0.0042,
+        "holes_worn_under_5cm_patching": 0.0105,
+        "split_seam_fraying_edge": 0.0105,
+        "holes_worn_under_5cm_visible_mending": 0.0105,
+        "holes_worn_under_5cm_sashiko": 0.021,
+        "holes_worn_under_7cm_applique": 0.021,
+        "large_damage_fbm_replacement": 0.042,
     }
 
     for damage_code, expected_amount in expected_sewing_amounts.items():
         requirement = DAMAGE_PROFILE_BY_CODE[damage_code].repair_processes[0]
         assert requirement.name == "sewing"
         assert requirement.amount == pytest.approx(expected_amount)
+
+
+def test_patch_repairs_include_area_weighted_material_emissions(seeded_db):
+    garment_id = get_circular_scenario_options()["garments"][0]["id"]
+
+    patching = calculate_circular_scenarios(
+        garment_id,
+        100,
+        "holes_worn_under_5cm_patching",
+        _mock_wiser_client(),
+    )
+    seam_repair = calculate_circular_scenarios(
+        garment_id,
+        100,
+        "split_seam_fraying_edge",
+        _mock_wiser_client(),
+    )
+
+    patch = patching["damage"]["patch_material"]
+    assert patch["nominal_area_sqm"] == pytest.approx(0.0025)
+    assert patch["area_sqm"] == pytest.approx(0.0025)
+    assert patch["weight_kg"] > 0
+    assert patch["co2eq"] > 0
+    assert next(
+        component["co2eq"]
+        for component in patching["repair"]["self_repair"]["components"]
+        if component["name"] == "Patch material"
+    ) == pytest.approx(patch["co2eq"])
+    assert (
+        patching["repair"]["self_repair"]["shared_repair_co2eq"]
+        - seam_repair["repair"]["self_repair"]["shared_repair_co2eq"]
+    ) == pytest.approx(patch["co2eq"])
+
+
+def test_only_repairs_that_need_extra_fabric_get_patch_material(seeded_db):
+    garment_id = get_circular_scenario_options()["garments"][0]["id"]
+
+    expected_areas = {
+        "holes_worn_under_5cm_patching": 0.0025,
+        "holes_worn_under_5cm_visible_mending": 0.0025,
+        "holes_worn_under_7cm_applique": 0.0049,
+    }
+    for damage_code, expected_area in expected_areas.items():
+        payload = calculate_circular_scenarios(
+            garment_id,
+            100,
+            damage_code,
+            _mock_wiser_client(),
+        )
+        assert payload["damage"]["patch_material"]["area_sqm"] == pytest.approx(
+            expected_area
+        )
+
+    sashiko = calculate_circular_scenarios(
+        garment_id,
+        100,
+        "holes_worn_under_5cm_sashiko",
+        _mock_wiser_client(),
+    )
+    assert sashiko["damage"]["patch_material"]["area_sqm"] == 0
+    assert all(
+        component["name"] != "Patch material"
+        for component in sashiko["repair"]["self_repair"]["components"]
+    )
 
 
 def test_every_returnable_damage_adds_washing_and_steaming_once():
@@ -370,13 +460,41 @@ def test_every_returnable_damage_adds_washing_and_steaming_once():
         assert process_names.count("steaming") == 1
 
 
+def test_no_damage_allows_return_but_disables_repair(seeded_db):
+    garment_id = get_circular_scenario_options()["garments"][0]["id"]
+
+    payload = calculate_circular_scenarios(
+        garment_id=garment_id,
+        distance_km=100,
+        damage_code="no_damage",
+        wiser_client=_mock_wiser_client(),
+    )
+
+    assert payload["damage"]["repair_available"] is False
+    assert payload["damage"]["processes"] == []
+    assert payload["repair"]["self_repair"]["available"] is False
+    assert (
+        payload["repair"]["self_repair"]["reason"]
+        == "This garment does not need a repair."
+    )
+    assert payload["repair"]["professional_repair"]["available"] is False
+    assert (
+        payload["repair"]["professional_repair"]["reason"]
+        == "This garment does not need a repair."
+    )
+    assert payload["return"]["whole_garment"]["available"] is True
+    assert {
+        process["name"] for process in get_return_inventory_processes("no_damage")
+    } == {"washing", "steaming"}
+
+
 def test_repair_process_is_shared_but_transport_differs(seeded_db):
     garment_id = get_circular_scenario_options()["garments"][0]["id"]
 
     payload = calculate_circular_scenarios(
         garment_id=garment_id,
         distance_km=100,
-        damage_code="small_hole",
+        damage_code="holes_worn_under_5cm_patching",
         wiser_client=_mock_wiser_client(),
     )
 
@@ -430,13 +548,13 @@ def test_higher_electricity_factor_mode_changes_page_calculations(seeded_db):
     current = calculate_circular_scenarios(
         garment_id,
         100,
-        "small_hole",
+        "holes_worn_under_5cm_patching",
         _mock_wiser_client(),
     )
     higher_factor = calculate_circular_scenarios(
         garment_id,
         100,
-        "small_hole",
+        "holes_worn_under_5cm_patching",
         _mock_wiser_client(),
         use_higher_electricity_factor=True,
     )
@@ -473,7 +591,7 @@ def test_higher_electricity_factor_mode_requests_configured_activity(seeded_db):
     calculate_circular_scenarios(
         garment_id,
         100,
-        "small_hole",
+        "holes_worn_under_5cm_patching",
         wiser_client,
         use_higher_electricity_factor=True,
     )
@@ -489,7 +607,7 @@ def test_chart_components_reconcile_with_scenario_totals(seeded_db):
     payload = calculate_circular_scenarios(
         garment_id=garment_id,
         distance_km=100,
-        damage_code="burn",
+        damage_code="large_damage_fbm_replacement",
         wiser_client=_mock_wiser_client(),
     )
 
@@ -528,24 +646,24 @@ def test_chart_components_reconcile_with_scenario_totals(seeded_db):
 def test_block_recovery_uses_damage_block_loss_assumption(seeded_db):
     garment_id = get_circular_scenario_options()["garments"][0]["id"]
 
-    small_hole = calculate_circular_scenarios(
+    small_damage = calculate_circular_scenarios(
         garment_id,
         50,
-        "small_hole",
+        "holes_worn_under_5cm_patching",
         _mock_wiser_client(),
     )
-    burn = calculate_circular_scenarios(
+    large_damage = calculate_circular_scenarios(
         garment_id,
         50,
-        "burn",
+        "large_damage_fbm_replacement",
         _mock_wiser_client(),
     )
 
     assert (
-        burn["return"]["fabric_blocks"]["recoverable_block_count"]
-        == small_hole["return"]["fabric_blocks"]["recoverable_block_count"] - 1
+        large_damage["return"]["fabric_blocks"]["recoverable_block_count"]
+        == small_damage["return"]["fabric_blocks"]["recoverable_block_count"] - 1
     )
     assert (
-        burn["return"]["fabric_blocks"]["recoverable_material_co2eq"]
-        < small_hole["return"]["fabric_blocks"]["recoverable_material_co2eq"]
+        large_damage["return"]["fabric_blocks"]["recoverable_material_co2eq"]
+        < small_damage["return"]["fabric_blocks"]["recoverable_material_co2eq"]
     )

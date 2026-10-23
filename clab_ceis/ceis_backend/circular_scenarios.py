@@ -42,11 +42,13 @@ class DamageProfile:
     code: str
     label: str
     repair_processes: tuple[ProcessRequirement, ...]
+    patch_area_sqm: float = 0.0
     replacement_block_count: int = 0
     unrecoverable_block_count: int = 0
     repair_available: bool = True
     whole_garment_available: bool = True
     fabric_blocks_available: bool = True
+    repair_unavailable_reason: str = "This damage requires manual assessment."
 
 
 # The seeded garment recipe uses 0.042 kWh of sewing and 0.22 kWh of
@@ -58,6 +60,8 @@ _LARGE_REPAIR_SEWING_KWH = 0.021
 _PANEL_REPLACEMENT_SEWING_KWH = 0.042
 _ALLOCATED_WASHING_KWH = 0.10
 _LIGHT_STEAMING_KWH = 0.11
+_SMALL_PATCH_AREA_SQM = 0.05 * 0.05
+_MEDIUM_PATCH_AREA_SQM = 0.07 * 0.07
 
 _RETURN_PREPARATION = (
     ProcessRequirement("washing", _ALLOCATED_WASHING_KWH),
@@ -71,61 +75,63 @@ _BLOCK_PREPARATION = (
 
 DAMAGE_PROFILES: tuple[DamageProfile, ...] = (
     DamageProfile(
-        "dirt",
-        "Dirt or odor",
-        (ProcessRequirement("washing", _ALLOCATED_WASHING_KWH),),
+        "no_damage",
+        "No damages",
+        (),
+        repair_available=False,
+        repair_unavailable_reason="This garment does not need a repair.",
     ),
     DamageProfile(
-        "stain",
-        "Stain or discoloration",
-        (
-            ProcessRequirement("washing", _ALLOCATED_WASHING_KWH),
-            ProcessRequirement("dyeing", 0.02, "surface treatment"),
-        ),
-    ),
-    DamageProfile(
-        "small_hole",
-        "Small hole or puncture",
+        "loose_missing_fasteners",
+        "Loose/missing fasteners",
         (ProcessRequirement("sewing", _SMALL_REPAIR_SEWING_KWH),),
     ),
     DamageProfile(
-        "tear",
-        "Large hole, tear or cut",
-        (ProcessRequirement("sewing", _LARGE_REPAIR_SEWING_KWH),),
-    ),
-    DamageProfile(
-        "seam",
-        "Open or damaged seam",
+        "loose_elastic",
+        "Loose elastic",
         (ProcessRequirement("sewing", _MEDIUM_REPAIR_SEWING_KWH),),
     ),
     DamageProfile(
-        "worn",
-        "Worn or thinning fabric",
-        (ProcessRequirement("sewing", _LARGE_REPAIR_SEWING_KWH),),
-    ),
-    DamageProfile(
-        "fastener",
-        "Missing button or snap",
+        "loose_missing_button",
+        "Loose/missing button",
         (ProcessRequirement("sewing", _SMALL_REPAIR_SEWING_KWH),),
     ),
     DamageProfile(
-        "zipper",
-        "Broken zipper",
-        (ProcessRequirement("sewing", _LARGE_REPAIR_SEWING_KWH),),
+        "holes_worn_under_5cm_patching",
+        "Holes & worn-out areas <5 cm — patching",
+        (ProcessRequirement("sewing", _MEDIUM_REPAIR_SEWING_KWH),),
+        patch_area_sqm=_SMALL_PATCH_AREA_SQM,
     ),
     DamageProfile(
-        "trim",
-        "Damaged elastic, cuff or hem",
+        "split_seam_fraying_edge",
+        "Split/blown seam or fraying edge",
         (ProcessRequirement("sewing", _MEDIUM_REPAIR_SEWING_KWH),),
     ),
     DamageProfile(
-        "coating",
-        "Coating or delamination failure",
-        (ProcessRequirement("dyeing", 0.04, "surface treatment"),),
+        "holes_worn_under_5cm_visible_mending",
+        "Holes & worn-out areas <5 cm — visible mending",
+        (ProcessRequirement("sewing", _MEDIUM_REPAIR_SEWING_KWH),),
+        patch_area_sqm=_SMALL_PATCH_AREA_SQM,
     ),
     DamageProfile(
-        "burn",
-        "Burn or chemical damage",
+        "holes_worn_under_5cm_sashiko",
+        "Holes & worn-out areas <5 cm — sashiko",
+        (ProcessRequirement("sewing", _LARGE_REPAIR_SEWING_KWH),),
+    ),
+    DamageProfile(
+        "holes_worn_under_7cm_applique",
+        "Holes & worn-out areas <7 cm — appliqué / reverse appliqué",
+        (ProcessRequirement("sewing", _LARGE_REPAIR_SEWING_KWH),),
+        patch_area_sqm=_MEDIUM_PATCH_AREA_SQM,
+    ),
+    DamageProfile(
+        "stains_painting",
+        "Stains — textile painting",
+        (ProcessRequirement("dyeing", 0.02, "textile painting"),),
+    ),
+    DamageProfile(
+        "large_damage_fbm_replacement",
+        "Holes/worn-out areas/stains >7 cm or deformed shape",
         (
             ProcessRequirement(
                 "sewing",
@@ -135,22 +141,6 @@ DAMAGE_PROFILES: tuple[DamageProfile, ...] = (
         ),
         replacement_block_count=1,
         unrecoverable_block_count=1,
-    ),
-    DamageProfile(
-        "contamination",
-        "Mold or unsafe contamination",
-        (),
-        repair_available=False,
-        whole_garment_available=False,
-        fabric_blocks_available=False,
-    ),
-    DamageProfile(
-        "unknown",
-        "Multiple or unknown damage",
-        (),
-        repair_available=False,
-        whole_garment_available=False,
-        fabric_blocks_available=False,
     ),
 )
 
@@ -214,7 +204,7 @@ def get_return_inventory_processes(damage_code: str) -> list[dict]:
     damage = DAMAGE_PROFILE_BY_CODE.get(damage_code)
     if damage is None:
         raise HTTPException(status_code=404, detail="Damage type not found")
-    if not damage.repair_available or not damage.whole_garment_available:
+    if not damage.whole_garment_available:
         raise HTTPException(
             status_code=422,
             detail="Garment return is not available for this damage type",
@@ -283,6 +273,7 @@ def _new_equivalent_block_data(
     details: list[dict] = []
     total_co2eq = 0.0
     total_weight_kg = 0.0
+    total_area_sqm = 0.0
     total_material_co2eq = 0.0
     total_process_co2eq = 0.0
 
@@ -322,6 +313,7 @@ def _new_equivalent_block_data(
         block_total = material_co2eq + process_co2eq
         total_co2eq += block_total
         total_weight_kg += weight_kg
+        total_area_sqm += float(block["sqm"])
         total_material_co2eq += material_co2eq
         total_process_co2eq += process_co2eq
         details.append(
@@ -340,7 +332,16 @@ def _new_equivalent_block_data(
     return {
         "total_co2eq": round(total_co2eq, 6),
         "total_weight_kg": round(total_weight_kg, 6),
+        "total_area_sqm": round(total_area_sqm, 6),
         "material_co2eq": round(total_material_co2eq, 6),
+        "material_co2eq_per_sqm": round(
+            total_material_co2eq / total_area_sqm if total_area_sqm else 0.0,
+            6,
+        ),
+        "weight_kg_per_sqm": round(
+            total_weight_kg / total_area_sqm if total_area_sqm else 0.0,
+            6,
+        ),
         "process_co2eq": round(total_process_co2eq, 6),
         "details": details,
     }
@@ -527,8 +528,18 @@ def calculate_circular_scenarios(
         float(block_reference["total_co2eq"]) * replacement_share
     )
     replacement_weight_kg = garment_weight_kg * replacement_share
+    patch_material_area_sqm = damage.patch_area_sqm
+    patch_material_co2eq = (
+        patch_material_area_sqm
+        * float(block_reference["material_co2eq_per_sqm"])
+    )
+    patch_material_weight_kg = (
+        patch_material_area_sqm * float(block_reference["weight_kg_per_sqm"])
+    )
     shared_repair_co2eq = (
-        float(repair_process["total_co2eq"]) + replacement_material_co2eq
+        float(repair_process["total_co2eq"])
+        + replacement_material_co2eq
+        + patch_material_co2eq
     )
     shared_repair_components = _process_components("Repair", repair_process)
     if replacement_material_co2eq:
@@ -538,12 +549,22 @@ def calculate_circular_scenarios(
                 "co2eq": round(replacement_material_co2eq, 6),
             }
         )
+    if patch_material_co2eq:
+        shared_repair_components.append(
+            {
+                "name": "Patch material",
+                "co2eq": round(patch_material_co2eq, 6),
+            }
+        )
 
     if damage.repair_available:
         self_transport = _transport_result(
             distance_km,
             1,
-            max(replacement_weight_kg, MINIMUM_REPAIR_KIT_WEIGHT_KG),
+            max(
+                replacement_weight_kg + patch_material_weight_kg,
+                MINIMUM_REPAIR_KIT_WEIGHT_KG,
+            ),
             transport_factor,
         )
         professional_transport = _transport_result(
@@ -576,7 +597,7 @@ def calculate_circular_scenarios(
             transport=professional_transport,
         )
     else:
-        reason = "This damage requires manual assessment."
+        reason = damage.repair_unavailable_reason
         self_repair = _unavailable_scenario(reason)
         professional_repair = _unavailable_scenario(reason)
 
@@ -593,7 +614,7 @@ def calculate_circular_scenarios(
         wiser_client, _BLOCK_PREPARATION, use_higher_electricity_factor
     )
 
-    if damage.whole_garment_available and damage.repair_available:
+    if damage.whole_garment_available:
         whole_total = (
             return_transport["co2eq"]
             + shared_repair_co2eq
@@ -675,6 +696,13 @@ def calculate_circular_scenarios(
             "code": damage.code,
             "label": damage.label,
             "processes": repair_process["details"],
+            "repair_available": damage.repair_available,
+            "patch_material": {
+                "nominal_area_sqm": round(damage.patch_area_sqm, 6),
+                "area_sqm": round(patch_material_area_sqm, 6),
+                "weight_kg": round(patch_material_weight_kg, 6),
+                "co2eq": round(patch_material_co2eq, 6),
+            },
             "replacement_block_count": replacement_count,
             "unrecoverable_block_count": min(
                 damage.unrecoverable_block_count, block_count
@@ -725,8 +753,10 @@ def calculate_circular_scenarios(
                 else "Electricity-based processes use the currently configured activity."
             ),
             "Self and professional repair use the same repair processes.",
-            "Repair sewing is scaled from 10% to 100% of the seeded garment "
-            "sewing amount.",
+            "Where used, repair sewing is scaled from 10% to 100% of the "
+            "seeded garment sewing amount.",
+            "Patch material uses a 5 × 5 cm or 7 × 7 cm area and the "
+            "garment's area-weighted material intensity.",
             "Return preparation always includes washing, and steaming uses "
             "half the new-garment amount.",
             "Self repair transports one repair kit or replacement-material shipment.",

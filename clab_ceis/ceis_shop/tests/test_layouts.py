@@ -130,7 +130,11 @@ def test_scenario_explorer_uses_bought_garment_and_damage_options():
                 {"id": 7, "label": "Basic Crop Top · garment #7"},
             ],
             "damages": [
-                {"code": "small_hole", "label": "Small hole or puncture"},
+                {"code": "no_damage", "label": "No damages"},
+                {
+                    "code": "loose_missing_button",
+                    "label": "Loose/missing button",
+                },
             ],
         }
     )
@@ -144,7 +148,9 @@ def test_scenario_explorer_uses_bought_garment_and_damage_options():
     assert "circular-distance" in text
     assert "value=1000" in text
     assert "circular-damage" in text
-    assert "Small hole or puncture" in text
+    assert "No damages" in text
+    assert "Loose/missing button" in text
+    assert "value='no_damage'" in text
     assert "circular-use-higher-electricity-factor" not in text
     assert "Electricity factor" not in text
     assert "circular-garment-return-result" in text
@@ -199,6 +205,7 @@ def test_scenario_results_show_alternatives_without_recommendation():
             "damage": {
                 "processes": [{"process": "sewing"}],
                 "replacement_block_count": 1,
+                "patch_material": {"area_sqm": 0.0025, "co2eq": 0.002625},
             },
             "repair": {
                 "self_repair": scenario,
@@ -239,6 +246,7 @@ def test_scenario_results_show_alternatives_without_recommendation():
     assert "Recover fabric blocks" not in text
     assert text.index("Expected CO2 saving") < text.index("return-garment-button")
     assert "Pieces to replace: 1" in text
+    assert "Patch material: 0.003 m²" in text
     assert "garment #7" not in text
     assert "View detailed charts" in text
     assert "scenario-secondary-button" in text
