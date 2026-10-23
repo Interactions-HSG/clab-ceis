@@ -8,6 +8,7 @@ from ceis_backend.circular_scenarios import (
     DAMAGE_PROFILE_BY_CODE,
     calculate_circular_scenarios,
     get_circular_scenario_options,
+    get_return_inventory_processes,
 )
 from ceis_backend.db_init import init_sqlite_db
 from ceis_backend.main import app
@@ -181,6 +182,7 @@ def test_garment_return_copies_blocks_with_processes_only_on_garment(seeded_db):
     )
     garment_processes = dict(cursor.fetchall())
     assert garment_processes["sewing"] == pytest.approx(0.0042)
+    assert garment_processes["washing"] == pytest.approx(0.10)
     assert garment_processes["steaming"] == pytest.approx(0.11)
     cursor.execute(
         """
@@ -331,6 +333,7 @@ def test_returned_garment_shop_offer_uses_only_preparation_co2(seeded_db):
     assert comparison["new_total_co2eq"] > comparison["returned_total_co2eq"]
     assert {step["process"] for step in comparison["preparation_processes"]} == {
         "sewing",
+        "washing",
         "steaming",
     }
     assert regular_order["garment_inventory_id"] != returned_id
@@ -351,6 +354,20 @@ def test_mock_repair_amounts_are_scaled_to_garment_assembly():
         requirement = DAMAGE_PROFILE_BY_CODE[damage_code].repair_processes[0]
         assert requirement.name == "sewing"
         assert requirement.amount == pytest.approx(expected_amount)
+
+
+def test_every_returnable_damage_adds_washing_and_steaming_once():
+    for damage_code, profile in DAMAGE_PROFILE_BY_CODE.items():
+        if not profile.repair_available or not profile.whole_garment_available:
+            continue
+
+        process_names = [
+            process["name"]
+            for process in get_return_inventory_processes(damage_code)
+        ]
+
+        assert process_names.count("washing") == 1
+        assert process_names.count("steaming") == 1
 
 
 def test_repair_process_is_shared_but_transport_differs(seeded_db):
@@ -397,6 +414,12 @@ def test_repair_process_is_shared_but_transport_differs(seeded_db):
     )
     assert new_garment["saving_percent"] == 0.0
     assert payload["return"]["whole_garment"]["available"] is True
+    assert {
+        detail["process"]
+        for detail in payload["return"]["whole_garment"]["preparation"][
+            "details"
+        ]
+    } == {"washing", "steaming"}
     assert payload["return"]["fabric_blocks"]["available"] is True
     assert "recommendation" not in payload
 

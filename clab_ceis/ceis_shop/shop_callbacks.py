@@ -5,6 +5,7 @@ from pathlib import Path
 import plotly.graph_objects as go
 from dash import ctx, dcc, html, no_update
 from dash.dependencies import Input, Output, State
+from pages.chart_theme import apply_bar_chart_theme, component_marker
 
 from ceis_shop import config
 from ceis_shop.layouts.garment import (
@@ -76,7 +77,7 @@ def get_callbacks(app):
         Input("returned-garment-order-button", "n_clicks"),
         State("garment-type-id-store", "data"),
         State("garment-material-dropdown", "value"),
-        State("returned-garment-dropdown", "value"),
+        State("returned-garment-selection", "data"),
         prevent_initial_call=True,
     )
     def place_returned_garment_order(
@@ -97,13 +98,13 @@ def get_callbacks(app):
             response.raise_for_status()
             order = response.json()
         except Exception as exc:
-            return html.P(f"Unable to order returned garment: {exc}")
+            return html.P(f"Unable to order pre-loved garment: {exc}")
 
         return html.Div(
             [
                 html.Strong("Second-life garment reserved"),
                 html.P(
-                    f"Returned garment reserved for CHF {float(order['price_chf']):.2f}. "
+                    f"Pre-loved garment reserved for CHF {float(order['price_chf']):.2f}. "
                     "Delivery has started."
                 ),
             ],
@@ -113,7 +114,7 @@ def get_callbacks(app):
     @app.callback(
         Output("returned-garment-comparison", "children"),
         Input("garment-material-dropdown", "value"),
-        Input("returned-garment-dropdown", "value"),
+        Input("returned-garment-selection", "data"),
         State("garment-type-id-store", "data"),
     )
     def update_returned_garment_comparison(
@@ -122,7 +123,7 @@ def get_callbacks(app):
         if material_id is None:
             return "Select a material above to compare it with the equivalent new garment."
         if garment_inventory_id is None:
-            return "No returned garment is currently available."
+            return "No pre-loved garment is currently available."
         try:
             response = requests.get(
                 f"{config.BACKEND_API_URL}/garment-types/{garment_type_id}/"
@@ -133,7 +134,7 @@ def get_callbacks(app):
             response.raise_for_status()
             payload = response.json()
         except Exception as exc:
-            return html.P(f"Unable to calculate returned-garment CO2: {exc}")
+            return html.P(f"Unable to calculate pre-loved garment CO2: {exc}")
 
         return render_returned_garment_comparison(payload)
 
@@ -170,7 +171,7 @@ def get_callbacks(app):
             scenario.get("label", "Scenario") for scenario in scenarios
         ]
         figure = go.Figure()
-        for activity_name in sorted(all_activities):
+        for index, activity_name in enumerate(sorted(all_activities)):
             figure.add_bar(
                 name=activity_name,
                 x=scenario_labels,
@@ -178,6 +179,7 @@ def get_callbacks(app):
                     scenario_activity_map.get(label, {}).get(activity_name, 0)
                     for label in scenario_labels
                 ],
+                marker=component_marker(activity_name, index),
             )
 
         figure.update_layout(
@@ -188,8 +190,9 @@ def get_callbacks(app):
             ),
             xaxis_title="Scenario",
             yaxis_title="CO2 (kg CO2eq)",
-            margin={"l": 20, "r": 20, "t": 40, "b": 20},
+            margin={"l": 55, "r": 20, "t": 90, "b": 55},
         )
+        apply_bar_chart_theme(figure)
         return html.Div(dcc.Graph(figure=figure))
 
     @app.callback(
@@ -216,11 +219,8 @@ def get_callbacks(app):
         Input("circular-garment", "value"),
         Input("circular-distance", "value"),
         Input("circular-damage", "value"),
-        Input("circular-use-higher-electricity-factor", "value"),
     )
-    def update_customer_circular_scenarios(
-        garment_id, distance_km, damage_code, electricity_mode
-    ):
+    def update_customer_circular_scenarios(garment_id, distance_km, damage_code):
         if garment_id is None or distance_km is None or damage_code is None:
             return html.P("Select a garment, distance, and damage type.")
 
@@ -230,8 +230,6 @@ def get_callbacks(app):
                 params={
                     "distance_km": distance_km,
                     "damage_code": damage_code,
-                    "use_higher_electricity_factor": "higher_factor"
-                    in (electricity_mode or []),
                 },
                 timeout=30,
             )

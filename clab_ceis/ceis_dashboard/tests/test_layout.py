@@ -15,7 +15,10 @@ from pages.flow import (
     get_dashboard_layout,
 )
 from pages.home import get_index_layout
-from pages.order_table import render_return_alternative_details
+from pages.order_table import (
+    _return_alternatives_chart,
+    render_return_alternative_details,
+)
 from pages.ui import page_hero
 
 
@@ -108,10 +111,13 @@ def test_homepage_shows_orders_at_top_with_ship_action():
     text = str(layout)
 
     assert "Orders" in text
+    assert "orders-card" in text
     assert "orders-table-container" in text
     assert "Made coat" in text
     assert "ship-order" in text
-    assert "Returned Garments" in text
+    assert "Pre-loved Garments" in text
+    assert "returned-garments-card" in text
+    assert "Pre-loved" in text
     assert "Returned coat" in text
     assert "disassemble-returned-garment" in text
     assert "view-return-alternatives" in text
@@ -119,8 +125,8 @@ def test_homepage_shows_orders_at_top_with_ship_action():
     assert "returned-alternatives-higher-electricity-factor" in text
     assert "Use higher electricity emission factor" in text
     assert text.index("Orders") < text.index("Second-hand Fabric Block Inventory")
-    assert text.index("Orders") < text.index("Returned Garments")
-    assert text.index("Returned Garments") < text.index(
+    assert text.index("Orders") < text.index("Pre-loved Garments")
+    assert text.index("Pre-loved Garments") < text.index(
         "Second-hand Fabric Block Inventory"
     )
 
@@ -155,6 +161,20 @@ def test_return_alternative_details_match_shop_chart_structure():
     assert "Recover fabric blocks" in text
     assert "Saved: Material production avoided" in text
     assert "Higher electricity factor" in text
+
+    figure = _return_alternatives_chart(
+        {
+            "return": {
+                "whole_garment": scenario,
+                "fabric_blocks": scenario,
+            }
+        }
+    )
+    traces = {trace.name: trace for trace in figure.data}
+    assert traces["Transport"].marker.color == "#d45d3a"
+    assert traces["Saved: Material production avoided"].marker.color == "#e3a928"
+    assert traces["Saved: Material production avoided"].marker.pattern.shape == "/"
+    assert figure.layout.colorway[0] == "#1f6a52"
 
 
 def test_product_lifecycle_uses_top_to_bottom_flow():

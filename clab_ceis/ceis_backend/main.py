@@ -249,7 +249,7 @@ def get_returned_garment_alternatives(
 ):
     garment = db_get_returned_garment(garment_id)
     if garment is None:
-        raise HTTPException(status_code=404, detail="Returned garment not found")
+        raise HTTPException(status_code=404, detail="Pre-loved garment not found")
     try:
         return calculate_circular_scenarios(
             garment_id,

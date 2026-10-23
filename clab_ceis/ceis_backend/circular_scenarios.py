@@ -59,7 +59,10 @@ _PANEL_REPLACEMENT_SEWING_KWH = 0.042
 _ALLOCATED_WASHING_KWH = 0.10
 _LIGHT_STEAMING_KWH = 0.11
 
-_STEAMING = (ProcessRequirement("steaming", _LIGHT_STEAMING_KWH),)
+_RETURN_PREPARATION = (
+    ProcessRequirement("washing", _ALLOCATED_WASHING_KWH),
+    ProcessRequirement("steaming", _LIGHT_STEAMING_KWH),
+)
 _BLOCK_PREPARATION = (
     ProcessRequirement("washing", _ALLOCATED_WASHING_KWH),
     ProcessRequirement("sewing", _LARGE_REPAIR_SEWING_KWH, "disassembly"),
@@ -216,9 +219,16 @@ def get_return_inventory_processes(damage_code: str) -> list[dict]:
             status_code=422,
             detail="Garment return is not available for this damage type",
         )
+    requirements = list(damage.repair_processes)
+    process_names = {requirement.name for requirement in requirements}
+    requirements.extend(
+        requirement
+        for requirement in _RETURN_PREPARATION
+        if requirement.name not in process_names
+    )
     return [
         {"name": requirement.name, "amount": requirement.amount}
-        for requirement in (*damage.repair_processes, *_STEAMING)
+        for requirement in requirements
     ]
 
 
@@ -437,7 +447,7 @@ def calculate_circular_scenarios(
     )
     if garment is None:
         detail = (
-            "Returned garment not found"
+            "Pre-loved garment not found"
             if returned_garment
             else "Sold garment not found"
         )
@@ -577,7 +587,7 @@ def calculate_circular_scenarios(
         transport_factor,
     )
     whole_preparation = _process_result(
-        wiser_client, _STEAMING, use_higher_electricity_factor
+        wiser_client, _RETURN_PREPARATION, use_higher_electricity_factor
     )
     block_preparation = _process_result(
         wiser_client, _BLOCK_PREPARATION, use_higher_electricity_factor
@@ -717,8 +727,8 @@ def calculate_circular_scenarios(
             "Self and professional repair use the same repair processes.",
             "Repair sewing is scaled from 10% to 100% of the seeded garment "
             "sewing amount.",
-            "Washing is allocated per garment and return steaming uses half "
-            "the new-garment amount.",
+            "Return preparation always includes washing, and steaming uses "
+            "half the new-garment amount.",
             "Self repair transports one repair kit or replacement-material shipment.",
             "Professional repair transports the complete garment for two legs.",
             "Return scenarios transport the complete garment for one leg.",

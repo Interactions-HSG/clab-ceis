@@ -310,10 +310,10 @@ def _render_returned_garment_offer(returned_garments: list[dict]) -> html.Div:
     if not returned_garments:
         return html.Div(
             [
-                dcc.Dropdown(id="returned-garment-dropdown", options=[]),
+                dcc.Store(id="returned-garment-selection", data=None),
                 html.Div(id="returned-garment-comparison"),
                 html.Button(
-                    "Order returned garment",
+                    "Order pre-loved garment",
                     id="returned-garment-order-button",
                     n_clicks=0,
                 ),
@@ -324,26 +324,14 @@ def _render_returned_garment_offer(returned_garments: list[dict]) -> html.Div:
         )
 
     selected = returned_garments[0]
-    options = [
-        {
-            "label": f"Second-life {selected['garment']}",
-            "value": selected["id"],
-        }
-    ]
     return html.Div(
         [
+            dcc.Store(id="returned-garment-selection", data=selected["id"]),
             html.Div("50% OFF · ONE AVAILABLE", className="discount-badge"),
             html.Div("Whole-garment alternative", className="section-eyebrow"),
-            html.H2("Give a returned garment its next life"),
+            html.H2("Give a pre-loved garment its next life"),
             html.P(
                 "Professionally prepared and ready to wear, with no new fabric required."
-            ),
-            dcc.Dropdown(
-                id="returned-garment-dropdown",
-                options=options,
-                value=selected["id"],
-                clearable=False,
-                disabled=True,
             ),
             html.Div(
                 [
@@ -359,7 +347,7 @@ def _render_returned_garment_offer(returned_garments: list[dict]) -> html.Div:
                 className="price-stack horizontal",
             ),
             html.P(
-                "Choosing the returned garment avoids new-fabric emissions.",
+                "Choosing the pre-loved garment avoids new-fabric emissions.",
                 className="alternative-impact",
             ),
             html.Div(
@@ -368,7 +356,7 @@ def _render_returned_garment_offer(returned_garments: list[dict]) -> html.Div:
                 className="returned-comparison-slot",
             ),
             html.Button(
-                "Order returned garment",
+                "Order pre-loved garment",
                 id="returned-garment-order-button",
                 n_clicks=0,
                 className="primary-button",
