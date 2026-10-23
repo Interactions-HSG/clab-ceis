@@ -561,6 +561,25 @@ ul {
     margin-top: 18px;
 }
 
+.scenario-primary-button {
+    min-height: 48px;
+    padding-inline: 22px;
+}
+
+.scenario-secondary-button {
+    background: transparent;
+    border-color: var(--line-strong);
+    color: var(--accent-strong);
+    font-weight: 700;
+}
+
+.scenario-secondary-button:hover {
+    background: var(--surface-soft);
+    border-color: var(--accent);
+    color: var(--accent-strong);
+    box-shadow: none;
+}
+
 .scenario-chart-grid {
     display: grid;
     gap: 18px;
@@ -1061,7 +1080,7 @@ ul {
     padding: clamp(28px, 5vw, 64px);
 }
 
-.home-hero {
+.shop-page .home-hero {
     align-items: end;
     background:
         radial-gradient(circle at 87% 16%, rgba(244, 201, 93, 0.75) 0 7%, transparent 7.4%),
@@ -1069,7 +1088,8 @@ ul {
         var(--shop-green-dark);
     color: #ffffff;
     grid-template-columns: minmax(0, 1.45fr) minmax(220px, 0.55fr);
-    min-height: 410px;
+    min-height: 350px;
+    padding: clamp(26px, 4vw, 48px);
 }
 
 .home-hero .shop-kicker,
@@ -1079,7 +1099,7 @@ ul {
 
 .home-hero .header-title {
     color: #ffffff;
-    font-size: clamp(2.5rem, 5.8vw, 4.9rem);
+    font-size: clamp(2.35rem, 4.8vw, 4.2rem);
     letter-spacing: -0.045em;
     max-width: 880px;
 }
@@ -1581,6 +1601,15 @@ ul {
     .home-hero,
     .garment-page .product-content {
         grid-template-columns: 1fr;
+    }
+
+    .shop-page .home-hero {
+        min-height: 0;
+        padding: 26px;
+    }
+
+    .home-hero .header-title {
+        font-size: 2.15rem;
     }
 
     .shop-page .shop-hero {

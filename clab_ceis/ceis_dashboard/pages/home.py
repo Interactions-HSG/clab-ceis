@@ -48,9 +48,16 @@ def get_index_layout():
                 children=render_orders_table(fetch_orders()),
             ),
             html.Div(id="order-action-status", className="order-action-status"),
-            html.H2("Returned Garments"),
+        ],
+        id="orders-card",
+        className="panel table-panel orders-panel",
+    )
+
+    returned_garments = html.Div(
+        [
+            html.H2("Pre-loved Garments"),
             html.P(
-                "Disassemble a returned garment to release all of its fabric "
+                "Disassemble a pre-loved garment to release all of its fabric "
                 "blocks into second-hand inventory."
             ),
             html.Div(
@@ -129,7 +136,8 @@ def get_index_layout():
                 hidden=True,
             ),
         ],
-        className="panel table-panel orders-panel",
+        id="returned-garments-card",
+        className="panel table-panel returned-garments-panel",
     )
 
     inventory_form = html.Div(
@@ -325,6 +333,7 @@ def get_index_layout():
                 "Manage reusable fabric inventory, recipe references, and garment-level assessments from one cockpit.",
             ),
             orders,
+            returned_garments,
             inventory_form,
             fabric_form,
             repair_actions,

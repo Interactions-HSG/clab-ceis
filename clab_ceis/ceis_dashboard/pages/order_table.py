@@ -3,6 +3,8 @@ from __future__ import annotations
 import plotly.graph_objects as go
 from dash import dcc, html
 
+from pages.chart_theme import apply_bar_chart_theme, component_marker
+
 
 def render_orders_table(orders: list[dict]):
     if not orders:
@@ -53,7 +55,9 @@ def render_orders_table(orders: list[dict]):
 
 def render_returned_garments_table(garments: list[dict]):
     if not garments:
-        return html.Div("No returned garments awaiting action.", className="panel-muted")
+        return html.Div(
+            "No pre-loved garments awaiting action.", className="panel-muted"
+        )
 
     header = html.Thead(
         html.Tr(
@@ -76,11 +80,15 @@ def render_returned_garments_table(garments: list[dict]):
                 html.Td(f"#{garment['returned_from_garment_id']}"),
                 html.Td(garment.get("fabric_block_count", 0)),
                 html.Td(
-                    str(garment.get("damage_code") or "small_hole")
+                    str(garment.get("damage_code") or "no_damage")
                     .replace("_", " ")
                     .title()
                 ),
-                html.Td(garment.get("status") or "Returned"),
+                html.Td(
+                    "Pre-loved"
+                    if garment.get("status") in (None, "", "Returned")
+                    else garment["status"]
+                ),
                 html.Td(
                     html.Div(
                         [
@@ -161,7 +169,7 @@ def _return_alternatives_chart(payload: dict) -> go.Figure:
 
     figure = go.Figure()
     labels = [label for label, _ in bars]
-    for component_name in component_names:
+    for index, component_name in enumerate(component_names):
         values = [values.get(component_name, 0) for values in values_by_bar]
         figure.add_bar(
             name=component_name,
@@ -169,6 +177,7 @@ def _return_alternatives_chart(payload: dict) -> go.Figure:
             y=values,
             text=[f"{value:.3f}" if value else "" for value in values],
             textposition="inside",
+            marker=component_marker(component_name, index),
             hovertemplate=component_name + ": %{y:.3f} kg CO2eq<extra></extra>",
         )
 
@@ -183,19 +192,8 @@ def _return_alternatives_chart(payload: dict) -> go.Figure:
         yaxis_title="kg CO2eq",
         legend_title_text="Calculation components",
         margin={"l": 55, "r": 20, "t": 60, "b": 55},
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        hovermode="closest",
-        uniformtext_minsize=9,
-        uniformtext_mode="hide",
     )
-    figure.update_yaxes(
-        gridcolor="rgba(31, 46, 42, 0.12)",
-        zeroline=True,
-        zerolinecolor="rgba(31, 46, 42, 0.65)",
-        zerolinewidth=2,
-    )
-    return figure
+    return apply_bar_chart_theme(figure)
 
 
 def render_return_alternative_details(payload: dict) -> html.Div:

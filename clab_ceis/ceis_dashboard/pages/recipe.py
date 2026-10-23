@@ -235,10 +235,13 @@ def get_recipe_layout():
                                 step=1,
                                 placeholder="e.g., 2660",
                             ),
-                            html.Button(
-                                "Add Process Type",
-                                id="add-process-type",
-                                n_clicks=0,
+                            html.Div(
+                                html.Button(
+                                    "Add Process Type",
+                                    id="add-process-type",
+                                    n_clicks=0,
+                                ),
+                                className="form-actions",
                             ),
                             html.Div(
                                 id="process-type-status",
@@ -279,10 +282,13 @@ def get_recipe_layout():
                                 step=1,
                                 placeholder="e.g., 4358",
                             ),
-                            html.Button(
-                                "Save Material",
-                                id="add-material",
-                                n_clicks=0,
+                            html.Div(
+                                html.Button(
+                                    "Save Material",
+                                    id="add-material",
+                                    n_clicks=0,
+                                ),
+                                className="form-actions",
                             ),
                             html.Div(
                                 id="material-status",

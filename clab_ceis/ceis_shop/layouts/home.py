@@ -85,8 +85,8 @@ def home_page():
         }
         collection_groups = []
         for title, garment_names in (
-            ("Second collection", SECOND_COLLECTION_NAMES),
-            ("First collection", FIRST_COLLECTION_NAMES),
+            ("Refashion’s first collection", FIRST_COLLECTION_NAMES),
+            ("ongoing collection", SECOND_COLLECTION_NAMES),
         ):
             garments = [
                 garments_by_name[name]
@@ -124,7 +124,7 @@ def home_page():
                                 "Explore circular garments, compare their climate impact, and save with available second-life alternatives.",
                                 className="shop-intro",
                             ),
-                            dcc.Link(
+                            html.A(
                                 "Browse the collection",
                                 href="#collection",
                                 className="primary-link",

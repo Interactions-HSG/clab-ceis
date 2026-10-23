@@ -110,7 +110,7 @@ def get_returned_garment_co2_comparison(
         None,
     )
     if returned_garment is None:
-        raise HTTPException(status_code=404, detail="Returned garment not available")
+        raise HTTPException(status_code=404, detail="Pre-loved garment not available")
 
     preparation_total, preparation_details = calculate_process_emissions(
         wiser_client,

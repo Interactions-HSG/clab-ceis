@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import plotly.graph_objects as go
 from dash import dcc, html
+from pages.chart_theme import apply_bar_chart_theme, component_marker
 
 from ceis_shop.layouts.ui import shop_home_link, shop_topbar
 
@@ -152,9 +153,9 @@ def render_scenario_explorer(options_payload: dict) -> html.Div:
                             dcc.Dropdown(
                                 id="circular-damage",
                                 options=damage_options,
-                                value="small_hole"
+                                value="no_damage"
                                 if any(
-                                    option["value"] == "small_hole"
+                                    option["value"] == "no_damage"
                                     for option in damage_options
                                 )
                                 else damage_options[0]["value"],
@@ -162,28 +163,6 @@ def render_scenario_explorer(options_payload: dict) -> html.Div:
                             ),
                         ],
                         className="field-panel",
-                    ),
-                    html.Div(
-                        [
-                            html.Div("Electricity factor", className="field-label"),
-                            dcc.Checklist(
-                                id="circular-use-higher-electricity-factor",
-                                options=[
-                                    {
-                                        "label": "Use higher electricity emission factor",
-                                        "value": "higher_factor",
-                                    }
-                                ],
-                                value=[],
-                                className="circular-factor-switch",
-                            ),
-                            html.P(
-                                "Uses a higher electricity emissions factor for "
-                                "calculations on this page only.",
-                                className="field-help",
-                            ),
-                        ],
-                        className="field-panel higher-electricity-factor-control",
                     ),
                 ],
                 className="form-grid scenario-controls",
@@ -289,6 +268,18 @@ def _expected_return_saving_card(scenario: dict) -> html.Div:
             className="co2-metric-card",
         )
 
+    avoided_new_garment_co2eq = scenario.get("avoided_new_garment_co2eq")
+    if avoided_new_garment_co2eq is None:
+        reference_components = scenario.get("reference_components", [])
+        avoided_new_garment_co2eq = (
+            sum(
+                float(component.get("co2eq", 0))
+                for component in reference_components
+            )
+            if reference_components
+            else scenario.get("saving_co2eq")
+        )
+
     return html.Div(
         [
             html.Div("Expected CO2 saving", className="co2-metric-title"),
@@ -300,7 +291,7 @@ def _expected_return_saving_card(scenario: dict) -> html.Div:
                 [
                     html.Strong(
                         "Reusing this garment saves "
-                        f"{_format_number(scenario.get('saving_co2eq'))} kg CO2eq "
+                        f"{_format_number(avoided_new_garment_co2eq)} kg CO2eq "
                         "compared with buying a new one."
                     ),
                     html.Span(
@@ -335,7 +326,7 @@ def _component_bar_chart(
 
     labels = [label for label, _ in bars]
     figure = go.Figure()
-    for component_name in component_names:
+    for index, component_name in enumerate(component_names):
         values = [values.get(component_name, 0) for values in values_by_bar]
         figure.add_bar(
             name=component_name,
@@ -343,6 +334,7 @@ def _component_bar_chart(
             y=values,
             text=[f"{value:.3f}" if value else "" for value in values],
             textposition="inside",
+            marker=component_marker(component_name, index),
             hovertemplate=(
                 component_name + ": %{y:.3f} kg CO2eq<extra></extra>"
             ),
@@ -354,20 +346,9 @@ def _component_bar_chart(
         xaxis_title=None,
         yaxis_title="kg CO2eq",
         legend_title_text="Calculation components",
-        margin={"l": 55, "r": 20, "t": 60, "b": 55},
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        hovermode="closest",
-        uniformtext_minsize=9,
-        uniformtext_mode="hide",
+        margin={"l": 55, "r": 20, "t": 70, "b": 55},
     )
-    figure.update_yaxes(
-        gridcolor="rgba(31, 46, 42, 0.12)",
-        zeroline=True,
-        zerolinecolor="rgba(31, 46, 42, 0.65)",
-        zerolinewidth=2,
-    )
-    return figure
+    return apply_bar_chart_theme(figure)
 
 
 def _saved_components(components: list[dict]) -> list[dict]:
@@ -383,13 +364,18 @@ def _saved_components(components: list[dict]) -> list[dict]:
 def render_scenario_results(payload: dict) -> html.Div:
     garment = payload.get("garment", {})
     damage = payload.get("damage", {})
+    patch_material = damage.get("patch_material", {})
     repair = payload.get("repair", {})
     return_scenarios = payload.get("return", {})
     process_names = [
         detail.get("process", "Unknown process")
         for detail in damage.get("processes", [])
     ]
-    process_label = ", ".join(process_names) or "Manual assessment"
+    process_label = ", ".join(process_names) or (
+        "No repair needed"
+        if damage.get("code") == "no_damage"
+        else "Manual assessment"
+    )
     self_repair = repair.get("self_repair", {})
     professional_repair = repair.get("professional_repair", {})
     new_garment = repair.get("new_garment", {})
@@ -407,7 +393,7 @@ def render_scenario_results(payload: dict) -> html.Div:
         ],
     )
     return_figure = _component_bar_chart(
-        "Return alternative: CO2 needed (+) and CO2 saved (-)",
+        "Returning your garment: CO2 needed (+) and CO2 saved (-)",
         [
             (
                 "Expected CO2 saving",
@@ -434,6 +420,16 @@ def render_scenario_results(payload: dict) -> html.Div:
                     html.Span(
                         "Pieces to replace: "
                         f"{damage.get('replacement_block_count', 0)}"
+                    ),
+                    *(
+                        [
+                            html.Span(
+                                "Patch material: "
+                                f"{_format_number(patch_material.get('area_sqm'))} m²"
+                            )
+                        ]
+                        if patch_material.get("area_sqm")
+                        else []
                     ),
                 ],
                 className="scenario-summary panel-muted",
@@ -471,7 +467,7 @@ def render_scenario_results(payload: dict) -> html.Div:
                 className="repair-order-result",
                 role="status",
             ),
-            html.H2("Return alternatives"),
+            html.H2("Return your garment"),
             html.Div(
                 [_expected_return_saving_card(whole_garment)],
                 className="co2-metric-grid return-scenario-grid",
@@ -481,14 +477,16 @@ def render_scenario_results(payload: dict) -> html.Div:
                     "Return garment",
                     id="return-garment-button",
                     n_clicks=0,
+                    className="scenario-primary-button",
                 ),
                 className="scenario-chart-actions",
             ),
             html.Div(
                 html.Button(
-                    "View detailed bar charts",
+                    "View detailed charts",
                     id="toggle-circular-charts",
                     n_clicks=0,
+                    className="scenario-secondary-button",
                 ),
                 className="scenario-chart-actions",
             ),

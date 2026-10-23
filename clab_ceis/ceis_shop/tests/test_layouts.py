@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from unittest.mock import Mock, patch
 
+from dash import html
+
 from ceis_shop.layouts.scenarios import (
     _component_bar_chart,
+    _expected_return_saving_card,
     _saved_components,
     repair_return_page,
     render_scenario_explorer,
@@ -43,7 +46,11 @@ def test_home_page_contains_expected_links():
         layout = home_page()
         text = str(layout)
 
+    browse_link = layout.children[1].children[0].children[3]
+
     assert "Choose clothes with a life beyond the first wear." in text
+    assert isinstance(browse_link, html.A)
+    assert browse_link.href == "#collection"
     assert "The collection" in text
     assert "/garment/1" in text
     assert "/garment/2" in text
@@ -71,7 +78,7 @@ def test_home_page_hides_products_without_pictures():
     assert "Garment Without A Picture" not in text
 
 
-def test_home_page_shows_second_collection_before_first_collection():
+def test_home_page_shows_refashions_first_collection_before_ongoing_collection():
     with patch("ceis_shop.layouts.home.requests.get") as mocked_get:
         mocked_response = Mock()
         mocked_response.json.return_value = [
@@ -85,10 +92,12 @@ def test_home_page_shows_second_collection_before_first_collection():
 
         text = str(home_page())
 
-    assert text.index("Second collection") < text.index("First collection")
-    assert text.index("Basic Trousers") < text.index("Wrap Skirt")
-    assert text.index("Wrap Skirt") < text.index("Mangata Dress")
+    assert text.index("Refashion’s first collection") < text.index(
+        "ongoing collection"
+    )
     assert text.index("Mangata Dress") < text.index("Orka jacket")
+    assert text.index("Orka jacket") < text.index("Basic Trousers")
+    assert text.index("Basic Trousers") < text.index("Wrap Skirt")
 
 
 def test_scenarios_page_contains_scenarios_section():
@@ -121,7 +130,11 @@ def test_scenario_explorer_uses_bought_garment_and_damage_options():
                 {"id": 7, "label": "Basic Crop Top · garment #7"},
             ],
             "damages": [
-                {"code": "small_hole", "label": "Small hole or puncture"},
+                {"code": "no_damage", "label": "No damages"},
+                {
+                    "code": "loose_missing_button",
+                    "label": "Loose/missing button",
+                },
             ],
         }
     )
@@ -135,9 +148,11 @@ def test_scenario_explorer_uses_bought_garment_and_damage_options():
     assert "circular-distance" in text
     assert "value=1000" in text
     assert "circular-damage" in text
-    assert "Small hole or puncture" in text
-    assert "circular-use-higher-electricity-factor" in text
-    assert "Use higher electricity emission factor" in text
+    assert "No damages" in text
+    assert "Loose/missing button" in text
+    assert "value='no_damage'" in text
+    assert "circular-use-higher-electricity-factor" not in text
+    assert "Electricity factor" not in text
     assert "circular-garment-return-result" in text
 
 
@@ -170,6 +185,7 @@ def test_scenario_results_show_alternatives_without_recommendation():
         "total_co2eq": 0.3,
         "saving_co2eq": 1.2,
         "saving_percent": 80.0,
+        "avoided_new_garment_co2eq": 1.5,
         "components": [
             {"name": "Transport", "co2eq": 0.1},
             {"name": "Repair: sewing", "co2eq": 0.2},
@@ -189,6 +205,7 @@ def test_scenario_results_show_alternatives_without_recommendation():
             "damage": {
                 "processes": [{"process": "sewing"}],
                 "replacement_block_count": 1,
+                "patch_material": {"area_sqm": 0.0025, "co2eq": 0.002625},
             },
             "repair": {
                 "self_repair": scenario,
@@ -203,6 +220,7 @@ def test_scenario_results_show_alternatives_without_recommendation():
         }
     )
     text = str(layout)
+    saving_card = _expected_return_saving_card(scenario)
 
     assert "Self-repair" in text
     assert "Professional repair" in text
@@ -213,11 +231,14 @@ def test_scenario_results_show_alternatives_without_recommendation():
     assert "circular-repair-order-result" in text
     assert "Return garment" in text
     assert "return-garment-button" in text
+    assert "scenario-primary-button" in text
     assert "circular-garment-return-result" not in text
     assert "Expected CO2 saving" in text
     assert "1.200 kg CO2eq" in text
+    assert "1.500 kg CO2eq" in text
+    assert saving_card.children[1].children == "1.200 kg CO2eq"
     assert (
-        "Reusing this garment saves 1.200 kg CO2eq compared with buying a new one."
+        "Reusing this garment saves 1.500 kg CO2eq compared with buying a new one."
         in text
     )
     assert "Transport, repair, and preparation add 0.300 kg CO2eq." in text
@@ -225,12 +246,16 @@ def test_scenario_results_show_alternatives_without_recommendation():
     assert "Recover fabric blocks" not in text
     assert text.index("Expected CO2 saving") < text.index("return-garment-button")
     assert "Pieces to replace: 1" in text
-    assert "#7" not in text
-    assert "View detailed bar charts" in text
+    assert "Patch material: 0.003 m²" in text
+    assert "garment #7" not in text
+    assert "View detailed charts" in text
+    assert "scenario-secondary-button" in text
     assert "circular-detailed-charts" in text
     assert "repair-component-chart" in text
     assert "return-component-chart" in text
-    assert "Return alternative: CO2 needed (+) and CO2 saved (-)" in text
+    assert "Return your garment" in text
+    assert "Returning your garment: CO2 needed (+) and CO2 saved (-)" in text
+    assert "Return alternatives" not in text
     assert "Saved: New material" in text
     assert "Calculation components" in text
     assert "80.0%" in text
@@ -265,6 +290,11 @@ def test_component_bar_chart_lists_each_calculation_component():
     assert list(traces["New material"].y) == [0, 1.0]
     assert figure.layout.barmode == "stack"
     assert figure.layout.hovermode == "closest"
+    assert traces["Transport"].marker.color == "#d45d3a"
+    assert traces["Repair: sewing"].marker.color == "#1f6a52"
+    assert traces["New material"].marker.color == "#e3a928"
+    assert figure.layout.bargap == 0.3
+    assert figure.layout.font.color == "#18352d"
     assert "%{x}" not in traces["Transport"].hovertemplate
 
 
@@ -287,6 +317,8 @@ def test_saved_components_are_negative_for_return_saving_chart():
     ]
     assert figure.layout.barmode == "relative"
     assert all(value <= 0 for trace in figure.data for value in trace.y)
+    assert len({trace.marker.color for trace in figure.data}) == len(figure.data)
+    assert all(trace.marker.pattern.shape == "/" for trace in figure.data)
 
 
 def test_garment_page_contains_recipe_and_co2_sections():
@@ -389,7 +421,8 @@ def test_garment_page_shows_available_returned_garment_at_half_price():
     with patch("ceis_shop.layouts.garment.requests.get", side_effect=responses):
         text = str(garment_page(1))
 
-    assert "Give a returned garment its next life" in text
+    assert "Give a pre-loved garment its next life" in text
+    assert "Order pre-loved garment" in text
     assert "50% OFF" in text
     assert "CHF 50.00" in text
     assert "CHF 100.00" in text
@@ -398,7 +431,7 @@ def test_garment_page_shows_available_returned_garment_at_half_price():
     assert "returned-garment-order-button" in text
 
 
-def test_returned_garment_offer_only_shows_first_available_option():
+def test_returned_garment_offer_stores_first_available_garment_without_name_card():
     text = str(
         _render_returned_garment_offer(
             [
@@ -418,10 +451,12 @@ def test_returned_garment_offer_only_shows_first_available_option():
         )
     )
 
-    assert "Second-life Basic Trousers" in text
+    assert "offer-garment-summary" not in text
+    assert "Basic Trousers" not in text
     assert "Basic Trousers backup" not in text
-    assert "value=42" in text
-    assert "value=43" not in text
+    assert "returned-garment-selection" in text
+    assert "data=42" in text
+    assert "returned-garment-dropdown" not in text
 
 
 def test_returned_garment_comparison_explains_zero_fabric_emissions():
